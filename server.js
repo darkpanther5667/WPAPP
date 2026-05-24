@@ -1092,7 +1092,7 @@ async function sendDailyReport() {
   }, 0);
 
   const report =
-    `🌅 *Sharma General Store — Subah ki Report*\n` +
+    `🌅 *${shop.name || 'General Store'} — Subah ki Report*\n` +
     `📅 ${fmtDate(new Date().toISOString())}\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `💰 Aaj ki total sales: *${fmtRs(billsTotal)}*\n` +
@@ -1102,7 +1102,7 @@ async function sendDailyReport() {
     `📊 Total outstanding (sab customers): *${fmtRs(totalOutstanding)}*\n` +
     `👥 Total customers: ${db.customers.length}\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Sharma General Store Bot 🤖_`;
+    `_${shop.name || 'General Store'} Bot 🤖_`;
 
   for (const staff of db.staff) {
     await sendWhatsAppMessage(staff.phone, report);
@@ -1157,7 +1157,7 @@ app.post('/webhook', async (req, res) => {
       const currentLang = getLanguage(staffPhone);
       if (currentLang === 'english') {
         replyText =
-          `🏪 *Sharma Store Bot — Commands*\n` +
+          `🏪 *${shop.name || 'Store'} Bot — Commands*\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
           `👤 *Customer Commands:*\n` +
           `🔹 _Ramesh ka kitna baaki hai_ — Balance check\n` +
@@ -1186,7 +1186,7 @@ app.post('/webhook', async (req, res) => {
           `_Type *help* anytime to see this menu_`;
       } else {
         replyText =
-          `🏪 *शर्मा स्टोर बॉट — कमांड्स*\n` +
+          `🏪 *${shop.name || 'स्टोर'} बॉट — कमांड्स*\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
           `👤 *ग्राहक कमांड्स:*\n` +
           `🔹 _रमेश का कितना बाकी है_ — बैलेंस चेक\n` +
@@ -1245,7 +1245,7 @@ app.post('/webhook', async (req, res) => {
       const unpaidCount = billsToday.filter(b => b.status === 'unpaid').length;
 
       replyText =
-        `📊 *Sharma Store — Aaj ki Report*\n` +
+        `📊 *${shop.name || 'Store'} — Aaj ki Report*\n` +
         `📅 ${fmtDate(timestampIso)}\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `💰 Total sales: *${fmtRs(billsTotal)}*\n` +
@@ -1304,11 +1304,11 @@ app.post('/webhook', async (req, res) => {
         const bal = getCustomerOutstanding(c.id, db.transactions, db.bills);
         if (bal > 0 && c.phone) {
           const reminderMsg =
-            `🙏 *${shop.name || 'Sharma General Store'}*\n\n` +
+            `🙏 *${shop.name || 'General Store'}*\n\n` +
             `Namaste *${c.name}* ji,\n\n` +
             `Aapka ${fmtRs(bal)} ka baaki hai hamare yahan.\n` +
             `Kripya jald hi chukta karein.\n\n` +
-            `Shukriya 🙏\n_${shop.owner || 'Rajesh Sharma'}_`;
+            `Shukriya 🙏\n_${shop.owner || 'Store Owner'}_`;
           await sendWhatsAppMessage(c.phone, reminderMsg);
           sentCount++;
         }
@@ -1485,7 +1485,7 @@ app.post('/webhook', async (req, res) => {
         const latestBill = customerBills[customerBills.length - 1];
         const itemLines = latestBill.items.map((it, i) => `  ${i + 1}. ${it.name} (${it.qty}x ${fmtRs(it.price)})`).join('\n');
         replyText =
-          `📄 *SHARMA GENERAL STORE*\n` +
+          `📄 *${shop.name || 'GENERAL STORE'}*\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
           `🧾 Bill #${latestBill.id}\n` +
           `📅 Date: ${fmtDate(latestBill.created_at)}\n` +
@@ -1507,7 +1507,7 @@ app.post('/webhook', async (req, res) => {
         const pdfUrl = `http://localhost:${PORT}/api/bill/${unpaidBill.id}/pdf`;
         const customer = db.customers.find(c => c.id === customerId);
         if (customer && customer.phone) {
-          await sendWhatsAppDocument(customer.phone, pdfUrl, `invoice-${unpaidBill.id}.pdf`, `🧾 Your invoice from Sharma General Store`);
+          await sendWhatsAppDocument(customer.phone, pdfUrl, `invoice-${unpaidBill.id}.pdf`, `🧾 Your invoice from ${shop.name || 'General Store'}`);
         }
         replyText =
           `📄 *Bill PDF Generated!*\n` +
@@ -1526,7 +1526,7 @@ app.post('/webhook', async (req, res) => {
       const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
       const pdfUrl = `http://localhost:${PORT}/api/customer/${customerId}/statement/pdf`;
       if (customer && customer.phone) {
-        await sendWhatsAppDocument(customer.phone, pdfUrl, `statement-${customer.name.replace(/\s+/g, '_')}.pdf`, `📊 Your account statement from Sharma General Store`);
+        await sendWhatsAppDocument(customer.phone, pdfUrl, `statement-${customer.name.replace(/\s+/g, '_')}.pdf`, `📊 Your account statement from ${shop.name || 'General Store'}`);
       }
       replyText =
         `📊 *Statement PDF Generated!*\n` +
@@ -1598,7 +1598,7 @@ app.post('/api/send-reminders', async (req, res) => {
     const bal = getCustomerOutstanding(c.id, db.transactions, db.bills);
     if (bal > 0 && c.phone) {
       const msg =
-        `🙏 *${db.shop.name || 'Sharma General Store'}*\n\n` +
+        `🙏 *${db.shop.name || 'General Store'}*\n\n` +
         `Namaste *${c.name}* ji,\n\n` +
         `Aapka ${fmtRs(bal)} ka baaki hai hamare yahan.\n` +
         `Kripya jald hi chukta karein.\n\nShukriya 🙏`;
@@ -1629,6 +1629,7 @@ app.get('/api/bill/:id/pdf', async (req, res) => {
   try {
     const db = await readDB();
     const bill = db.bills.find(b => b.id === req.params.id);
+    const shop = db.shop || {};
 
     if (!bill) {
       return res.status(404).json({ status: 'error', message: 'Bill not found' });
@@ -1650,9 +1651,11 @@ app.get('/api/bill/:id/pdf', async (req, res) => {
     doc.pipe(res);
 
     // Header
-    doc.fontSize(20).text('SHARMA GENERAL STORE', { align: 'center' });
-    doc.fontSize(12).text('Main Bazaar, Farrukhabad, Uttar Pradesh', { align: 'center' });
-    doc.text('WhatsApp Contact: +91 9999999999', { align: 'center' });
+    doc.fontSize(20).text(shop.name || 'GENERAL STORE', { align: 'center' });
+    doc.fontSize(12).text(shop.address || '', { align: 'center' });
+    if (shop.phone) {
+      doc.text(`WhatsApp Contact: +91 ${shop.phone}`, { align: 'center' });
+    }
     doc.moveDown(2);
 
     // Invoice details
@@ -1726,6 +1729,7 @@ app.get('/api/customer/:id/statement/pdf', async (req, res) => {
   try {
     const db = await readDB();
     const customer = db.customers.find(c => c.id === req.params.id);
+    const shop = db.shop || {};
 
     if (!customer) {
       return res.status(404).json({ status: 'error', message: 'Customer not found' });
@@ -1746,9 +1750,11 @@ app.get('/api/customer/:id/statement/pdf', async (req, res) => {
     doc.pipe(res);
 
     // Header
-    doc.fontSize(20).text('SHARMA GENERAL STORE', { align: 'center' });
-    doc.fontSize(12).text('Main Bazaar, Farrukhabad, Uttar Pradesh', { align: 'center' });
-    doc.text('WhatsApp Contact: +91 9999999999', { align: 'center' });
+    doc.fontSize(20).text(shop.name || 'GENERAL STORE', { align: 'center' });
+    doc.fontSize(12).text(shop.address || '', { align: 'center' });
+    if (shop.phone) {
+      doc.text(`WhatsApp Contact: +91 ${shop.phone}`, { align: 'center' });
+    }
     doc.moveDown(2);
 
     // Statement title
@@ -1836,6 +1842,7 @@ app.get('/api/report/:date/pdf', async (req, res) => {
   try {
     const targetDate = req.params.date;
     const db = await readDB();
+    const shop = db.shop || {};
 
     const billsToday = db.bills.filter(b => b.created_at.startsWith(targetDate));
     const billsTotal = billsToday.reduce((sum, b) => sum + b.total, 0);
@@ -1856,9 +1863,11 @@ app.get('/api/report/:date/pdf', async (req, res) => {
     doc.pipe(res);
 
     // Header
-    doc.fontSize(20).text('SHARMA GENERAL STORE', { align: 'center' });
-    doc.fontSize(12).text('Main Bazaar, Farrukhabad, Uttar Pradesh', { align: 'center' });
-    doc.text('WhatsApp Contact: +91 9999999999', { align: 'center' });
+    doc.fontSize(20).text(shop.name || 'GENERAL STORE', { align: 'center' });
+    doc.fontSize(12).text(shop.address || '', { align: 'center' });
+    if (shop.phone) {
+      doc.text(`WhatsApp Contact: +91 ${shop.phone}`, { align: 'center' });
+    }
     doc.moveDown(2);
 
     // Report title
@@ -1940,9 +1949,9 @@ app.get('/api/report/:date/pdf', async (req, res) => {
 // Root page
 app.get('/', (req, res) => {
   res.send(`
-    <html><head><title>Sharma Store Bot</title></head>
+    <html><head><title>Store Bot</title></head>
     <body style="font-family:sans-serif;padding:2rem;background:#f5f5f5">
-    <h1>🏪 Sharma Store WhatsApp Bot</h1>
+    <h1>🏪 Store WhatsApp Bot</h1>
     <p>✅ Bot is running on port <strong>${PORT}</strong></p>
     <h3>API Endpoints:</h3>
     <ul>
@@ -1961,7 +1970,7 @@ app.get('/', (req, res) => {
 // ─── START SERVER ──────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
-  console.log(`🚀 Sharma Store Bot running on port ${PORT}`);
+  console.log(`🚀 Store Bot running on port ${PORT}`);
   console.log(`📱 Webhook: POST /webhook`);
   console.log(`🌐 Dashboard API: GET /api/db`);
   // Start daily 9 AM report scheduler
