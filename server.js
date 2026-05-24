@@ -1574,6 +1574,130 @@ app.post('/webhook', async (req, res) => {
   return res.sendStatus(200);
 });
 
+// ─── MOBILE APP API ENDPOINTS ─────────────────────────────────────────────────────
+
+// POST /api/customer/add - Add a new customer
+app.post('/api/customer/add', async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+    if (!name || !phone) {
+      return res.status(400).json({ success: false, message: 'Name and phone are required' });
+    }
+
+    const db = await readDB();
+    
+    // Check if customer already exists
+    const existingCustomer = db.customers.find(c => c.name.toLowerCase() === name.toLowerCase() || c.phone === phone);
+    if (existingCustomer) {
+      return res.status(400).json({ success: false, message: 'Customer already exists' });
+    }
+
+    const newCustomer = {
+      id: genId('c'),
+      name: name.replace(/\b\w/g, c => c.toUpperCase()),
+      phone,
+      created_at: new Date().toISOString().substring(0, 10)
+    };
+
+    db.customers.push(newCustomer);
+    await writeDB(db);
+    // Invalidate cache to ensure AI gets fresh data
+    cachedDB = null;
+    dbCacheTimestamp = 0;
+
+    res.json({ success: true, customer: newCustomer });
+  } catch (error) {
+    console.error('Error adding customer:', error);
+    res.status(500).json({ success: false, message: 'Failed to add customer' });
+  }
+});
+
+// POST /api/payment/add - Record a payment
+app.post('/api/payment/add', async (req, res) => {
+  try {
+    const { customerId, amount, note } = req.body;
+    if (!customerId || !amount) {
+      return res.status(400).json({ success: false, message: 'Customer ID and amount are required' });
+    }
+
+    const db = await readDB();
+    const customer = db.customers.find(c => c.id === customerId);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    const newTxId = genId('t');
+    db.transactions.push({
+      id: newTxId,
+      customer_id: customerId,
+      type: 'payment',
+      amount: Number(amount),
+      note: note || 'Payment recorded via Mobile App',
+      staff_phone: 'mobile_app',
+      timestamp: new Date().toISOString()
+    });
+
+    await writeDB(db);
+    // Invalidate cache to ensure AI gets fresh data
+    cachedDB = null;
+    dbCacheTimestamp = 0;
+
+    const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
+    res.json({ success: true, customerName: customer.name, amount: Number(amount), remainingOutstanding: balance });
+  } catch (error) {
+    console.error('Error adding payment:', error);
+    res.status(500).json({ success: false, message: 'Failed to add payment' });
+  }
+});
+
+// POST /api/bill/create - Create a new bill
+app.post('/api/bill/create', async (req, res) => {
+  try {
+    const { customerId, amount, items } = req.body;
+    if (!customerId || !amount) {
+      return res.status(400).json({ success: false, message: 'Customer ID and amount are required' });
+    }
+
+    const db = await readDB();
+    const customer = db.customers.find(c => c.id === customerId);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    const newBillId = genId('b');
+    const timestampIso = new Date().toISOString();
+
+    const billItems = items && items.length > 0 
+      ? items.map(item => ({
+          name: item.name,
+          qty: item.qty || 1,
+          price: Number(item.price)
+        }))
+      : [{ name: 'General Grocery Item', qty: 1, price: Number(amount) }];
+
+    db.bills.push({
+      id: newBillId,
+      customer_id: customerId,
+      items: billItems,
+      total: Number(amount),
+      status: 'unpaid',
+      created_at: timestampIso,
+      paid_at: null
+    });
+
+    await writeDB(db);
+    // Invalidate cache to ensure AI gets fresh data
+    cachedDB = null;
+    dbCacheTimestamp = 0;
+
+    const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
+    res.json({ success: true, customerName: customer.name, billId: newBillId, amount: Number(amount), netOutstanding: balance });
+  } catch (error) {
+    console.error('Error creating bill:', error);
+    res.status(500).json({ success: false, message: 'Failed to create bill' });
+  }
+});
+
 // ─── REST API ROUTES ───────────────────────────────────────────────────────────
 
 app.get('/api/db', async (req, res) => res.json(await readDB()));
