@@ -35,6 +35,79 @@ let cachedDB = { shop: {}, customers: [], transactions: [], bills: [], staff: []
 let dbCacheTimestamp = 0;
 const DB_CACHE_TTL = 5000; // 5 seconds cache TTL
 
+// Session memory for language preference and conversation context
+const sessionMemory = new Map(); // staffPhone -> { language: 'hindi'|'english', history: [], lastActivity: timestamp }
+const SESSION_TTL = 30 * 60 * 1000; // 30 minutes session TTL
+
+// Helper functions for session management
+function getSession(staffPhone) {
+  const now = Date.now();
+  let session = sessionMemory.get(staffPhone);
+  
+  // Clean up expired sessions
+  if (session && (now - session.lastActivity) > SESSION_TTL) {
+    sessionMemory.delete(staffPhone);
+    session = null;
+  }
+  
+  // Create new session if doesn't exist
+  if (!session) {
+    session = {
+      language: 'hindi', // Default to Hindi
+      history: [],
+      lastActivity: now
+    };
+    sessionMemory.set(staffPhone, session);
+  }
+  
+  session.lastActivity = now;
+  return session;
+}
+
+function setLanguage(staffPhone, language) {
+  const session = getSession(staffPhone);
+  session.language = language.toLowerCase();
+  return session.language;
+}
+
+function getLanguage(staffPhone) {
+  const session = getSession(staffPhone);
+  return session.language;
+}
+
+function addToHistory(staffPhone, message, response) {
+  const session = getSession(staffPhone);
+  session.history.push({ message, response, timestamp: Date.now() });
+  
+  // Keep only last 10 messages to avoid memory bloat
+  if (session.history.length > 10) {
+    session.history = session.history.slice(-10);
+  }
+}
+
+function extractCustomerId(message) {
+  // Extract customer ID from message in various formats
+  const patterns = [
+    /\(?\s*ID:\s*([c_][a-z0-9]+)\s*\)?/i,
+    /customer\s+ID:\s*([c_][a-z0-9]+)/i,
+    /customer\s+([c_][a-z0-9]+)/i,
+    /\b([c_][a-z0-9]{8,})\b/
+  ];
+  
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match) {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+function getConversationContext(staffPhone) {
+  const session = getSession(staffPhone);
+  return session.history.slice(-5); // Return last 5 messages for context
+}
+
 async function readDB() {
   const now = Date.now();
   if (cachedDB && (now - dbCacheTimestamp) < DB_CACHE_TTL) {
@@ -372,6 +445,16 @@ function parseCommand(message, customers, transactions, bills) {
     return { type: 'help' };
   }
 
+  // ── LANGUAGE SWITCHING ─────────────────────────────────────────────────────────
+  if (text.includes('language') || text.includes('bhasha') || text.includes('lang')) {
+    if (text.includes('english') || text.includes('angrezi')) {
+      return { type: 'set_language', language: 'english' };
+    }
+    if (text.includes('hindi') || text.includes('hinglish')) {
+      return { type: 'set_language', language: 'hindi' };
+    }
+  }
+
   // ── TODAY'S SALE REPORT ───────────────────────────────────────────────────────
   if (
     (text.includes('aaj') && (text.includes('sale') || text.includes('bikri') || text.includes('collect') || text.includes('kamai'))) ||
@@ -416,6 +499,35 @@ function parseCommand(message, customers, transactions, bills) {
   }
 
   // ── LOOK UP CUSTOMER FOR REMAINING COMMANDS ───────────────────────────────────
+  // Check for explicit customer ID format: (ID: c_xxxxx) or ID: c_xxxxx
+  const explicitIdMatch = text.match(/\(?\s*ID:\s*([c_][a-z0-9]+)\s*\)?/i);
+  if (explicitIdMatch) {
+    const customer = customers.find(c => c.id === explicitIdMatch[1]);
+    if (customer) {
+      const custName = customer.name;
+      const custId = customer.id;
+      
+      // Now check what action they want with this customer
+      if (text.includes('bill pdf') || text.includes('pdf bill') || text.includes('invoice pdf')) {
+        return { type: 'send_bill_pdf', customerId: custId, customerName: custName };
+      }
+      if (text.includes('statement pdf') || text.includes('hisab pdf') || text.includes('statement bhej')) {
+        return { type: 'send_statement_pdf', customerId: custId, customerName: custName };
+      }
+      if (text.includes('statement') || text.includes('hisab') || text.includes('ledger')) {
+        return { type: 'query_balance', customerId: custId, customerName: custName };
+      }
+      if (text.includes('bill') || text.includes('invoice')) {
+        return { type: 'send_bill', customerId: custId, customerName: custName };
+      }
+      if (text.includes('kitna baaki') || text.includes('outstanding') || text.includes('balance')) {
+        return { type: 'query_balance', customerId: custId, customerName: custName };
+      }
+      // If just ID provided, return unknown so AI can handle it
+      return { type: 'unknown' };
+    }
+  }
+
   const customer = findCustomer(text, customers);
   if (!customer) return { type: 'unknown' };
 
@@ -559,6 +671,9 @@ async function askGeminiWithTools(messageText, staffPhone) {
   }
 
   const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const language = getLanguage(staffPhone);
+  const conversationContext = getConversationContext(staffPhone);
+  
   try {
     const db = await readDB();
     const shopInfo = db.shop || {};
@@ -568,7 +683,7 @@ async function askGeminiWithTools(messageText, staffPhone) {
       functionDeclarations: [
         {
           name: 'addCustomerTool',
-          description: 'Registers a new customer in the database with their name and phone number.',
+          description: 'Registers a new customer in the database with their name and phone number. Returns success:true with customer object if successful, or error if customer already exists.',
           parameters: {
             type: 'OBJECT',
             properties: {
@@ -702,22 +817,55 @@ async function askGeminiWithTools(messageText, staffPhone) {
       tools: tools
     });
 
+    // Build language-specific system instruction
+    const languageInstruction = language === 'english' 
+      ? `You must respond in English only. Do not use Hindi or Hinglish.`
+      : `You must respond in Hindi or Hinglish only. Do not use English. Use natural conversational Hindi that a shopkeeper would use.`;
+
     const systemInstruction = `
 You are the AI assistant for ${shopInfo.name || 'Sharma General Store'} owned by ${shopInfo.owner || 'Rajesh Sharma'} located at ${shopInfo.address || 'Main Bazaar, Farrukhabad'}.
 You process incoming messages from store staff and perform operations on the database using the tools available.
 
-Rules:
-1. Always start by fetching the list of customers using 'getCustomersListTool' if you need to map names to customer IDs. If the user mentions customer names (e.g. "ramesh", "suresh"), you MUST match them to the registered customer ID from the list.
+${languageInstruction}
+
+CRITICAL RULES TO PREVENT HALLUCINATION:
+1. ALWAYS start by fetching the list of customers using 'getCustomersListTool' if you need to map names to customer IDs. If the user mentions customer names (e.g. "ramesh", "suresh"), you MUST match them to the registered customer ID from the list.
 2. If a customer is mentioned but is NOT in the list, tell the user that the customer is not registered, and politely instruct them to register the customer first using the format 'naya customer <naam> <phone>'. Do NOT call any other tool for that customer.
-3. If money/rupees are mentioned, pass them to tools as integers/numbers.
-4. Execute tools when needed to resolve the user's intent. You can make multiple tool calls in a single turn (e.g., adding a customer and then recording their payment).
-5. After receiving the output of a tool, summarize the result in a polite conversational message in Hindi/Hinglish to send back to the user. Make sure to use emojis, clear formatting, and standard Indian currency style (e.g., ₹1,000).
-6. If the request is a general question (greeting, shop details, or balance questions), call the appropriate query tool ('getShopDetailsTool', 'getCustomerBalancesTool', etc.) to fetch accurate info before answering.
+3. NEVER make up customer IDs, names, or data. Only use data returned from tools. If addCustomerTool returns success, use the EXACT customer ID it returns. Do not invent your own.
+4. If money/rupees are mentioned, pass them to tools as integers/numbers.
+5. Execute tools when needed to resolve the user's intent. You can make multiple tool calls in a single turn (e.g., adding a customer and then recording their payment).
+6. After receiving the output of a tool, summarize the result in a polite conversational message to send back to the user. Make sure to use emojis, clear formatting, and standard Indian currency style (e.g., ₹1,000).
+7. If the request is a general question (greeting, shop details, or balance questions), call the appropriate query tool ('getShopDetailsTool', 'getCustomerBalancesTool', etc.) to fetch accurate info before answering.
+8. If a tool returns an error, communicate the exact error message to the user. Do not make up success messages.
+9. Keep responses concise and relevant. Do not add unnecessary information.
+10. PAY ATTENTION to conversation context. If the user previously provided a customer ID or name, remember it and use it. Don't ask for it again.
+11. If user provides a customer ID in format "(ID: c_xxxxx)" or "ID: c_xxxxx", use that exact ID for operations.
 `;
 
-    // Initialize messages list
+    // Build conversation context string
+    let contextString = '';
+    let lastCustomerId = null;
+    
+    if (conversationContext.length > 0) {
+      contextString = '\n\nRecent conversation context:\n';
+      conversationContext.forEach((ctx, idx) => {
+        contextString += `${idx + 1}. User: "${ctx.message}"\n   Assistant: "${ctx.response.substring(0, 100)}..."\n`;
+        
+        // Extract customer ID from recent messages
+        const extractedId = extractCustomerId(ctx.message);
+        if (extractedId) {
+          lastCustomerId = extractedId;
+        }
+      });
+      
+      if (lastCustomerId) {
+        contextString += `\n⚠️ IMPORTANT: User recently mentioned customer ID: ${lastCustomerId}. Use this ID if they ask for operations without specifying customer again.`;
+      }
+    }
+
+    // Initialize messages list with context
     const sessionMessages = [
-      { role: 'user', parts: [{ text: `System instruction: ${systemInstruction}\n\nUser Message: "${messageText}"` }] }
+      { role: 'user', parts: [{ text: `System instruction: ${systemInstruction}${contextString}\n\nCurrent User Message: "${messageText}"` }] }
     ];
 
     let response = await model.generateContent({ contents: sessionMessages });
@@ -753,16 +901,29 @@ Rules:
       response = await model.generateContent({ contents: sessionMessages });
     }
 
-    return response.response.text().trim();
+    const finalResponse = response.response.text().trim();
+    
+    // Add to conversation history
+    addToHistory(staffPhone, messageText, finalResponse);
+    
+    return finalResponse;
   } catch (error) {
     console.error('❌ Gemini API error:', error.message || error);
+    const errorMsg = language === 'english'
+      ? `❌ Technical error occurred. Please try again or contact admin. 🙏`
+      : `❌ कुछ तकनीकल समस्या हुई। कृपया दोबारा कोशिश करें या एडमिन को बताएं। 🙏`;
+    
     if (error.status === 429) {
-      return `⏳ Bot thoda busy hai abhi. Ek-do minute mein dobara try karein. 🙏`;
+      return language === 'english'
+        ? `⏳ Bot is busy right now. Please try again in a minute. 🙏`
+        : `⏳ बॉट अभी व्यस्त है। एक मिनट बाद दोबारा कोशिश करें। 🙏`;
     }
     if (error.status === 503 || error.message?.includes('network')) {
-      return `📶 Network error aa gaya. Thodi der baad try karein.`;
+      return language === 'english'
+        ? `📶 Network error. Please try again later.`
+        : `📶 नेटवर्क एरर। कृपया बाद में कोशिश करें।`;
     }
-    return `❌ Kuch technical problem hui. Admin ko batayein. 🙏`;
+    return errorMsg;
   }
 }
 
@@ -930,32 +1091,86 @@ app.post('/webhook', async (req, res) => {
 
     // ── HELP ────────────────────────────────────────────────────────────────────
     if (action.type === 'help') {
-      replyText =
-        `🏪 *Sharma Store Bot — Commands*\n` +
-        `━━━━━━━━━━━━━━━━━━━━\n` +
-        `👤 *Customer Commands:*\n` +
-        `🔹 _Ramesh ka kitna baaki hai_ — Balance check\n` +
-        `🔹 _Ramesh ne 200 diya_ — Record payment\n` +
-        `🔹 _Ramesh ka khata mein 100 daal do_ — Add credit\n` +
-        `🔹 _Ramesh ka 500 ka bill banao_ — Create bill\n` +
-        `🔹 _Ramesh ka soap 30 add karo_ — Add item to bill\n` +
-        `🔹 _Ramesh ka bill bhej do_ — Send bill summary\n` +
-        `🔹 _Ramesh ka bill pdf_ — Send bill PDF to customer\n` +
-        `🔹 _Ramesh ka statement pdf_ — Send account statement PDF\n` +
-        `🔹 _Ramesh ka bill mark paid_ — Mark bill as paid\n` +
-        `━━━━━━━━━━━━━━━━━━━━\n` +
-        `📊 *Store Commands:*\n` +
-        `🔹 _Aaj ki sale kitni thi_ — Today's sales\n` +
-        `🔹 _Sab ka hisab batao_ — All outstanding balances\n` +
-        `🔹 _Reminder bhejo_ — Send payment reminders\n` +
-        `🔹 _Naya customer Rahul 9876543210_ — Add customer\n` +
-        `━━━━━━━━━━━━━━━━━━━━\n` +
-        `📄 *PDF Features:*\n` +
-        `🔹 _Bill PDF_ — Generate and send invoice PDF\n` +
-        `🔹 _Statement PDF_ — Generate customer account statement\n` +
-        `🔹 _Daily Report PDF_ — Generate daily sales report\n` +
-        `━━━━━━━━━━━━━━━━━━━━\n` +
-        `_Type *help* anytime to see this menu_`;
+      const currentLang = getLanguage(staffPhone);
+      if (currentLang === 'english') {
+        replyText =
+          `🏪 *Sharma Store Bot — Commands*\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `👤 *Customer Commands:*\n` +
+          `🔹 _Ramesh ka kitna baaki hai_ — Balance check\n` +
+          `🔹 _Ramesh ne 200 diya_ — Record payment\n` +
+          `🔹 _Ramesh ka khata mein 100 daal do_ — Add credit\n` +
+          `🔹 _Ramesh ka 500 ka bill banao_ — Create bill\n` +
+          `🔹 _Ramesh ka soap 30 add karo_ — Add item to bill\n` +
+          `🔹 _Ramesh ka bill bhej do_ — Send bill summary\n` +
+          `🔹 _Ramesh ka bill pdf_ — Send bill PDF to customer\n` +
+          `🔹 _Ramesh ka statement pdf_ — Send account statement PDF\n` +
+          `🔹 _Ramesh ka bill mark paid_ — Mark bill as paid\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `📊 *Store Commands:*\n` +
+          `🔹 _Aaj ki sale kitni thi_ — Today's sales\n` +
+          `🔹 _Sab ka hisab batao_ — All outstanding balances\n` +
+          `🔹 _Reminder bhejo_ — Send payment reminders\n` +
+          `🔹 _Naya customer Rahul 9876543210_ — Add customer\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `📄 *PDF Features:*\n` +
+          `🔹 _Bill PDF_ — Generate and send invoice PDF\n` +
+          `🔹 _Statement PDF_ — Generate customer account statement\n` +
+          `🔹 _Daily Report PDF_ — Generate daily sales report\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `🌐 *Language: English* — Type "language hindi" to switch\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `_Type *help* anytime to see this menu_`;
+      } else {
+        replyText =
+          `🏪 *शर्मा स्टोर बॉट — कमांड्स*\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `👤 *ग्राहक कमांड्स:*\n` +
+          `🔹 _रमेश का कितना बाकी है_ — बैलेंस चेक\n` +
+          `🔹 _रमेश ने 200 दिया_ — पेमेंट रिकॉर्ड करें\n` +
+          `🔹 _रमेश का खाते में 100 डाल दो_ — क्रेडिट जोड़ें\n` +
+          `🔹 _रमेश का 500 का बिल बनाओ_ — बिल बनाएं\n` +
+          `🔹 _रमेश का साबुन 30 ऐड करो_ — आइटम ऐड करें\n` +
+          `🔹 _रमेश का बिल भेज दो_ — बिल सारांश भेजें\n` +
+          `🔹 _रमेश का बिल पीडीएफ_ — बिल पीडीएफ भेजें\n` +
+          `🔹 _रमेश का स्टेटमेंट पीडीएफ_ — खाता स्टेटमेंट भेजें\n` +
+          `🔹 _रमेश का बिल मार्क पेड_ — बिल पेड मार्क करें\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `📊 *स्टोर कमांड्स:*\n` +
+          `🔹 _आज की सेल कितनी थी_ — आज की बिक्री\n` +
+          `🔹 _सब का हिसाब बताओ_ — सभी बाकी बैलेंस\n` +
+          `🔹 _रिमाइंडर भेजो_ — पेमेंट रिमाइंडर भेजें\n` +
+          `🔹 _नया ग्राहक राहुल 9876543210_ — ग्राहक जोड़ें\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `📄 *पीडीएफ फीचर्स:*\n` +
+          `🔹 _बिल पीडीएफ_ — इनवॉइस पीडीएफ बनाएं\n` +
+          `🔹 _स्टेटमेंट पीडीएफ_ — खाता स्टेटमेंट बनाएं\n` +
+          `🔹 _डेली रिपोर्ट पीडीएफ_ — डेली सेल्स रिपोर्ट बनाएं\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `🌐 *भाषा: हिंदी* — "language english" टाइप करें बदलने के लिए\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `_कभी भी *help* टाइप करें मेनू देखने के लिए_`;
+      }
+
+    // ── SET LANGUAGE ─────────────────────────────────────────────────────────────
+    } else if (action.type === 'set_language') {
+      const { language } = action;
+      setLanguage(staffPhone, language);
+      if (language === 'english') {
+        replyText =
+          `🌐 *Language Changed to English*\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `✅ Bot will now respond in English.\n` +
+          `Type "language hindi" to switch back to Hindi.\n` +
+          `━━━━━━━━━━━━━━━━━━━━`;
+      } else {
+        replyText =
+          `🌐 *भाषा हिंदी में बदल दी गई*\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `✅ बॉट अब हिंदी में जवाब देगा।\n` +
+          `अंग्रेजी में बदलने के लिए "language english" टाइप करें।\n` +
+          `━━━━━━━━━━━━━━━━━━━━`;
+      }
 
     // ── TODAY'S SALE ─────────────────────────────────────────────────────────────
     } else if (action.type === 'today_sale') {
