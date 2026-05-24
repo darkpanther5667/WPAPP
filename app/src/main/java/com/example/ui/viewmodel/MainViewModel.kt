@@ -37,9 +37,8 @@ class MainViewModel : ViewModel() {
     private val _operationState = MutableStateFlow<OperationState>(OperationState.Idle)
     val operationState: StateFlow<OperationState> = _operationState.asStateFlow()
 
-    init {
-        fetchData()
-    }
+    // Don't fetch data automatically on init to prevent crashes
+    // init { fetchData() }
 
     fun fetchData() {
         _dbState.value = UiState.Loading

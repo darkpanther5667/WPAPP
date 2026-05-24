@@ -30,6 +30,11 @@ import java.util.*
 fun DashboardScreen(viewModel: MainViewModel, onNavigateToCustomers: () -> Unit) {
     val reportState by viewModel.reportState.collectAsState()
 
+    // Fetch data when screen loads
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.fetchData()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
