@@ -1,7 +1,10 @@
 const { MongoClient } = require('mongodb');
 
-// Bypass SRV record due to local DNS block by using explicit direct replica set string
-const MONGODB_URI = "mongodb://clashhmrri_db_user:KyDmI2m0Y50E3czc@ac-gesi8dm-shard-00-00.cmciyqa.mongodb.net:27017,ac-gesi8dm-shard-00-01.cmciyqa.mongodb.net:27017,ac-gesi8dm-shard-00-02.cmciyqa.mongodb.net:27017/?ssl=true&replicaSet=atlas-3ui4o6-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Cluster0";
+// MongoDB connection string must be supplied via environment variable to avoid committing secrets.
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  console.warn('⚠️ MONGODB_URI not set. Set it in .env or environment variables.');
+}
 
 let client;
 let db;
