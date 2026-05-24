@@ -3,14 +3,17 @@ const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
 const PDFDocument = require('pdfkit');
 
-// Initialize Gemini API
-const apiKey = process.env.GEMINI_API_KEY;
-let genAI = null;
-if (apiKey && apiKey !== 'MY_GEMINI_API_KEY') {
-  genAI = new GoogleGenerativeAI(apiKey);
+// Initialize OpenRouter API
+const openrouterApiKey = process.env.OPENROUTER_API_KEY;
+let openai = null;
+if (openrouterApiKey && openrouterApiKey !== 'YOUR_OPENROUTER_API_KEY') {
+  openai = new OpenAI({
+    apiKey: openrouterApiKey,
+    baseURL: 'https://openrouter.ai/api/v1'
+  });
 }
 
 const app = express();
@@ -615,9 +618,9 @@ function parseCommand(message, customers, transactions, bills) {
   return { type: 'unknown' };
 }
 
-// ─── GEMINI AI FUNCTION CALLING (TOOL USE) ────────────────────────────────────
+// ─── OPENROUTER AI FUNCTION CALLING (TOOL USE) ────────────────────────────────────
 
-// Map Gemini function calls to local JS functions
+// Map OpenRouter function calls to local JS functions
 async function executeTool(name, args, staffPhone) {
   console.log(`🛠️ Executing AI Tool: "${name}" with args:`, args);
   try {
@@ -657,20 +660,23 @@ async function executeTool(name, args, staffPhone) {
   }
 }
 
-async function askGeminiWithTools(messageText, staffPhone) {
-  if (!genAI) {
-    const currentApiKey = process.env.GEMINI_API_KEY;
-    if (currentApiKey && currentApiKey !== 'MY_GEMINI_API_KEY') {
-      genAI = new GoogleGenerativeAI(currentApiKey);
+async function askOpenRouterWithTools(messageText, staffPhone) {
+  if (!openai) {
+    const currentApiKey = process.env.OPENROUTER_API_KEY;
+    if (currentApiKey && currentApiKey !== 'YOUR_OPENROUTER_API_KEY') {
+      openai = new OpenAI({
+        apiKey: currentApiKey,
+        baseURL: 'https://openrouter.ai/api/v1'
+      });
     }
   }
 
-  if (!genAI) {
-    console.warn('⚠️ Gemini AI is not configured. GEMINI_API_KEY is missing.');
-    return '⚠️ Gemini AI API key missing. Please configure it in your .env file.';
+  if (!openai) {
+    console.warn('⚠️ OpenRouter AI is not configured. OPENROUTER_API_KEY is missing.');
+    return '⚠️ OpenRouter API key missing. Please configure it in your .env file.';
   }
 
-  const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const modelName = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
   const language = getLanguage(staffPhone);
   const conversationContext = getConversationContext(staffPhone);
   
@@ -678,144 +684,176 @@ async function askGeminiWithTools(messageText, staffPhone) {
     const db = await readDB();
     const shopInfo = db.shop || {};
     
-    // Declare the database tools for Gemini
-    const tools = [{
-      functionDeclarations: [
-        {
+    // Declare the database tools for OpenRouter (OpenAI format)
+    const tools = [
+      {
+        type: 'function',
+        function: {
           name: 'addCustomerTool',
           description: 'Registers a new customer in the database with their name and phone number. Returns success:true with customer object if successful, or error if customer already exists.',
           parameters: {
-            type: 'OBJECT',
+            type: 'object',
             properties: {
-              name: { type: 'STRING', description: 'The customer\'s full name, e.g. "Rahul Singh".' },
-              phone: { type: 'STRING', description: 'The customer\'s 10-digit phone number, e.g. "9876543210".' }
+              name: { type: 'string', description: 'The customer\'s full name, e.g. "Rahul Singh".' },
+              phone: { type: 'string', description: 'The customer\'s 10-digit phone number, e.g. "9876543210".' }
             },
             required: ['name', 'phone']
           }
-        },
-        {
+        }
+      },
+      {
+        type: 'function',
+        function: {
           name: 'recordPaymentTool',
           description: 'Records a payment (jama/diya/cash received) from an existing customer to reduce their outstanding balance.',
           parameters: {
-            type: 'OBJECT',
+            type: 'object',
             properties: {
-              customerId: { type: 'STRING', description: 'The customer ID, e.g. "c1".' },
-              amount: { type: 'NUMBER', description: 'The payment amount in Rupees, e.g. 500.' },
-              note: { type: 'STRING', description: 'Optional description of the payment, e.g. "Cash token payment".' }
+              customerId: { type: 'string', description: 'The customer ID, e.g. "c1".' },
+              amount: { type: 'number', description: 'The payment amount in Rupees, e.g. 500.' },
+              note: { type: 'string', description: 'Optional description of the payment, e.g. "Cash token payment".' }
             },
             required: ['customerId', 'amount']
           }
-        },
-        {
+        }
+      },
+      {
+        type: 'function',
+        function: {
           name: 'addCreditTool',
           description: 'Adds outstanding credit (udhaar/khata/item taken on credit) to an existing customer.',
           parameters: {
-            type: 'OBJECT',
+            type: 'object',
             properties: {
-              customerId: { type: 'STRING', description: 'The customer ID, e.g. "c1".' },
-              amount: { type: 'NUMBER', description: 'The credit amount in Rupees, e.g. 150.' },
-              note: { type: 'STRING', description: 'Optional description of the credit, e.g. "Refined oil 2L".' }
+              customerId: { type: 'string', description: 'The customer ID, e.g. "c1".' },
+              amount: { type: 'number', description: 'The credit amount in Rupees, e.g. 150.' },
+              note: { type: 'string', description: 'Optional description of the credit, e.g. "Refined oil 2L".' }
             },
             required: ['customerId', 'amount']
           }
-        },
-        {
+        }
+      },
+      {
+        type: 'function',
+        function: {
           name: 'addItemToUnpaidBillTool',
           description: 'Adds an item (along with price and optional quantity) to a customer\'s active unpaid bill. Creates a new unpaid bill if none exists.',
           parameters: {
-            type: 'OBJECT',
+            type: 'object',
             properties: {
-              customerId: { type: 'STRING', description: 'The customer ID, e.g. "c1".' },
-              itemName: { type: 'STRING', description: 'The name of the item, e.g. "Sugar".' },
-              price: { type: 'NUMBER', description: 'The price per unit in Rupees, e.g. 50.' },
-              qty: { type: 'NUMBER', description: 'The quantity of items, defaults to 1.' }
+              customerId: { type: 'string', description: 'The customer ID, e.g. "c1".' },
+              itemName: { type: 'string', description: 'The name of the item, e.g. "Sugar".' },
+              price: { type: 'number', description: 'The price per unit in Rupees, e.g. 50.' },
+              qty: { type: 'number', description: 'The quantity of items, defaults to 1.' }
             },
             required: ['customerId', 'itemName', 'price']
           }
-        },
-        {
+        }
+      },
+      {
+        type: 'function',
+        function: {
           name: 'generateBillTool',
           description: 'Generates a simple fixed-amount unpaid bill for a customer.',
           parameters: {
-            type: 'OBJECT',
+            type: 'object',
             properties: {
-              customerId: { type: 'STRING', description: 'The customer ID, e.g. "c1".' },
-              amount: { type: 'NUMBER', description: 'The total bill amount in Rupees, e.g. 1000.' }
+              customerId: { type: 'string', description: 'The customer ID, e.g. "c1".' },
+              amount: { type: 'number', description: 'The total bill amount in Rupees, e.g. 1000.' }
             },
             required: ['customerId', 'amount']
           }
-        },
-        {
+        }
+      },
+      {
+        type: 'function',
+        function: {
           name: 'markBillAsPaidTool',
           description: 'Marks the customer\'s active unpaid bill as paid.',
           parameters: {
-            type: 'OBJECT',
+            type: 'object',
             properties: {
-              customerId: { type: 'STRING', description: 'The customer ID, e.g. "c1".' }
+              customerId: { type: 'string', description: 'The customer ID, e.g. "c1".' }
             },
             required: ['customerId']
           }
-        },
-        {
+        }
+      },
+      {
+        type: 'function',
+        function: {
           name: 'getCustomerBalancesTool',
           description: 'Retrieves outstanding balances for all registered customers.',
-          parameters: { type: 'OBJECT', properties: {} }
-        },
-        {
+          parameters: { type: 'object', properties: {} }
+        }
+      },
+      {
+        type: 'function',
+        function: {
           name: 'getTodaySalesReportTool',
           description: 'Retrieves today\'s sales report including total sales, total collections, and count of bills.',
-          parameters: { type: 'OBJECT', properties: {} }
-        },
-        {
+          parameters: { type: 'object', properties: {} }
+        }
+      },
+      {
+        type: 'function',
+        function: {
           name: 'getShopDetailsTool',
           description: 'Retrieves metadata about the shop, such as shop name, owner, and address.',
-          parameters: { type: 'OBJECT', properties: {} }
-        },
-        {
+          parameters: { type: 'object', properties: {} }
+        }
+      },
+      {
+        type: 'function',
+        function: {
           name: 'getCustomersListTool',
           description: 'Retrieves a list of all registered customers with their IDs, names, and phone numbers.',
-          parameters: { type: 'OBJECT', properties: {} }
-        },
-        {
+          parameters: { type: 'object', properties: {} }
+        }
+      },
+      {
+        type: 'function',
+        function: {
           name: 'getBillPdfTool',
           description: 'Generates a PDF invoice for a customer and returns the download URL. Finds the latest unpaid bill or creates a simple one if none exists.',
           parameters: {
-            type: 'OBJECT',
+            type: 'object',
             properties: {
-              customerId: { type: 'STRING', description: 'The customer ID, e.g. "c1".' }
+              customerId: { type: 'string', description: 'The customer ID, e.g. "c1".' }
             },
             required: ['customerId']
           }
-        },
-        {
+        }
+      },
+      {
+        type: 'function',
+        function: {
           name: 'getCustomerStatementPdfTool',
           description: 'Generates a PDF statement for a customer showing all their transactions, bills, and current balance.',
           parameters: {
-            type: 'OBJECT',
+            type: 'object',
             properties: {
-              customerId: { type: 'STRING', description: 'The customer ID, e.g. "c1".' }
+              customerId: { type: 'string', description: 'The customer ID, e.g. "c1".' }
             },
             required: ['customerId']
           }
-        },
-        {
+        }
+      },
+      {
+        type: 'function',
+        function: {
           name: 'getDailyReportPdfTool',
           description: 'Generates a PDF daily report showing sales, collections, credits, and bill counts for a specific date.',
           parameters: {
-            type: 'OBJECT',
+            type: 'object',
             properties: {
-              date: { type: 'STRING', description: 'The date in YYYY-MM-DD format. If not provided, uses today\'s date.' }
+              date: { type: 'string', description: 'The date in YYYY-MM-DD format. If not provided, uses today\'s date.' }
             },
             required: []
           }
         }
-      ]
-    }];
-
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      tools: tools
-    });
+      }
+    ];
 
     // Build language-specific system instruction
     const languageInstruction = language === 'english' 
@@ -864,51 +902,58 @@ CRITICAL RULES TO PREVENT HALLUCINATION:
     }
 
     // Initialize messages list with context
-    const sessionMessages = [
-      { role: 'user', parts: [{ text: `System instruction: ${systemInstruction}${contextString}\n\nCurrent User Message: "${messageText}"` }] }
+    const messages = [
+      { role: 'system', content: `${systemInstruction}${contextString}` },
+      { role: 'user', content: messageText }
     ];
 
-    let response = await model.generateContent({ contents: sessionMessages });
+    let response = await openai.chat.completions.create({
+      model: modelName,
+      messages: messages,
+      tools: tools,
+      tool_choice: 'auto'
+    });
 
     // Loop for handling tool calls
     let loopCount = 0;
     while (loopCount < 5) {
-      const fCalls = response.response.functionCalls();
-      if (!fCalls || fCalls.length === 0) break;
+      const toolCalls = response.choices[0].message.tool_calls;
+      if (!toolCalls || toolCalls.length === 0) break;
 
       loopCount++;
-      const toolResults = [];
-
-      for (const call of fCalls) {
-        const toolResult = await executeTool(call.name, call.args, staffPhone);
-        console.log(`   ↳ ${call.name} result:`, toolResult);
-        toolResults.push({
-          functionResponse: {
-            name: call.name,
-            response: toolResult
-          }
+      
+      // Add assistant's tool call message
+      messages.push(response.choices[0].message);
+      
+      // Execute tools and get results
+      for (const toolCall of toolCalls) {
+        const toolResult = await executeTool(toolCall.function.name, JSON.parse(toolCall.function.arguments), staffPhone);
+        console.log(`   ↳ ${toolCall.function.name} result:`, toolResult);
+        
+        messages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(toolResult)
         });
       }
 
-      // Add assistant's tool call message and our function responses
-      sessionMessages.push(response.response.candidates[0].content);
-      sessionMessages.push({
-        role: 'function',
-        parts: toolResults
+      // Get next response from OpenRouter
+      response = await openai.chat.completions.create({
+        model: modelName,
+        messages: messages,
+        tools: tools,
+        tool_choice: 'auto'
       });
-
-      // Get next response from Gemini
-      response = await model.generateContent({ contents: sessionMessages });
     }
 
-    const finalResponse = response.response.text().trim();
+    const finalResponse = response.choices[0].message.content.trim();
     
     // Add to conversation history
     addToHistory(staffPhone, messageText, finalResponse);
     
     return finalResponse;
   } catch (error) {
-    console.error('❌ Gemini API error:', error.message || error);
+    console.error('❌ OpenRouter API error:', error.message || error);
     const errorMsg = language === 'english'
       ? `❌ Technical error occurred. Please try again or contact admin. 🙏`
       : `❌ कुछ तकनीकल समस्या हुई। कृपया दोबारा कोशिश करें या एडमिन को बताएं। 🙏`;
@@ -1481,8 +1526,8 @@ app.post('/webhook', async (req, res) => {
       }
     // ── UNKNOWN → AI AGENT WITH TOOL USE ─────────────────────────────────────
     } else {
-      console.log(`🤖 Regex did not match. Forwarding to Gemini AI Agent: "${bodyText}"`);
-      replyText = await askGeminiWithTools(bodyText, staffPhone);
+      console.log(`🤖 Regex did not match. Forwarding to OpenRouter AI Agent: "${bodyText}"`);
+      replyText = await askOpenRouterWithTools(bodyText, staffPhone);
       console.log(`🤖 AI Agent reply: "${replyText}"`);
     }
 
