@@ -1,0 +1,6 @@
+{
+  "name": "Sharma Khata & Billing",
+  "description": "Shop Billing & Khata Management with WhatsApp Bot",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

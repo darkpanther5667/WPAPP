@@ -1,0 +1,1118 @@
+require('dotenv').config();
+const express = require('express');
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+// Initialize Gemini API
+const apiKey = process.env.GEMINI_API_KEY;
+let genAI = null;
+if (apiKey && apiKey !== 'MY_GEMINI_API_KEY') {
+  genAI = new GoogleGenerativeAI(apiKey);
+}
+
+const app = express();
+app.use(express.json());
+
+// Allow the local dashboard (file:// origin) to call the API
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
+const PORT = process.env.PORT || 3000;
+const DB_FILE = path.join(__dirname, 'db.json');
+
+// ─── DATABASE HELPERS (MONGODB) ────────────────────────────────────────────────
+const { connectDB, getFullDB } = require('./db.js');
+
+let cachedDB = { shop: {}, customers: [], transactions: [], bills: [], staff: [] };
+
+async function readDB() {
+  try {
+    cachedDB = await getFullDB();
+    return cachedDB;
+  } catch (error) {
+    console.error('Error reading from MongoDB:', error);
+    return cachedDB;
+  }
+}
+
+// Write lock to prevent concurrent DB corruption
+let dbWriteLock = false;
+async function writeDB(data) {
+  if (dbWriteLock) {
+    // Wait 50ms and retry
+    await new Promise(r => setTimeout(r, 50));
+    return await writeDB(data);
+  }
+  dbWriteLock = true;
+  try {
+    const database = await connectDB();
+    // Overwrite collections (mimics the db.json full overwrite behavior for backwards compatibility)
+    for (const col of ['shop', 'customers', 'transactions', 'bills', 'staff']) {
+      if (data[col]) {
+        await database.collection(col).deleteMany({});
+        let docs = Array.isArray(data[col]) ? data[col] : [data[col]];
+        if (docs.length > 0) await database.collection(col).insertMany(docs);
+      }
+    }
+    cachedDB = data;
+  } catch (error) {
+    console.error('Error writing to MongoDB:', error);
+  } finally {
+    dbWriteLock = false;
+  }
+}
+
+// ─── UTILITY HELPERS ───────────────────────────────────────────────────────────
+
+// Format date as DD/MM/YYYY (Indian standard)
+function fmtDate(isoStr) {
+  return new Date(isoStr).toLocaleDateString('en-GB');
+}
+
+// Format rupee amount
+function fmtRs(amount) {
+  return `₹${Number(amount).toLocaleString('en-IN')}`;
+}
+
+// Generate a short random ID
+function genId(prefix) {
+  return prefix + '_' + Math.random().toString(36).substring(2, 9);
+}
+
+// Calculate customer outstanding balance
+function getCustomerOutstanding(customerId, transactions, bills) {
+  let balance = 0;
+  transactions.forEach(t => {
+    if (t.customer_id === customerId) {
+      if (t.type === 'credit') balance += t.amount;
+      else if (t.type === 'payment') balance -= t.amount;
+    }
+  });
+  bills.forEach(b => {
+    if (b.customer_id === customerId && b.status === 'unpaid') balance += b.total;
+  });
+  return balance;
+}
+
+// Find customer by name (supports Hindi/English first name or full name)
+function findCustomer(text, customers) {
+  const sortedCustomers = [...customers].sort((a, b) => b.name.length - a.name.length);
+  // Full name match first
+  for (const c of sortedCustomers) {
+    if (text.includes(c.name.toLowerCase())) return c;
+  }
+  // First name match fallback
+  for (const c of sortedCustomers) {
+    const firstName = c.name.split(' ')[0].toLowerCase();
+    if (firstName.length > 2 && text.includes(firstName)) return c;
+  }
+  return null;
+}
+
+// ─── DATABASE OPERATION TOOLS FOR GEMINI AI ───────────────────────────────────
+
+async function addCustomerTool(name, phone) {
+  const db = await readDB();
+  const existing = db.customers.find(c => c.phone === phone || c.name.toLowerCase() === name.toLowerCase());
+  if (existing) {
+    return { error: `Customer '${name}' or phone '${phone}' is already registered.` };
+  }
+  const newCustomer = {
+    id: genId('c'),
+    name: name.replace(/\b\w/g, c => c.toUpperCase()),
+    phone,
+    created_at: new Date().toISOString().substring(0, 10)
+  };
+  db.customers.push(newCustomer);
+  await writeDB(db);
+  return { success: true, customer: newCustomer };
+}
+
+async function recordPaymentTool(customerId, amount, note, staffPhone) {
+  const db = await readDB();
+  const customer = db.customers.find(c => c.id === customerId);
+  if (!customer) return { error: `Customer with ID '${customerId}' not found.` };
+  const newTxId = genId('t');
+  db.transactions.push({
+    id: newTxId,
+    customer_id: customerId,
+    type: 'payment',
+    amount: Number(amount),
+    note: note || 'Payment recorded via AI Bot',
+    staff_phone: staffPhone || 'system',
+    timestamp: new Date().toISOString()
+  });
+  await writeDB(db);
+  const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
+  return { success: true, customerName: customer.name, amount: Number(amount), remainingOutstanding: balance };
+}
+
+async function addCreditTool(customerId, amount, note, staffPhone) {
+  const db = await readDB();
+  const customer = db.customers.find(c => c.id === customerId);
+  if (!customer) return { error: `Customer with ID '${customerId}' not found.` };
+  const newTxId = genId('t');
+  db.transactions.push({
+    id: newTxId,
+    customer_id: customerId,
+    type: 'credit',
+    amount: Number(amount),
+    note: note || 'Credit added via AI Bot',
+    staff_phone: staffPhone || 'system',
+    timestamp: new Date().toISOString()
+  });
+  await writeDB(db);
+  const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
+  return { success: true, customerName: customer.name, amountAdded: Number(amount), totalOutstanding: balance };
+}
+
+async function addItemToUnpaidBillTool(customerId, itemName, price, qty) {
+  const db = await readDB();
+  const customer = db.customers.find(c => c.id === customerId);
+  if (!customer) return { error: `Customer with ID '${customerId}' not found.` };
+  let currentBill = db.bills.find(b => b.customer_id === customerId && b.status === 'unpaid');
+  const timestampIso = new Date().toISOString();
+  if (!currentBill) {
+    currentBill = {
+      id: genId('b'),
+      customer_id: customerId,
+      items: [],
+      total: 0,
+      status: 'unpaid',
+      created_at: timestampIso,
+      paid_at: null
+    };
+    db.bills.push(currentBill);
+  }
+  const quantity = Number(qty) || 1;
+  currentBill.items.push({ name: itemName, qty: quantity, price: Number(price) });
+  currentBill.total += Number(price) * quantity;
+  await writeDB(db);
+  const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
+  return { success: true, customerName: customer.name, itemAdded: itemName, itemPrice: Number(price), qty: quantity, billTotal: currentBill.total, netOutstanding: balance };
+}
+
+async function generateBillTool(customerId, amount) {
+  const db = await readDB();
+  const customer = db.customers.find(c => c.id === customerId);
+  if (!customer) return { error: `Customer with ID '${customerId}' not found.` };
+  const newBillId = genId('b');
+  const timestampIso = new Date().toISOString();
+  db.bills.push({
+    id: newBillId,
+    customer_id: customerId,
+    items: [{ name: 'General Grocery Item', qty: 1, price: Number(amount) }],
+    total: Number(amount),
+    status: 'unpaid',
+    created_at: timestampIso,
+    paid_at: null
+  });
+  await writeDB(db);
+  const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
+  return { success: true, customerName: customer.name, billId: newBillId, amount: Number(amount), netOutstanding: balance };
+}
+
+async function markBillAsPaidTool(customerId) {
+  const db = await readDB();
+  const customer = db.customers.find(c => c.id === customerId);
+  if (!customer) return { error: `Customer with ID '${customerId}' not found.` };
+  const unpaidBill = db.bills.find(b => b.customer_id === customerId && b.status === 'unpaid');
+  if (!unpaidBill) {
+    return { error: `No active unpaid bill found for customer '${customer.name}'.` };
+  }
+  unpaidBill.status = 'paid';
+  unpaidBill.paid_at = new Date().toISOString();
+  await writeDB(db);
+  const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
+  return { success: true, customerName: customer.name, billId: unpaidBill.id, amountPaid: unpaidBill.total, netOutstanding: balance };
+}
+
+async function getCustomerBalancesTool() {
+  const db = await readDB();
+  const balances = db.customers.map(c => {
+    const bal = getCustomerOutstanding(c.id, db.transactions, db.bills);
+    return { id: c.id, name: c.name, phone: c.phone, outstandingBalance: bal };
+  });
+  return { success: true, balances };
+}
+
+async function getTodaySalesReportTool() {
+  const db = await readDB();
+  const todayString = new Date().toISOString().substring(0, 10);
+  const billsToday = db.bills.filter(b => b.created_at.startsWith(todayString));
+  const billsTotal = billsToday.reduce((sum, b) => sum + b.total, 0);
+  const collectionsToday = db.transactions.filter(t => t.type === 'payment' && t.timestamp.startsWith(todayString));
+  const paymentTotal = collectionsToday.reduce((sum, t) => sum + t.amount, 0);
+  const unpaidCount = billsToday.filter(b => b.status === 'unpaid').length;
+  return {
+    success: true,
+    date: todayString,
+    todaySales: billsTotal,
+    todayCollections: paymentTotal,
+    billsCreated: billsToday.length,
+    unpaidBillsCount: unpaidCount
+  };
+}
+
+async function getShopDetailsTool() {
+  const db = await readDB();
+  return { success: true, shop: db.shop || {} };
+}
+
+async function getCustomersListTool() {
+  const db = await readDB();
+  const list = db.customers.map(c => ({ id: c.id, name: c.name, phone: c.phone }));
+  return { success: true, customers: list };
+}
+
+// ─── COMMAND PARSER ────────────────────────────────────────────────────────────
+
+function parseCommand(message, customers, transactions, bills) {
+  const text = message.toLowerCase().trim();
+
+  // ── HELP ──────────────────────────────────────────────────────────────────────
+  if (text === 'help' || text === 'menu' || text === '?' || text.includes('kya kya kar sakte') || text.includes('commands')) {
+    return { type: 'help' };
+  }
+
+  // ── TODAY'S SALE REPORT ───────────────────────────────────────────────────────
+  if (
+    (text.includes('aaj') && (text.includes('sale') || text.includes('bikri') || text.includes('collect') || text.includes('kamai'))) ||
+    text.includes('today sale') || text.includes("today's sale") || text.includes('daily report') || text.includes('aaj ki report')
+  ) {
+    return { type: 'today_sale' };
+  }
+
+  // ── ALL CUSTOMERS OUTSTANDING ─────────────────────────────────────────────────
+  if (
+    text.includes('sab ka hisab') || text.includes('sabka hisab') ||
+    text.includes('all balance') || text.includes('all outstanding') ||
+    text.includes('sab ka baaki') || text.includes('list karo') ||
+    text.includes('kitne baaki hain') || text.includes('poori list')
+  ) {
+    return { type: 'all_outstanding' };
+  }
+
+  // ── SEND PAYMENT REMINDERS ────────────────────────────────────────────────────
+  if (
+    text.includes('reminder bhejo') || text.includes('reminder send') ||
+    text.includes('sab ko reminder') || text.includes('payment reminder') ||
+    text.includes('baaki walo ko message')
+  ) {
+    return { type: 'send_reminders' };
+  }
+
+  // ── ADD NEW CUSTOMER ──────────────────────────────────────────────────────────
+  // e.g. "naya customer Rahul 9876543210" / "add customer Priya 98765"
+  const newCustMatch = text.match(/(?:naya|new|add)\s+(?:customer|khata|grahak)\s+([a-zA-Z\u0900-\u097F\s]+?)\s+(\d{10})/i);
+  if (newCustMatch) {
+    const name = newCustMatch[1].trim();
+    const phone = newCustMatch[2].trim();
+    if (name && phone) {
+      return { type: 'add_customer', name: name.replace(/\b\w/g, c => c.toUpperCase()), phone };
+    }
+  }
+
+  // ── LOOK UP CUSTOMER FOR REMAINING COMMANDS ───────────────────────────────────
+  const customer = findCustomer(text, customers);
+  if (!customer) return { type: 'unknown' };
+
+  const custName = customer.name;
+  const custId = customer.id;
+
+  // ── SEND BILL ─────────────────────────────────────────────────────────────────
+  if (text.includes('bill bhej') || text.includes('send bill') || text.includes('bill send')) {
+    return { type: 'send_bill', customerId: custId, customerName: custName };
+  }
+
+  // ── MARK BILL PAID ────────────────────────────────────────────────────────────
+  if (
+    text.includes('mark paid') || text.includes('paid kar do') ||
+    text.includes('chukta') || text.includes('bill paid') || text.includes('paid mark')
+  ) {
+    return { type: 'mark_paid', customerId: custId, customerName: custName };
+  }
+
+  // ── RECORD PAYMENT RECEIVED ───────────────────────────────────────────────────
+  // e.g. "Ramesh ne 200 diya" / "Ramesh ne 500 rupaye diye" / "Ramesh payment 300"
+  const paymentMatch = text.match(/(?:ne|ka|ke)?\s*(\d+)\s*(?:diya|diye|rupaye|rs|payment|jama|ada|paid)/i) ||
+    text.match(/payment\s+(\d+)/i) || text.match(/(\d+)\s*(?:diya|diye|ada kiya)/i);
+  if (paymentMatch && (text.includes('ne ') || text.includes('payment') || text.includes('diya') || text.includes('diye') || text.includes('ada'))) {
+    const amount = parseInt(paymentMatch[1]);
+    if (amount > 0) {
+      return { type: 'record_payment', customerId: custId, customerName: custName, amount };
+    }
+  }
+
+  // ── QUERY BALANCE ─────────────────────────────────────────────────────────────
+  if (
+    text.includes('kitna baaki') || text.includes('outstanding') ||
+    text.includes('hisab') || text.includes('balance') ||
+    text.includes('baqi') || text.includes('kitna bacha') ||
+    text.includes('kya baaki') || text.includes('total due')
+  ) {
+    return { type: 'query_balance', customerId: custId, customerName: custName };
+  }
+
+  // ── ADD ITEM TO BILL ──────────────────────────────────────────────────────────
+  // e.g. "Ramesh ka 50 mein Chini add karo" / "Ramesh ka soap 30 add karo"
+  const addLineMatch = text.match(
+    /(?:(?:ka|ke)\s+(\d+)\s*(?:mein|me)?\s*([a-zA-Z\u0900-\u097F]+?)\s*add\s*(?:karo|do)?)|(?:(?:ka|ke)\s*([a-zA-Z\u0900-\u097F]+?)\s+(\d+)\s*add\s*(?:karo|do)?)/
+  );
+  if (addLineMatch) {
+    let price = 0; let itemName = '';
+    if (addLineMatch[1] && addLineMatch[2]) { price = parseInt(addLineMatch[1]); itemName = addLineMatch[2].trim(); }
+    else if (addLineMatch[3] && addLineMatch[4]) { itemName = addLineMatch[3].trim(); price = parseInt(addLineMatch[4]); }
+    if (itemName && price > 0) {
+      return { type: 'add_item', customerId: custId, customerName: custName, itemName, price };
+    }
+  }
+
+  // ── GENERATE FIXED BILL ───────────────────────────────────────────────────────
+  // e.g. "Suresh ka 500 ka bill banao"
+  const billMatch = text.match(/(?:(?:ka|ke)\s+(\d+)\s*(?:ka|ke)?\s*bill\s*(?:banao|banaiye|create))/i) ||
+    text.match(/bill\s+(?:banao|create)?\s*(?:of|for)?\s*(\d+)/i);
+  if (billMatch) {
+    const amount = parseInt(billMatch[1]);
+    return { type: 'generate_bill', customerId: custId, customerName: custName, amount };
+  }
+
+  // ── ADD CREDIT (UDHAR) ────────────────────────────────────────────────────────
+  // e.g. "Ramesh ka khata mein 100 daal do"
+  const creditMatch = text.match(/(?:(?:khata|khate|account|me|mein)?\s*(\d+)\s*(?:daal|add|jama|credit|plus|deposit|udhar|udhaar))/i) ||
+    text.match(/(\d+)\s*(?:daal|add|jama|credit|deposit|udhar)/i);
+  if (creditMatch) {
+    const amount = parseInt(creditMatch[1]);
+    if (amount > 0) {
+      return { type: 'add_credit', customerId: custId, customerName: custName, amount };
+    }
+  }
+
+  return { type: 'unknown' };
+}
+
+// ─── GEMINI AI FUNCTION CALLING (TOOL USE) ────────────────────────────────────
+
+// Map Gemini function calls to local JS functions
+async function executeTool(name, args, staffPhone) {
+  console.log(`🛠️ Executing AI Tool: "${name}" with args:`, args);
+  try {
+    switch (name) {
+      case 'addCustomerTool':
+        return await addCustomerTool(args.name, args.phone);
+      case 'recordPaymentTool':
+        return await recordPaymentTool(args.customerId, args.amount, args.note, staffPhone);
+      case 'addCreditTool':
+        return await addCreditTool(args.customerId, args.amount, args.note, staffPhone);
+      case 'addItemToUnpaidBillTool':
+        return await addItemToUnpaidBillTool(args.customerId, args.itemName, args.price, args.qty);
+      case 'generateBillTool':
+        return await generateBillTool(args.customerId, args.amount);
+      case 'markBillAsPaidTool':
+        return await markBillAsPaidTool(args.customerId);
+      case 'getCustomerBalancesTool':
+        return await getCustomerBalancesTool();
+      case 'getTodaySalesReportTool':
+        return await getTodaySalesReportTool();
+      case 'getShopDetailsTool':
+        return await getShopDetailsTool();
+      case 'getCustomersListTool':
+        return await getCustomersListTool();
+      default:
+        return { error: `Tool "${name}" is not implemented.` };
+    }
+  } catch (err) {
+    console.error(`❌ Error executing tool "${name}":`, err);
+    return { error: err.message };
+  }
+}
+
+async function askGeminiWithTools(messageText, staffPhone) {
+  if (!genAI) {
+    const currentApiKey = process.env.GEMINI_API_KEY;
+    if (currentApiKey && currentApiKey !== 'MY_GEMINI_API_KEY') {
+      genAI = new GoogleGenerativeAI(currentApiKey);
+    }
+  }
+
+  if (!genAI) {
+    console.warn('⚠️ Gemini AI is not configured. GEMINI_API_KEY is missing.');
+    return '⚠️ Gemini AI API key missing. Please configure it in your .env file.';
+  }
+
+  const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  try {
+    const db = await readDB();
+    const shopInfo = db.shop || {};
+    
+    // Declare the database tools for Gemini
+    const tools = [{
+      functionDeclarations: [
+        {
+          name: 'addCustomerTool',
+          description: 'Registers a new customer in the database with their name and phone number.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              name: { type: 'STRING', description: 'The customer\'s full name, e.g. "Rahul Singh".' },
+              phone: { type: 'STRING', description: 'The customer\'s 10-digit phone number, e.g. "9876543210".' }
+            },
+            required: ['name', 'phone']
+          }
+        },
+        {
+          name: 'recordPaymentTool',
+          description: 'Records a payment (jama/diya/cash received) from an existing customer to reduce their outstanding balance.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              customerId: { type: 'STRING', description: 'The customer ID, e.g. "c1".' },
+              amount: { type: 'NUMBER', description: 'The payment amount in Rupees, e.g. 500.' },
+              note: { type: 'STRING', description: 'Optional description of the payment, e.g. "Cash token payment".' }
+            },
+            required: ['customerId', 'amount']
+          }
+        },
+        {
+          name: 'addCreditTool',
+          description: 'Adds outstanding credit (udhaar/khata/item taken on credit) to an existing customer.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              customerId: { type: 'STRING', description: 'The customer ID, e.g. "c1".' },
+              amount: { type: 'NUMBER', description: 'The credit amount in Rupees, e.g. 150.' },
+              note: { type: 'STRING', description: 'Optional description of the credit, e.g. "Refined oil 2L".' }
+            },
+            required: ['customerId', 'amount']
+          }
+        },
+        {
+          name: 'addItemToUnpaidBillTool',
+          description: 'Adds an item (along with price and optional quantity) to a customer\'s active unpaid bill. Creates a new unpaid bill if none exists.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              customerId: { type: 'STRING', description: 'The customer ID, e.g. "c1".' },
+              itemName: { type: 'STRING', description: 'The name of the item, e.g. "Sugar".' },
+              price: { type: 'NUMBER', description: 'The price per unit in Rupees, e.g. 50.' },
+              qty: { type: 'NUMBER', description: 'The quantity of items, defaults to 1.' }
+            },
+            required: ['customerId', 'itemName', 'price']
+          }
+        },
+        {
+          name: 'generateBillTool',
+          description: 'Generates a simple fixed-amount unpaid bill for a customer.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              customerId: { type: 'STRING', description: 'The customer ID, e.g. "c1".' },
+              amount: { type: 'NUMBER', description: 'The total bill amount in Rupees, e.g. 1000.' }
+            },
+            required: ['customerId', 'amount']
+          }
+        },
+        {
+          name: 'markBillAsPaidTool',
+          description: 'Marks the customer\'s active unpaid bill as paid.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              customerId: { type: 'STRING', description: 'The customer ID, e.g. "c1".' }
+            },
+            required: ['customerId']
+          }
+        },
+        {
+          name: 'getCustomerBalancesTool',
+          description: 'Retrieves outstanding balances for all registered customers.',
+          parameters: { type: 'OBJECT', properties: {} }
+        },
+        {
+          name: 'getTodaySalesReportTool',
+          description: 'Retrieves today\'s sales report including total sales, total collections, and count of bills.',
+          parameters: { type: 'OBJECT', properties: {} }
+        },
+        {
+          name: 'getShopDetailsTool',
+          description: 'Retrieves metadata about the shop, such as shop name, owner, and address.',
+          parameters: { type: 'OBJECT', properties: {} }
+        },
+        {
+          name: 'getCustomersListTool',
+          description: 'Retrieves a list of all registered customers with their IDs, names, and phone numbers.',
+          parameters: { type: 'OBJECT', properties: {} }
+        }
+      ]
+    }];
+
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      tools: tools
+    });
+
+    const systemInstruction = `
+You are the AI assistant for ${shopInfo.name || 'Sharma General Store'} owned by ${shopInfo.owner || 'Rajesh Sharma'} located at ${shopInfo.address || 'Main Bazaar, Farrukhabad'}.
+You process incoming messages from store staff and perform operations on the database using the tools available.
+
+Rules:
+1. Always start by fetching the list of customers using 'getCustomersListTool' if you need to map names to customer IDs. If the user mentions customer names (e.g. "ramesh", "suresh"), you MUST match them to the registered customer ID from the list.
+2. If a customer is mentioned but is NOT in the list, tell the user that the customer is not registered, and politely instruct them to register the customer first using the format 'naya customer <naam> <phone>'. Do NOT call any other tool for that customer.
+3. If money/rupees are mentioned, pass them to tools as integers/numbers.
+4. Execute tools when needed to resolve the user's intent. You can make multiple tool calls in a single turn (e.g., adding a customer and then recording their payment).
+5. After receiving the output of a tool, summarize the result in a polite conversational message in Hindi/Hinglish to send back to the user. Make sure to use emojis, clear formatting, and standard Indian currency style (e.g., ₹1,000).
+6. If the request is a general question (greeting, shop details, or balance questions), call the appropriate query tool ('getShopDetailsTool', 'getCustomerBalancesTool', etc.) to fetch accurate info before answering.
+`;
+
+    // Initialize messages list
+    const sessionMessages = [
+      { role: 'user', parts: [{ text: `System instruction: ${systemInstruction}\n\nUser Message: "${messageText}"` }] }
+    ];
+
+    let response = await model.generateContent({ contents: sessionMessages });
+
+    // Loop for handling tool calls
+    let loopCount = 0;
+    while (loopCount < 5) {
+      const fCalls = response.response.functionCalls();
+      if (!fCalls || fCalls.length === 0) break;
+
+      loopCount++;
+      const toolResults = [];
+
+      for (const call of fCalls) {
+        const toolResult = await executeTool(call.name, call.args, staffPhone);
+        console.log(`   ↳ ${call.name} result:`, toolResult);
+        toolResults.push({
+          functionResponse: {
+            name: call.name,
+            response: toolResult
+          }
+        });
+      }
+
+      // Add assistant's tool call message and our function responses
+      sessionMessages.push(response.response.candidates[0].content);
+      sessionMessages.push({
+        role: 'function',
+        parts: toolResults
+      });
+
+      // Get next response from Gemini
+      response = await model.generateContent({ contents: sessionMessages });
+    }
+
+    return response.response.text().trim();
+  } catch (error) {
+    console.error('❌ Gemini API error:', error.message || error);
+    if (error.status === 429) {
+      return `⏳ Bot thoda busy hai abhi. Ek-do minute mein dobara try karein. 🙏`;
+    }
+    if (error.status === 503 || error.message?.includes('network')) {
+      return `📶 Network error aa gaya. Thodi der baad try karein.`;
+    }
+    return `❌ Kuch technical problem hui. Admin ko batayein. 🙏`;
+  }
+}
+
+// ─── WHATSAPP SENDER ───────────────────────────────────────────────────────────
+
+async function sendWhatsAppMessage(recipientPhone, textMessage) {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneId = process.env.PHONE_NUMBER_ID;
+
+  if (!token || !phoneId || token === 'your_whatsapp_access_token_here') {
+    console.log(`⚠️  WhatsApp token not configured. Local log only:`);
+    console.log(`    To: ${recipientPhone}\n    Msg: ${textMessage}`);
+    return false;
+  }
+
+  try {
+    const response = await axios.post(
+      `https://graph.facebook.com/v19.0/${phoneId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: recipientPhone,
+        type: 'text',
+        text: { body: textMessage }
+      },
+      { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+    );
+    return response.status === 200 || response.status === 201;
+  } catch (error) {
+    console.error('❌ WhatsApp API error:', error.response ? JSON.stringify(error.response.data) : error.message);
+    return false;
+  }
+}
+
+// ─── DAILY REPORT SCHEDULER (runs every day at 9:00 AM IST) ───────────────────
+
+function scheduleDaily(hour, minuteIST, fn) {
+  function msUntilNext() {
+    const now = new Date();
+    // IST = UTC+5:30
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const nowIST = new Date(now.getTime() + istOffsetMs);
+    const nextRun = new Date(nowIST);
+    nextRun.setHours(hour, minuteIST, 0, 0);
+    if (nextRun <= nowIST) nextRun.setDate(nextRun.getDate() + 1);
+    return nextRun.getTime() - nowIST.getTime();
+  }
+  function tick() {
+    fn();
+    setTimeout(tick, msUntilNext());
+  }
+  setTimeout(tick, msUntilNext());
+  console.log(`📅 Daily report scheduled at ${hour}:${String(minuteIST).padStart(2,'0')} IST`);
+}
+
+async function sendDailyReport() {
+  const db = await readDB();
+  const todayString = new Date().toISOString().substring(0, 10);
+
+  const billsToday = db.bills.filter(b => b.created_at.startsWith(todayString));
+  const billsTotal = billsToday.reduce((sum, b) => sum + b.total, 0);
+  const paidToday = billsToday.filter(b => b.status === 'paid').reduce((sum, b) => sum + b.total, 0);
+
+  const collectionsToday = db.transactions.filter(t => t.type === 'payment' && t.timestamp.startsWith(todayString));
+  const paymentTotal = collectionsToday.reduce((sum, t) => sum + t.amount, 0);
+
+  const totalOutstanding = db.customers.reduce((sum, c) => {
+    const bal = getCustomerOutstanding(c.id, db.transactions, db.bills);
+    return sum + (bal > 0 ? bal : 0);
+  }, 0);
+
+  const report =
+    `🌅 *Sharma General Store — Subah ki Report*\n` +
+    `📅 ${fmtDate(new Date().toISOString())}\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `💰 Aaj ki total sales: *${fmtRs(billsTotal)}*\n` +
+    `📥 Aaj ka collection: *${fmtRs(paymentTotal)}*\n` +
+    `🧾 Bills today: ${billsToday.length} (Paid: ${billsToday.filter(b => b.status === 'paid').length})\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `📊 Total outstanding (sab customers): *${fmtRs(totalOutstanding)}*\n` +
+    `👥 Total customers: ${db.customers.length}\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Sharma General Store Bot 🤖_`;
+
+  for (const staff of db.staff) {
+    await sendWhatsAppMessage(staff.phone, report);
+    console.log(`📨 Daily report sent to ${staff.name} (${staff.phone})`);
+  }
+}
+
+// ─── WEBHOOK ROUTES ────────────────────────────────────────────────────────────
+
+// GET /webhook — Meta verification
+app.get('/webhook', (req, res) => {
+  const verifyToken = process.env.VERIFY_TOKEN || 'sharma_store_token';
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode && token) {
+    if (mode === 'subscribe' && token === verifyToken) {
+      console.log('✅ Webhook verified!');
+      return res.status(200).send(challenge);
+    }
+    console.warn('❌ Webhook token mismatch');
+    return res.sendStatus(403);
+  }
+  return res.sendStatus(400);
+});
+
+// POST /webhook — Incoming WhatsApp messages
+app.post('/webhook', async (req, res) => {
+  const body = req.body;
+
+  if (
+    body.object === 'whatsapp_business_account' &&
+    body.entry?.[0]?.changes?.[0]?.value?.messages
+  ) {
+    const messageInfo = body.entry[0].changes[0].value.messages[0];
+    const staffPhone = messageInfo.from;
+    const bodyText = messageInfo.text?.body || '';
+
+    if (!bodyText) return res.sendStatus(200);
+
+    console.log(`📩 [${staffPhone}]: "${bodyText}"`);
+
+    const db = await readDB();
+    const activeStaff = db.staff.find(s => s.phone === staffPhone) || { id: 'unknown', name: 'Unknown User' };
+    const action = parseCommand(bodyText, db.customers, db.transactions, db.bills);
+    const timestampIso = new Date().toISOString();
+    let replyText = '';
+
+    // ── HELP ────────────────────────────────────────────────────────────────────
+    if (action.type === 'help') {
+      replyText =
+        `🏪 *Sharma Store Bot — Commands*\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 *Customer Commands:*\n` +
+        `🔹 _Ramesh ka kitna baaki hai_ — Balance check\n` +
+        `🔹 _Ramesh ne 200 diya_ — Record payment\n` +
+        `🔹 _Ramesh ka khata mein 100 daal do_ — Add credit\n` +
+        `🔹 _Ramesh ka 500 ka bill banao_ — Create bill\n` +
+        `🔹 _Ramesh ka soap 30 add karo_ — Add item to bill\n` +
+        `🔹 _Ramesh ka bill bhej do_ — Send bill summary\n` +
+        `🔹 _Ramesh ka bill mark paid_ — Mark bill as paid\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📊 *Store Commands:*\n` +
+        `🔹 _Aaj ki sale kitni thi_ — Today's sales\n` +
+        `🔹 _Sab ka hisab batao_ — All outstanding balances\n` +
+        `🔹 _Reminder bhejo_ — Send payment reminders\n` +
+        `🔹 _Naya customer Rahul 9876543210_ — Add customer\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `_Type *help* anytime to see this menu_`;
+
+    // ── TODAY'S SALE ─────────────────────────────────────────────────────────────
+    } else if (action.type === 'today_sale') {
+      const todayString = new Date().toISOString().substring(0, 10);
+      const billsToday = db.bills.filter(b => b.created_at.startsWith(todayString));
+      const billsTotal = billsToday.reduce((sum, b) => sum + b.total, 0);
+      const collectionsToday = db.transactions.filter(t => t.type === 'payment' && t.timestamp.startsWith(todayString));
+      const paymentTotal = collectionsToday.reduce((sum, t) => sum + t.amount, 0);
+      const unpaidCount = billsToday.filter(b => b.status === 'unpaid').length;
+
+      replyText =
+        `📊 *Sharma Store — Aaj ki Report*\n` +
+        `📅 ${fmtDate(timestampIso)}\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `💰 Total sales: *${fmtRs(billsTotal)}*\n` +
+        `📥 Collection received: *${fmtRs(paymentTotal)}*\n` +
+        `🧾 Bills created: ${billsToday.length}\n` +
+        `⏳ Unpaid bills: ${unpaidCount}\n` +
+        `💸 Pending collection: *${fmtRs(billsTotal - paymentTotal)}*`;
+
+    // ── ALL OUTSTANDING ──────────────────────────────────────────────────────────
+    } else if (action.type === 'all_outstanding') {
+      const lines = [];
+      let grandTotal = 0;
+      for (const c of db.customers) {
+        const bal = getCustomerOutstanding(c.id, db.transactions, db.bills);
+        if (bal > 0) {
+          lines.push(`• *${c.name}*: ${fmtRs(bal)}`);
+          grandTotal += bal;
+        }
+      }
+      if (lines.length === 0) {
+        replyText = `✅ Koi bhi outstanding balance nahi hai! Sab ka hisab saaf hai.`;
+      } else {
+        replyText =
+          `📋 *Outstanding Balances*\n` +
+          `📅 ${fmtDate(timestampIso)}\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          lines.join('\n') +
+          `\n━━━━━━━━━━━━━━━━━━━━\n` +
+          `💰 *Kul Outstanding: ${fmtRs(grandTotal)}*`;
+      }
+
+    // ── SEND PAYMENT REMINDERS ───────────────────────────────────────────────────
+    } else if (action.type === 'send_reminders') {
+      const shop = db.shop;
+      let sentCount = 0;
+      for (const c of db.customers) {
+        const bal = getCustomerOutstanding(c.id, db.transactions, db.bills);
+        if (bal > 0 && c.phone) {
+          const reminderMsg =
+            `🙏 *${shop.name || 'Sharma General Store'}*\n\n` +
+            `Namaste *${c.name}* ji,\n\n` +
+            `Aapka ${fmtRs(bal)} ka baaki hai hamare yahan.\n` +
+            `Kripya jald hi chukta karein.\n\n` +
+            `Shukriya 🙏\n_${shop.owner || 'Rajesh Sharma'}_`;
+          await sendWhatsAppMessage(c.phone, reminderMsg);
+          sentCount++;
+        }
+      }
+      replyText = sentCount > 0
+        ? `✅ *${sentCount} customers* ko payment reminder bhej diya gaya!\n💰 Reminder tab bheja jata hai jab balance > ₹0 ho.`
+        : `ℹ️ Kisi ko reminder nahi bheja — koi outstanding balance nahi hai.`;
+
+    // ── ADD NEW CUSTOMER ─────────────────────────────────────────────────────────
+    } else if (action.type === 'add_customer') {
+      const { name, phone } = action;
+      const existing = db.customers.find(c => c.phone === phone || c.name.toLowerCase() === name.toLowerCase());
+      if (existing) {
+        replyText = `⚠️ *${name}* ya phone *${phone}* se ek customer pehle se registered hai.`;
+      } else {
+        const newCustomer = {
+          id: genId('c'),
+          name,
+          phone,
+          created_at: timestampIso.substring(0, 10)
+        };
+        db.customers.push(newCustomer);
+        await writeDB(db);
+        replyText =
+          `✅ *Naya Customer Add Ho Gaya!*\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `👤 Naam: *${name}*\n` +
+          `📱 Phone: ${phone}\n` +
+          `🆔 ID: ${newCustomer.id}\n` +
+          `📅 Registered: ${fmtDate(timestampIso)}\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `_Ab aap iske liye bill ya khata bana sakte hain._`;
+      }
+
+    // ── RECORD PAYMENT ───────────────────────────────────────────────────────────
+    } else if (action.type === 'record_payment') {
+      const { customerId, customerName, amount } = action;
+      const newTxId = genId('t');
+      db.transactions.push({
+        id: newTxId,
+        customer_id: customerId,
+        type: 'payment',
+        amount,
+        note: `Payment received via Bot by ${activeStaff.name}`,
+        staff_phone: staffPhone,
+        timestamp: timestampIso
+      });
+      await writeDB(db);
+      const bal = getCustomerOutstanding(customerId, db.transactions, db.bills);
+      replyText =
+        `💵 *Payment Recorded!*\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 Customer: *${customerName}*\n` +
+        `✅ Amount paid: *${fmtRs(amount)}*\n` +
+        `👤 Staff: ${activeStaff.name}\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        (bal > 0
+          ? `💳 Remaining baaki: *${fmtRs(bal)}*`
+          : bal === 0
+            ? `🎉 *Poora hisab saaf ho gaya!*`
+            : `😊 *${fmtRs(Math.abs(bal))} advance balance* hai ${customerName} ka.`);
+
+    // ── ADD CREDIT (UDHAR) ───────────────────────────────────────────────────────
+    } else if (action.type === 'add_credit') {
+      const { customerId, customerName, amount } = action;
+      const newTxId = genId('t');
+      db.transactions.push({
+        id: newTxId,
+        customer_id: customerId,
+        type: 'credit',
+        amount,
+        note: `Credit added via Bot by ${activeStaff.name}`,
+        staff_phone: staffPhone,
+        timestamp: timestampIso
+      });
+      await writeDB(db);
+      const bal = getCustomerOutstanding(customerId, db.transactions, db.bills);
+      replyText =
+        `✅ *Udhar Add Ho Gaya!*\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 Customer: *${customerName}*\n` +
+        `➕ Udhar: *${fmtRs(amount)}*\n` +
+        `👤 Staff: ${activeStaff.name}\n` +
+        `💰 Kul Baaki: *${fmtRs(bal)}*`;
+
+    // ── GENERATE BILL ────────────────────────────────────────────────────────────
+    } else if (action.type === 'generate_bill') {
+      const { customerId, customerName, amount } = action;
+      const newBillId = genId('b');
+      db.bills.push({
+        id: newBillId,
+        customer_id: customerId,
+        items: [{ name: 'General Grocery Item', qty: 1, price: amount }],
+        total: amount,
+        status: 'unpaid',
+        created_at: timestampIso,
+        paid_at: null
+      });
+      await writeDB(db);
+      const bal = getCustomerOutstanding(customerId, db.transactions, db.bills);
+      replyText =
+        `📝 *Bill Bana Diya!*\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 Customer: *${customerName}*\n` +
+        `🧾 Bill #${newBillId}\n` +
+        `💵 Amount: *${fmtRs(amount)}*\n` +
+        `📌 Status: UNPAID\n` +
+        `💳 Total Due: *${fmtRs(bal)}*`;
+
+    // ── ADD ITEM TO BILL ─────────────────────────────────────────────────────────
+    } else if (action.type === 'add_item') {
+      const { customerId, customerName, itemName, price } = action;
+      let currentBill = db.bills.find(b => b.customer_id === customerId && b.status === 'unpaid');
+      if (!currentBill) {
+        currentBill = {
+          id: genId('b'),
+          customer_id: customerId,
+          items: [],
+          total: 0,
+          status: 'unpaid',
+          created_at: timestampIso,
+          paid_at: null
+        };
+        db.bills.push(currentBill);
+      }
+      currentBill.items.push({ name: itemName, qty: 1, price });
+      currentBill.total += price;
+      await writeDB(db);
+      const bal = getCustomerOutstanding(customerId, db.transactions, db.bills);
+      replyText =
+        `🛒 *Item Add Ho Gaya!*\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 Customer: *${customerName}*\n` +
+        `📦 Item: *${itemName}* — ${fmtRs(price)}\n` +
+        `📈 Bill Total: *${fmtRs(currentBill.total)}*\n` +
+        `💳 Net Outstanding: *${fmtRs(bal)}*`;
+
+    // ── QUERY BALANCE ────────────────────────────────────────────────────────────
+    } else if (action.type === 'query_balance') {
+      const { customerId, customerName } = action;
+      const bal = getCustomerOutstanding(customerId, db.transactions, db.bills);
+      const unpaidBills = db.bills.filter(b => b.customer_id === customerId && b.status === 'unpaid');
+      replyText =
+        `ℹ️ *${customerName} ka Hisab*\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        (bal > 0
+          ? `💳 Baaki: *${fmtRs(bal)}*\n🧾 Unpaid bills: ${unpaidBills.length}`
+          : bal === 0
+            ? `✅ Poora chukta hai! Balance ₹0`
+            : `😊 Advance balance: *${fmtRs(Math.abs(bal))}*`);
+
+    // ── SEND BILL SUMMARY ────────────────────────────────────────────────────────
+    } else if (action.type === 'send_bill') {
+      const { customerId, customerName } = action;
+      const customerBills = db.bills.filter(b => b.customer_id === customerId);
+      if (customerBills.length === 0) {
+        replyText = `❌ *${customerName}* ka koi bill nahi mila.`;
+      } else {
+        const latestBill = customerBills[customerBills.length - 1];
+        const itemLines = latestBill.items.map((it, i) => `  ${i + 1}. ${it.name} (${it.qty}x ${fmtRs(it.price)})`).join('\n');
+        replyText =
+          `📄 *SHARMA GENERAL STORE*\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `🧾 Bill #${latestBill.id}\n` +
+          `📅 Date: ${fmtDate(latestBill.created_at)}\n` +
+          `👤 Customer: *${customerName}*\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          itemLines + '\n' +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `💰 *Grand Total: ${fmtRs(latestBill.total)}*\n` +
+          `📌 Status: *${latestBill.status.toUpperCase()}*`;
+      }
+
+    // ── MARK BILL PAID ───────────────────────────────────────────────────────────
+    } else if (action.type === 'mark_paid') {
+      const { customerId, customerName } = action;
+      const unpaidBill = db.bills.find(b => b.customer_id === customerId && b.status === 'unpaid');
+      if (!unpaidBill) {
+        replyText = `ℹ️ *${customerName}* ka koi unpaid bill nahi hai.`;
+      } else {
+        unpaidBill.status = 'paid';
+        unpaidBill.paid_at = timestampIso;
+        await writeDB(db);
+        const bal = getCustomerOutstanding(customerId, db.transactions, db.bills);
+        replyText =
+          `✅ *Bill Mark Paid Ho Gaya!*\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `👤 Customer: *${customerName}*\n` +
+          `🧾 Bill #${unpaidBill.id} — ${fmtRs(unpaidBill.total)}\n` +
+          `📅 Paid on: ${fmtDate(timestampIso)}\n` +
+          (bal > 0
+            ? `💳 Remaining baaki: *${fmtRs(bal)}*`
+            : `🎉 *Poora hisab saaf ho gaya!*`);
+      }
+    // ── UNKNOWN → AI AGENT WITH TOOL USE ─────────────────────────────────────
+    } else {
+      console.log(`🤖 Regex did not match. Forwarding to Gemini AI Agent: "${bodyText}"`);
+      replyText = await askGeminiWithTools(bodyText, staffPhone);
+      console.log(`🤖 AI Agent reply: "${replyText}"`);
+    }
+
+    await sendWhatsAppMessage(staffPhone, replyText);
+    return res.status(200).json({ status: 'success', action: action.type, aiUsed: action.type === 'unknown' });
+  }
+
+  return res.sendStatus(200);
+});
+
+// ─── REST API ROUTES ───────────────────────────────────────────────────────────
+
+app.get('/api/db', async (req, res) => res.json(await readDB()));
+
+app.post('/api/db', async (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || !body.customers || !body.transactions || !body.bills) {
+    return res.status(400).json({ status: 'error', message: 'Invalid database payload' });
+  }
+  await writeDB(body);
+  res.json({ status: 'success' });
+});
+
+// ─── MANUAL TRIGGER ROUTES ─────────────────────────────────────────────────────
+
+// POST /api/send-reminders — Manually trigger payment reminders
+app.post('/api/send-reminders', async (req, res) => {
+  const db = await readDB();
+  let sentCount = 0;
+  const results = [];
+  for (const c of db.customers) {
+    const bal = getCustomerOutstanding(c.id, db.transactions, db.bills);
+    if (bal > 0 && c.phone) {
+      const msg =
+        `🙏 *${db.shop.name || 'Sharma General Store'}*\n\n` +
+        `Namaste *${c.name}* ji,\n\n` +
+        `Aapka ${fmtRs(bal)} ka baaki hai hamare yahan.\n` +
+        `Kripya jald hi chukta karein.\n\nShukriya 🙏`;
+      const sent = await sendWhatsAppMessage(c.phone, msg);
+      if (sent) { sentCount++; results.push({ name: c.name, amount: bal }); }
+    }
+  }
+  res.json({ status: 'success', sent: sentCount, results });
+});
+
+// GET /api/report — Get today's report JSON
+app.get('/api/report', async (req, res) => {
+  const db = await readDB();
+  const todayString = new Date().toISOString().substring(0, 10);
+  const billsToday = db.bills.filter(b => b.created_at.startsWith(todayString));
+  const billsTotal = billsToday.reduce((sum, b) => sum + b.total, 0);
+  const collectionsToday = db.transactions.filter(t => t.type === 'payment' && t.timestamp.startsWith(todayString));
+  const paymentTotal = collectionsToday.reduce((sum, t) => sum + t.amount, 0);
+  const outstanding = db.customers.map(c => ({
+    name: c.name, phone: c.phone,
+    balance: getCustomerOutstanding(c.id, db.transactions, db.bills)
+  })).filter(c => c.balance > 0);
+  res.json({ date: todayString, billsTotal, paymentTotal, billsCount: billsToday.length, outstanding });
+});
+
+// Root page
+app.get('/', (req, res) => {
+  res.send(`
+    <html><head><title>Sharma Store Bot</title></head>
+    <body style="font-family:sans-serif;padding:2rem;background:#f5f5f5">
+    <h1>🏪 Sharma Store WhatsApp Bot</h1>
+    <p>✅ Bot is running on port <strong>${PORT}</strong></p>
+    <h3>API Endpoints:</h3>
+    <ul>
+      <li><code>GET /webhook</code> — Meta webhook verification</li>
+      <li><code>POST /webhook</code> — Incoming WhatsApp messages</li>
+      <li><code>GET /api/db</code> — Read database</li>
+      <li><code>POST /api/db</code> — Write database</li>
+      <li><code>GET /api/report</code> — Today's report</li>
+      <li><code>POST /api/send-reminders</code> — Send payment reminders</li>
+    </ul>
+    <p><a href="/api/report">View Today's Report →</a></p>
+    </body></html>
+  `);
+});
+
+// ─── START SERVER ──────────────────────────────────────────────────────────────
+
+app.listen(PORT, () => {
+  console.log(`🚀 Sharma Store Bot running on port ${PORT}`);
+  console.log(`📱 Webhook: POST /webhook`);
+  console.log(`🌐 Dashboard API: GET /api/db`);
+  // Start daily 9 AM report scheduler
+  scheduleDaily(9, 0, sendDailyReport);
+});
