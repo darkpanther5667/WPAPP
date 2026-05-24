@@ -50,14 +50,14 @@ class MainViewModel : ViewModel() {
                 val db = ApiClient.apiService.getFullDatabase()
                 _dbState.value = UiState.Success(db)
             } catch (e: Exception) {
-                _dbState.value = UiState.Error(e.message ?: "Failed to load database")
+                _dbState.value = UiState.Error("Failed to load database: ${e.message}")
             }
 
             try {
                 val report = ApiClient.apiService.getDailyReport()
                 _reportState.value = UiState.Success(report)
             } catch (e: Exception) {
-                _reportState.value = UiState.Error(e.message ?: "Failed to load report")
+                _reportState.value = UiState.Error("Failed to load report: ${e.message}")
             }
         }
     }
@@ -74,7 +74,7 @@ class MainViewModel : ViewModel() {
                     _operationState.value = OperationState.Error(response.body()?.message ?: "Failed to add customer")
                 }
             } catch (e: Exception) {
-                _operationState.value = OperationState.Error(e.message ?: "Failed to add customer")
+                _operationState.value = OperationState.Error("Failed to add customer: ${e.message}")
             }
         }
     }
@@ -91,7 +91,7 @@ class MainViewModel : ViewModel() {
                     _operationState.value = OperationState.Error("Failed to record payment")
                 }
             } catch (e: Exception) {
-                _operationState.value = OperationState.Error(e.message ?: "Failed to record payment")
+                _operationState.value = OperationState.Error("Failed to record payment: ${e.message}")
             }
         }
     }
@@ -108,7 +108,7 @@ class MainViewModel : ViewModel() {
                     _operationState.value = OperationState.Error("Failed to create bill")
                 }
             } catch (e: Exception) {
-                _operationState.value = OperationState.Error(e.message ?: "Failed to create bill")
+                _operationState.value = OperationState.Error("Failed to create bill: ${e.message}")
             }
         }
     }
