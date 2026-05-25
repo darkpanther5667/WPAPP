@@ -2179,6 +2179,15 @@ app.get('/billing.html', (req, res) => {
   res.sendFile(__dirname + '/billing.html');
 });
 
+// Serve PWA files
+app.get('/manifest.json', (req, res) => {
+  res.sendFile(__dirname + '/manifest.json');
+});
+
+app.get('/sw.js', (req, res) => {
+  res.sendFile(__dirname + '/sw.js');
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Store Bot running on port ${PORT}`);
   console.log(`📱 Webhook: POST /webhook`);
