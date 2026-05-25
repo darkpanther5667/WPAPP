@@ -2075,6 +2075,23 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/dashboard.html');
 });
 
+// Serve other HTML pages
+app.get('/dashboard.html', (req, res) => {
+  res.sendFile(__dirname + '/dashboard.html');
+});
+
+app.get('/customers.html', (req, res) => {
+  res.sendFile(__dirname + '/customers.html');
+});
+
+app.get('/create-invoice.html', (req, res) => {
+  res.sendFile(__dirname + '/create-invoice.html');
+});
+
+app.get('/billing.html', (req, res) => {
+  res.sendFile(__dirname + '/billing.html');
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Store Bot running on port ${PORT}`);
   console.log(`📱 Webhook: POST /webhook`);
