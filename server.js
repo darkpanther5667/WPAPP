@@ -1710,14 +1710,44 @@ app.post('/webhook', async (req, res) => {
   return res.sendStatus(200);
 });
 
-// GET /api/test-db — Diagnostic route to check DB connection
+// GET /api/test-db — Diagnostic route to check DB connection and setup default store
 app.get('/api/test-db', async (req, res) => {
   try {
     const database = await connectDB();
     if (!database) return res.json({ status: 'No DB configured (useLocalFallback)' });
     
-    const collections = await database.listCollections().toArray();
-    return res.json({ status: 'Connected successfully!', collections: collections.map(c => c.name) });
+    // Create default store if missing
+    const stores = await database.collection('stores').find({}).toArray();
+    let storeId = stores.length > 0 ? stores[0].id : 'sharma-khata';
+    
+    if (stores.length === 0) {
+      await database.collection('stores').insertOne({
+        id: storeId,
+        store_name: 'Sharma Khata',
+        owner_name: 'Owner',
+        phone: '918052402633',
+        status: 'active'
+      });
+    }
+
+    // Create staff if missing
+    const staff = await database.collection('staff').find({ phone: '918052402633' }).toArray();
+    if (staff.length === 0) {
+      await database.collection('staff').insertOne({
+        id: 's1',
+        name: 'Owner',
+        phone: '918052402633',
+        role: 'owner',
+        store_id: storeId,
+        status: 'active'
+      });
+    }
+
+    return res.json({ 
+      status: 'Connected and setup successfully!', 
+      storeId: storeId,
+      phone: '918052402633'
+    });
   } catch (error) {
     return res.json({ status: 'Connection failed', error: error.message, stack: error.stack });
   }
