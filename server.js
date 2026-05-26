@@ -1751,7 +1751,7 @@ app.post('/api/auth/request-code', async (req, res) => {
     return res.json({ success: true });
   } catch (error) {
     console.error('Error requesting login code:', error);
-    return res.status(500).json({ success: false, message: 'Failed to request code' });
+    return res.status(500).json({ success: false, message: 'Failed to request code', error: error.message });
   }
 });
 
