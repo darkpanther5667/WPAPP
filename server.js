@@ -3,6 +3,7 @@ const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const OpenAI = require('openai');
 const PDFDocument = require('pdfkit');
 
@@ -18,6 +19,7 @@ if (openrouterApiKey && openrouterApiKey !== 'YOUR_OPENROUTER_API_KEY') {
 
 const app = express();
 app.use(express.json());
+app.set('trust proxy', 1);
 
 // Allow the local dashboard (file:// origin) to call the API
 app.use((req, res, next) => {
@@ -31,10 +33,127 @@ app.use((req, res, next) => {
 const PORT = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, 'db.json');
 
+// ─── MOBILE API KEY AUTH ──────────────────────────────────────────────────────
+
+function requiresMobileApiKey(req) {
+  if (!req.path.startsWith('/api/')) return false;
+
+  // Allow PDF endpoints to be fetched by WhatsApp/clients without an app key.
+  if (req.method === 'GET') {
+    if (/^\/api\/bill\/[^/]+\/pdf$/.test(req.path)) return false;
+    if (/^\/api\/customer\/[^/]+\/statement\/pdf$/.test(req.path)) return false;
+    if (/^\/api\/report\/[^/]+\/pdf$/.test(req.path)) return false;
+  }
+
+  // WhatsApp webhook is not under /api.
+  return true;
+}
+
+function mobileApiKeyMiddleware(req, res, next) {
+  if (!requiresMobileApiKey(req)) return next();
+
+  const expectedKey = process.env.MOBILE_API_KEY;
+  if (!expectedKey) {
+    return res.status(500).json({ success: false, message: 'Server misconfigured: MOBILE_API_KEY missing' });
+  }
+
+  const providedKey = req.get('X-API-KEY');
+  if (!providedKey || providedKey !== expectedKey) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  return next();
+}
+
+app.use(mobileApiKeyMiddleware);
+
+// ─── STORE SESSION AUTH (Bearer token) ────────────────────────────────────────
+
+function requiresSessionAuth(req) {
+  if (!req.path.startsWith('/api/')) return false;
+
+  // Auth + registration endpoints must be reachable without a session.
+  if (req.path === '/api/register-store') return false;
+  if (req.path.startsWith('/api/store/')) return false;
+  if (req.path === '/api/auth/request-code') return false;
+  if (req.path === '/api/auth/verify-code') return false;
+
+  // PDF endpoints are fetched by WhatsApp directly.
+  if (req.method === 'GET') {
+    if (/^\/api\/bill\/[^/]+\/pdf$/.test(req.path)) return false;
+    if (/^\/api\/customer\/[^/]+\/statement\/pdf$/.test(req.path)) return false;
+    if (/^\/api\/report\/[^/]+\/pdf$/.test(req.path)) return false;
+  }
+
+  return true;
+}
+
+async function sessionAuthMiddleware(req, res, next) {
+  if (!requiresSessionAuth(req)) return next();
+
+  const auth = req.get('Authorization') || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice('Bearer '.length).trim() : '';
+  if (!token) return res.status(401).json({ success: false, message: 'Missing session token' });
+
+  try {
+    const database = await connectDB();
+    if (!database) return res.status(500).json({ success: false, message: 'Server DB not configured' });
+
+    const session = await database.collection('sessions').findOne({ token, expires_at: { $gt: new Date() } });
+    if (!session) return res.status(401).json({ success: false, message: 'Invalid/expired session' });
+
+    req.storeId = session.store_id;
+    req.staffPhone = session.phone;
+    return next();
+  } catch (e) {
+    console.error('Session auth error:', e);
+    return res.status(500).json({ success: false, message: 'Auth failed' });
+  }
+}
+
+app.use(sessionAuthMiddleware);
+
+function getPublicBaseUrl(req) {
+  return process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
+}
+
+function normalizePhone(phone) {
+  if (!phone) return '';
+  const p = String(phone).trim();
+  if (p.startsWith('+')) return p.replace(/[^\d+]/g, '');
+  return p.replace(/[^\d]/g, '');
+}
+
+async function readStoreDB(storeId) {
+  const db = await readDB();
+  const sid = storeId || 'default';
+
+  const store = (db.stores || []).find(s => s.id === sid);
+  const shop =
+    store
+      ? {
+          name: store.store_name,
+          owner: store.owner_name,
+          phone: store.phone,
+          address: store.address,
+          store_id: sid,
+        }
+      : (sid === 'default' && db.shop ? db.shop : {});
+
+  return {
+    shop,
+    customers: (db.customers || []).filter(c => (c.store_id || 'default') === sid),
+    transactions: (db.transactions || []).filter(t => (t.store_id || 'default') === sid),
+    bills: (db.bills || []).filter(b => (b.store_id || 'default') === sid),
+    staff: (db.staff || []).filter(s => (s.store_id || 'default') === sid),
+    stores: db.stores || [],
+  };
+}
+
 // ─── DATABASE HELPERS (MONGODB) ────────────────────────────────────────────────
 const { connectDB, getFullDB } = require('./db.js');
 
-let cachedDB = { shop: {}, customers: [], transactions: [], bills: [], staff: [] };
+let cachedDB = { shop: {}, customers: [], transactions: [], bills: [], staff: [], stores: [] };
 let dbCacheTimestamp = 0;
 const DB_CACHE_TTL = 5000; // 5 seconds cache TTL
 
@@ -137,8 +256,14 @@ async function writeDB(data) {
   dbWriteLock = true;
   try {
     const database = await connectDB();
+    if (!database) {
+      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+      cachedDB = data;
+      return;
+    }
+
     // Overwrite collections (mimics the db.json full overwrite behavior for backwards compatibility)
-    for (const col of ['shop', 'customers', 'transactions', 'bills', 'staff']) {
+    for (const col of ['shop', 'customers', 'transactions', 'bills', 'staff', 'stores']) {
       if (data[col]) {
         await database.collection(col).deleteMany({});
         let docs = Array.isArray(data[col]) ? data[col] : [data[col]];
@@ -1146,8 +1271,17 @@ app.post('/webhook', async (req, res) => {
 
     console.log(`📩 [${staffPhone}]: "${bodyText}"`);
 
-    const db = await readDB();
-    const activeStaff = db.staff.find(s => s.phone === staffPhone) || { id: 'unknown', name: 'Unknown User' };
+    const fullDb = await readDB();
+    const staffRow = (fullDb.staff || []).find(s => s.phone === staffPhone);
+    if (!staffRow) {
+      await sendWhatsAppMessage(staffPhone, '❌ Not authorized. Please register your store and add this number as staff.');
+      return res.status(200).json({ status: 'success', action: 'unauthorized' });
+    }
+
+    const storeId = staffRow.store_id || 'default';
+    const db = await readStoreDB(storeId);
+    const shop = db.shop || {};
+    const activeStaff = staffRow;
     const action = parseCommand(bodyText, db.customers, db.transactions, db.bills);
     const timestampIso = new Date().toISOString();
     let replyText = '';
@@ -1576,6 +1710,92 @@ app.post('/webhook', async (req, res) => {
 
 // ─── MOBILE APP API ENDPOINTS ─────────────────────────────────────────────────────
 
+// POST /api/auth/request-code — Request WhatsApp OTP code for login
+app.post('/api/auth/request-code', async (req, res) => {
+  try {
+    const { storeId, phone } = req.body || {};
+    const sid = String(storeId || '').trim();
+    const p = normalizePhone(phone);
+    if (!sid || !p) return res.status(400).json({ success: false, message: 'storeId and phone are required' });
+
+    const database = await connectDB();
+    if (!database) return res.status(500).json({ success: false, message: 'Server DB not configured' });
+
+    const store = await database.collection('stores').findOne({ id: sid, status: { $ne: 'disabled' } });
+    if (!store) return res.status(404).json({ success: false, message: 'Store not found' });
+
+    const staff = await database.collection('staff').findOne({ phone: p, store_id: sid, status: { $ne: 'disabled' } });
+    if (!staff) return res.status(403).json({ success: false, message: 'Phone not authorized for this store' });
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await database.collection('login_codes').deleteMany({ store_id: sid, phone: p });
+    await database.collection('login_codes').insertOne({
+      store_id: sid,
+      phone: p,
+      code_hash: codeHash,
+      expires_at: expiresAt,
+      created_at: new Date(),
+      attempts: 0,
+    });
+
+    const msg =
+      `🔐 *Grahbook Login Code*\n\n` +
+      `Store: *${store.store_name || sid}*\n` +
+      `Code: *${code}*\n\n` +
+      `Valid for 10 minutes.`;
+
+    await sendWhatsAppMessage(p, msg);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Error requesting login code:', error);
+    return res.status(500).json({ success: false, message: 'Failed to request code' });
+  }
+});
+
+// POST /api/auth/verify-code — Verify OTP and create a session
+app.post('/api/auth/verify-code', async (req, res) => {
+  try {
+    const { storeId, phone, code } = req.body || {};
+    const sid = String(storeId || '').trim();
+    const p = normalizePhone(phone);
+    const c = String(code || '').trim();
+    if (!sid || !p || !c) return res.status(400).json({ success: false, message: 'storeId, phone, code are required' });
+
+    const database = await connectDB();
+    if (!database) return res.status(500).json({ success: false, message: 'Server DB not configured' });
+
+    const row = await database.collection('login_codes').findOne({ store_id: sid, phone: p, expires_at: { $gt: new Date() } });
+    if (!row) return res.status(401).json({ success: false, message: 'Invalid/expired code' });
+
+    const codeHash = crypto.createHash('sha256').update(c).digest('hex');
+    if (codeHash !== row.code_hash) {
+      await database.collection('login_codes').updateOne({ _id: row._id }, { $inc: { attempts: 1 } });
+      return res.status(401).json({ success: false, message: 'Invalid/expired code' });
+    }
+
+    await database.collection('login_codes').deleteMany({ store_id: sid, phone: p });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await database.collection('sessions').insertOne({
+      token,
+      store_id: sid,
+      phone: p,
+      created_at: new Date(),
+      expires_at: expiresAt,
+    });
+
+    const store = await database.collection('stores').findOne({ id: sid });
+    return res.json({ success: true, token, store });
+  } catch (error) {
+    console.error('Error verifying code:', error);
+    return res.status(500).json({ success: false, message: 'Failed to verify code' });
+  }
+});
+
 // POST /api/customer/add - Add a new customer
 app.post('/api/customer/add', async (req, res) => {
   try {
@@ -1584,7 +1804,7 @@ app.post('/api/customer/add', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Name and phone are required' });
     }
 
-    const db = await readDB();
+    const db = await readStoreDB(req.storeId);
     
     // Check if customer already exists
     const existingCustomer = db.customers.find(c => c.name.toLowerCase() === name.toLowerCase() || c.phone === phone);
@@ -1596,7 +1816,8 @@ app.post('/api/customer/add', async (req, res) => {
       id: genId('c'),
       name: name.replace(/\b\w/g, c => c.toUpperCase()),
       phone,
-      created_at: new Date().toISOString().substring(0, 10)
+      created_at: new Date().toISOString().substring(0, 10),
+      store_id: req.storeId || 'default',
     };
 
     db.customers.push(newCustomer);
@@ -1620,7 +1841,7 @@ app.post('/api/payment/add', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Customer ID and amount are required' });
     }
 
-    const db = await readDB();
+    const db = await readStoreDB(req.storeId);
     const customer = db.customers.find(c => c.id === customerId);
     if (!customer) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
@@ -1634,7 +1855,8 @@ app.post('/api/payment/add', async (req, res) => {
       amount: Number(amount),
       note: note || 'Payment recorded via Mobile App',
       staff_phone: 'mobile_app',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      store_id: req.storeId || 'default',
     });
 
     await writeDB(db);
@@ -1658,7 +1880,7 @@ app.post('/api/bill/create', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Customer ID and amount are required' });
     }
 
-    const db = await readDB();
+    const db = await readStoreDB(req.storeId);
     const customer = db.customers.find(c => c.id === customerId);
     if (!customer) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
@@ -1682,7 +1904,8 @@ app.post('/api/bill/create', async (req, res) => {
       total: Number(amount),
       status: 'unpaid',
       created_at: timestampIso,
-      paid_at: null
+      paid_at: null,
+      store_id: req.storeId || 'default',
     });
 
     await writeDB(db);
@@ -1698,9 +1921,41 @@ app.post('/api/bill/create', async (req, res) => {
   }
 });
 
+// POST /api/bill/mark-paid - Mark a bill as paid
+app.post('/api/bill/mark-paid', async (req, res) => {
+  try {
+    const { billId } = req.body || {};
+    if (!billId) {
+      return res.status(400).json({ success: false, message: 'billId is required' });
+    }
+
+    const db = await readStoreDB(req.storeId);
+    const bill = db.bills.find(b => b.id === billId);
+    if (!bill) {
+      return res.status(404).json({ success: false, message: 'Bill not found' });
+    }
+
+    if (bill.status === 'paid') {
+      return res.json({ success: true, billId, status: 'paid' });
+    }
+
+    bill.status = 'paid';
+    bill.paid_at = new Date().toISOString();
+
+    await writeDB(db);
+    cachedDB = null;
+    dbCacheTimestamp = 0;
+
+    return res.json({ success: true, billId, status: 'paid', paid_at: bill.paid_at });
+  } catch (error) {
+    console.error('Error marking bill paid:', error);
+    return res.status(500).json({ success: false, message: 'Failed to mark bill paid' });
+  }
+});
+
 // ─── REST API ROUTES ───────────────────────────────────────────────────────────
 
-app.get('/api/db', async (req, res) => res.json(await readDB()));
+app.get('/api/db', async (req, res) => res.json(await readStoreDB(req.storeId)));
 
 app.post('/api/db', async (req, res) => {
   const body = req.body;
@@ -1714,7 +1969,7 @@ app.post('/api/db', async (req, res) => {
 // POST /api/register-store - Register a new store
 app.post('/api/register-store', async (req, res) => {
   try {
-    const { store_name, owner_name, phone, email, business_type, plan } = req.body;
+    const { store_name, owner_name, phone, email, business_type, plan, address } = req.body;
     
     if (!store_name || !owner_name || !phone || !email) {
       return res.status(400).json({ status: 'error', message: 'Missing required fields' });
@@ -1742,23 +1997,40 @@ app.post('/api/register-store', async (req, res) => {
       id: storeId,
       store_name: store_name,
       owner_name: owner_name,
-      phone: phone,
+      phone: normalizePhone(phone),
       email: email,
       business_type: business_type || 'retail',
       plan: plan || 'basic',
+      address: address || '',
       created_at: new Date().toISOString(),
       status: 'active'
     };
     
     // Add store to database
     db.stores.push(newStore);
+
+    // Ensure owner is authorized for this store (staff entry)
+    if (!db.staff) db.staff = [];
+    const ownerPhone = normalizePhone(phone);
+    const existsStaff = db.staff.find(s => s.phone === ownerPhone && (s.store_id || 'default') === storeId);
+    if (!existsStaff) {
+      db.staff.push({
+        id: genId('s'),
+        name: owner_name,
+        phone: ownerPhone,
+        role: 'owner',
+        store_id: storeId,
+        status: 'active',
+        created_at: new Date().toISOString(),
+      });
+    }
     
     // Write updated database
     await writeDB(db);
     
     // Send welcome message via WhatsApp
     const welcomeMessage = `🎉 *Welcome to Grahbook!* 🎉\n\nYour store "${store_name}" has been successfully registered.\n\n📱 *Your Store Dashboard Link:* https://grahbook.com/dashboard/${storeId}\n\nUse this link to access your personalized dashboard.\n\nIf you have any questions, feel free to reach out to our support team.\n\nHappy selling! 🚀`;
-    await sendWhatsAppMessage(phone, welcomeMessage);
+    await sendWhatsAppMessage(ownerPhone, welcomeMessage);
     
     res.json({ 
       status: 'success', 
@@ -1822,7 +2094,7 @@ app.post('/api/send-reminders', async (req, res) => {
 
 // GET /api/report — Get today's report JSON
 app.get('/api/report', async (req, res) => {
-  const db = await readDB();
+  const db = await readStoreDB(req.storeId);
   const todayString = new Date().toISOString().substring(0, 10);
   const billsToday = db.bills.filter(b => b.created_at.startsWith(todayString));
   const billsTotal = billsToday.reduce((sum, b) => sum + b.total, 0);
@@ -1833,6 +2105,91 @@ app.get('/api/report', async (req, res) => {
     balance: getCustomerOutstanding(c.id, db.transactions, db.bills)
   })).filter(c => c.balance > 0);
   res.json({ date: todayString, billsTotal, paymentTotal, billsCount: billsToday.length, outstanding });
+});
+
+// ─── MOBILE → WHATSAPP ACTIONS (requires X-API-KEY) ───────────────────────────
+
+// POST /api/whatsapp/send-invoice — Sends an invoice PDF to the customer via WhatsApp
+app.post('/api/whatsapp/send-invoice', async (req, res) => {
+  try {
+    const { billId } = req.body || {};
+    if (!billId) return res.status(400).json({ success: false, message: 'billId is required' });
+
+    const db = await readStoreDB(req.storeId);
+    const bill = db.bills.find(b => b.id === billId);
+    if (!bill) return res.status(404).json({ success: false, message: 'Bill not found' });
+
+    const customer = db.customers.find(c => c.id === bill.customer_id);
+    if (!customer?.phone) return res.status(400).json({ success: false, message: 'Customer phone missing' });
+
+    const shop = db.shop || {};
+    const baseUrl = getPublicBaseUrl(req);
+    const pdfUrl = `${baseUrl}/api/bill/${encodeURIComponent(billId)}/pdf`;
+    const ok = await sendWhatsAppDocument(
+      customer.phone,
+      pdfUrl,
+      `invoice-${billId}.pdf`,
+      `🧾 Invoice from ${shop.name || 'Store'}`
+    );
+
+    return res.json({ success: ok, billId, customerPhone: customer.phone });
+  } catch (error) {
+    console.error('Error sending invoice:', error);
+    return res.status(500).json({ success: false, message: 'Failed to send invoice' });
+  }
+});
+
+// POST /api/whatsapp/send-statement — Sends customer statement PDF via WhatsApp
+app.post('/api/whatsapp/send-statement', async (req, res) => {
+  try {
+    const { customerId } = req.body || {};
+    if (!customerId) return res.status(400).json({ success: false, message: 'customerId is required' });
+
+    const db = await readStoreDB(req.storeId);
+    const customer = db.customers.find(c => c.id === customerId);
+    if (!customer) return res.status(404).json({ success: false, message: 'Customer not found' });
+    if (!customer.phone) return res.status(400).json({ success: false, message: 'Customer phone missing' });
+
+    const shop = db.shop || {};
+    const baseUrl = getPublicBaseUrl(req);
+    const pdfUrl = `${baseUrl}/api/customer/${encodeURIComponent(customerId)}/statement/pdf`;
+    const ok = await sendWhatsAppDocument(
+      customer.phone,
+      pdfUrl,
+      `statement-${customerId}.pdf`,
+      `📊 Account statement from ${shop.name || 'Store'}`
+    );
+
+    return res.json({ success: ok, customerId, customerPhone: customer.phone });
+  } catch (error) {
+    console.error('Error sending statement:', error);
+    return res.status(500).json({ success: false, message: 'Failed to send statement' });
+  }
+});
+
+// POST /api/whatsapp/send-reminder — Sends an outstanding reminder via WhatsApp
+app.post('/api/whatsapp/send-reminder', async (req, res) => {
+  try {
+    const { customerId, message } = req.body || {};
+    if (!customerId) return res.status(400).json({ success: false, message: 'customerId is required' });
+
+    const db = await readStoreDB(req.storeId);
+    const customer = db.customers.find(c => c.id === customerId);
+    if (!customer) return res.status(404).json({ success: false, message: 'Customer not found' });
+    if (!customer.phone) return res.status(400).json({ success: false, message: 'Customer phone missing' });
+
+    const shop = db.shop || {};
+    const bal = getCustomerOutstanding(customerId, db.transactions, db.bills);
+    const text =
+      (message && String(message).trim()) ||
+      `🙏 *${shop.name || 'Store'}*\n\nNamaste *${customer.name}* ji,\nAapka ${fmtRs(bal)} ka baaki hai.\nKripya jald hi chukta karein.`;
+
+    const ok = await sendWhatsAppMessage(customer.phone, text);
+    return res.json({ success: ok, customerId, customerPhone: customer.phone, outstanding: bal });
+  } catch (error) {
+    console.error('Error sending reminder:', error);
+    return res.status(500).json({ success: false, message: 'Failed to send reminder' });
+  }
 });
 
 // GET /api/bill/:id/pdf — Generate and return PDF invoice

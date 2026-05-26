@@ -1,0 +1,22 @@
+{
+  "appId": "com.grahbook.app",
+  "appName": "Grahbook",
+  "webDir": ".",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true,
+    "url": "http://localhost:3000"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "launchAutoHide": true,
+      "backgroundColor": "#25d366",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "androidSpinnerStyle": "large",
+      "spinnerColor": "#ffffff"
+    }
+  }
+}

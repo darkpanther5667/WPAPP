@@ -27,7 +27,7 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(viewModel: MainViewModel, onNavigateToCustomers: () -> Unit) {
+fun DashboardScreen(viewModel: MainViewModel, onNavigateToCustomers: () -> Unit, onNavigateToWebView: () -> Unit) {
     val reportState by viewModel.reportState.collectAsState()
 
     // Fetch data when screen loads
@@ -44,6 +44,9 @@ fun DashboardScreen(viewModel: MainViewModel, onNavigateToCustomers: () -> Unit)
                     titleContentColor = MaterialTheme.colorScheme.primary
                 ),
                 actions = {
+                    IconButton(onClick = onNavigateToWebView) {
+                        Icon(Icons.Default.Info, contentDescription = "Web Dashboard")
+                    }
                     IconButton(onClick = { viewModel.fetchData() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }

@@ -26,6 +26,7 @@ import com.example.ui.screens.CustomersScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.LedgerScreen
 import com.example.ui.screens.PaymentRecordingScreen
+import com.example.ui.screens.WebViewScreen
 import com.example.ui.viewmodel.MainViewModel
 
 class MainActivity : ComponentActivity() {
@@ -60,6 +61,10 @@ fun AppNavigation(viewModel: MainViewModel = viewModel()) {
           onNavigateToCustomers = {
             currentScreen = "customers"
             navController.navigate("customers")
+          },
+          onNavigateToWebView = {
+            currentScreen = "webview"
+            navController.navigate("webview")
           }
         )
       }
@@ -164,6 +169,15 @@ fun AppNavigation(viewModel: MainViewModel = viewModel()) {
           customerId = customerId,
           onBack = {
             currentScreen = "customer_detail"
+            navController.popBackStack()
+          }
+        )
+      }
+      composable("webview") {
+        WebViewScreen(
+          url = "http://10.0.2.2:3000",
+          onBack = {
+            currentScreen = "dashboard"
             navController.popBackStack()
           }
         )
