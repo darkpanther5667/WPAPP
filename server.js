@@ -123,9 +123,20 @@ function getPublicBaseUrl(req) {
 
 function normalizePhone(phone) {
   if (!phone) return '';
-  const p = String(phone).trim();
-  if (p.startsWith('+')) return p.replace(/[^\d+]/g, '');
-  return p.replace(/[^\d]/g, '');
+  let p = String(phone).trim();
+  // Strip all non-digit characters
+  if (p.startsWith('+')) {
+    p = p.replace(/[^\d]/g, '');
+  } else {
+    p = p.replace(/[^\d]/g, '');
+  }
+  // If 10 digits, assume Indian number and prepend country code 91
+  if (p.length === 10) {
+    p = '91' + p;
+  }
+  // Strip leading zeros
+  p = p.replace(/^0+/, '');
+  return p;
 }
 
 async function readStoreDB(storeId) {
@@ -1794,12 +1805,17 @@ app.post('/api/auth/request-code', async (req, res) => {
     const p = normalizePhone(phone);
     if (!p) return res.status(400).json({ success: false, message: 'phone is required' });
 
+    // Build phone variants for backwards-compatible lookups
+    const phoneVariants = [p];
+    if (p.startsWith('91') && p.length === 12) phoneVariants.push(p.slice(2));
+    else if (p.length === 10) phoneVariants.push('91' + p);
+
     const database = await connectDB();
     if (!database) return res.status(500).json({ success: false, message: 'Server DB not configured' });
 
     // If no storeId provided, look up store by phone via staff collection
     if (!sid) {
-      const staffEntry = await database.collection('staff').findOne({ phone: p, status: { $ne: 'disabled' } });
+      const staffEntry = await database.collection('staff').findOne({ phone: { $in: phoneVariants }, status: { $ne: 'disabled' } });
       if (!staffEntry) return res.status(404).json({ success: false, message: 'No store found for this phone number. Please register first.' });
       sid = staffEntry.store_id;
     }
@@ -1807,14 +1823,14 @@ app.post('/api/auth/request-code', async (req, res) => {
     const store = await database.collection('stores').findOne({ id: sid, status: { $ne: 'disabled' } });
     if (!store) return res.status(404).json({ success: false, message: 'Store not found' });
 
-    const staff = await database.collection('staff').findOne({ phone: p, store_id: sid, status: { $ne: 'disabled' } });
+    const staff = await database.collection('staff').findOne({ phone: { $in: phoneVariants }, store_id: sid, status: { $ne: 'disabled' } });
     if (!staff) return res.status(403).json({ success: false, message: 'Phone not authorized for this store' });
 
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const codeHash = crypto.createHash('sha256').update(code).digest('hex');
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    await database.collection('login_codes').deleteMany({ store_id: sid, phone: p });
+    await database.collection('login_codes').deleteMany({ store_id: sid, phone: { $in: phoneVariants } });
     await database.collection('login_codes').insertOne({
       store_id: sid,
       phone: p,
@@ -1851,13 +1867,17 @@ app.post('/api/auth/verify-code', async (req, res) => {
     if (!database) return res.status(500).json({ success: false, message: 'Server DB not configured' });
 
     // If no storeId, look up from login_codes by phone
+    const phoneVariants = [p];
+    if (p.startsWith('91') && p.length === 12) phoneVariants.push(p.slice(2));
+    else if (p.length === 10) phoneVariants.push('91' + p);
+
     if (!sid) {
-      const codeEntry = await database.collection('login_codes').findOne({ phone: p, expires_at: { $gt: new Date() } });
+      const codeEntry = await database.collection('login_codes').findOne({ phone: { $in: phoneVariants }, expires_at: { $gt: new Date() } });
       if (codeEntry) sid = codeEntry.store_id;
       if (!sid) return res.status(400).json({ success: false, message: 'No pending login found. Please request a code first.' });
     }
 
-    const row = await database.collection('login_codes').findOne({ store_id: sid, phone: p, expires_at: { $gt: new Date() } });
+    const row = await database.collection('login_codes').findOne({ store_id: sid, phone: { $in: phoneVariants }, expires_at: { $gt: new Date() } });
     if (!row) return res.status(401).json({ success: false, message: 'Invalid/expired code' });
 
     const codeHash = crypto.createHash('sha256').update(c).digest('hex');
@@ -1866,7 +1886,7 @@ app.post('/api/auth/verify-code', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid/expired code' });
     }
 
-    await database.collection('login_codes').deleteMany({ store_id: sid, phone: p });
+    await database.collection('login_codes').deleteMany({ store_id: sid, phone: { $in: phoneVariants } });
 
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
