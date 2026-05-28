@@ -1,6 +1,8 @@
 package com.aistudio.sharmakhata.pqmzvk.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,13 +14,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiClient
 import com.aistudio.sharmakhata.pqmzvk.data.remote.BillItemRequest
+import com.aistudio.sharmakhata.pqmzvk.data.remote.StoredItem
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
@@ -45,6 +51,20 @@ fun BillCreationScreen(
 
     var items by remember { mutableStateOf(listOf(BillItemEntry())) }
     var showSuccessDialog by remember { mutableStateOf(false) }
+
+    // Stored items from server
+    var storedItems by remember { mutableStateOf<List<StoredItem>>(emptyList()) }
+    var showStoredItems by remember { mutableStateOf(true) }
+
+    // Fetch stored items on launch
+    LaunchedEffect(Unit) {
+        try {
+            val response = ApiClient.apiService.getStoredItems()
+            storedItems = response.items
+        } catch (_: Exception) {
+            // Silently fail — stored items are optional
+        }
+    }
 
     LaunchedEffect(operationState) {
         when (operationState) {
@@ -109,6 +129,28 @@ fun BillCreationScreen(
             val price = item.price.toDoubleOrNull() ?: 0.0
             val qty = item.qty.toIntOrNull() ?: 1
             price * qty
+        }
+    }
+
+    // Add a stored item to the bill — fills first empty row or appends a new one
+    fun addStoredItem(stored: StoredItem) {
+        val firstEmptyIdx = items.indexOfFirst { it.name.isBlank() }
+        if (firstEmptyIdx >= 0) {
+            items = items.toMutableList().also {
+                it[firstEmptyIdx] = BillItemEntry(
+                    name = stored.name,
+                    price = stored.lastPrice.toString(),
+                    qty = "1"
+                )
+            }
+        } else {
+            if (items.size < 20) {
+                items = items + BillItemEntry(
+                    name = stored.name,
+                    price = stored.lastPrice.toString(),
+                    qty = "1"
+                )
+            }
         }
     }
 
@@ -178,6 +220,80 @@ fun BillCreationScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
+                        }
+                    }
+                }
+
+                // Stored items section (from server catalog)
+                if (storedItems.isNotEmpty() && showStoredItems) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = CardShape,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.flat)
+                    ) {
+                        Column(modifier = Modifier.padding(Spacing.cardPadding)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.ShoppingCart,
+                                        contentDescription = null,
+                                        tint = IndigoPrimary,
+                                        modifier = Modifier.size(IconSize.small)
+                                    )
+                                    Spacer(modifier = Modifier.width(Spacing.small))
+                                    Text(
+                                        text = "Quick Add Items",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { showStoredItems = false },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Hide",
+                                        tint = Slate400,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(Spacing.small))
+                            // Horizontally scrollable chips
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.small)
+                            ) {
+                                storedItems.take(20).forEach { stored ->
+                                    SuggestionChip(
+                                        onClick = { addStoredItem(stored) },
+                                        label = {
+                                            Text(
+                                                text = "${stored.name} \u20B9${stored.lastPrice.toInt()}",
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        },
+                                        icon = {
+                                            Icon(
+                                                Icons.Default.Add,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -257,7 +373,7 @@ fun BillCreationScreen(
                                 Spacer(modifier = Modifier.width(32.dp)) // for delete button
                             }
 
-                            Divider(color = CardBorder)
+                            HorizontalDivider(color = CardBorder)
 
                             Spacer(modifier = Modifier.height(8.dp))
 
@@ -330,7 +446,7 @@ fun BillCreationScreen(
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(48.dp),
-                                        placeholder = { Text("₹0", fontSize = 12.sp, textAlign = TextAlign.End) },
+                                        placeholder = { Text("\u20B90", fontSize = 12.sp, textAlign = TextAlign.End) },
                                         textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.End),
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -406,7 +522,7 @@ fun BillCreationScreen(
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
-                            Divider(color = CardBorder)
+                            HorizontalDivider(color = CardBorder)
                             Spacer(modifier = Modifier.height(8.dp))
 
                             Row(
@@ -450,9 +566,9 @@ fun BillCreationScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp),
+                        .height(ComponentSize.buttonHeight),
                     enabled = isValid && operationState !is OperationState.Loading,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = ButtonShape,
                     colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary)
                 ) {
                     if (operationState is OperationState.Loading) {

@@ -86,8 +86,6 @@ class MainViewModel : ViewModel() {
 
     fun fetchData(context: Context? = null) {
         println("MainViewModel: fetchData() called - starting sync")
-        _dbState.value = UiState.Loading
-        _reportState.value = UiState.Loading
         _syncError.value = null
 
         // Check network before starting sync
@@ -99,44 +97,53 @@ class MainViewModel : ViewModel() {
             return
         }
 
-        // Actually start the LiveSyncManager
-        println("MainViewModel: Starting LiveSyncManager")
+        // Ensure LiveSyncManager is running for continuous polling
         LiveSyncManager.start()
 
-        // Initialize LiveSyncManager (already done in init)
+        // Collect ongoing LiveSyncManager updates (idempotent — safe to call multiple times)
         viewModelScope.launch {
-            println("MainViewModel: Starting to collect fullDatabase from LiveSyncManager")
-            // Collect live full database updates
             LiveSyncManager.fullDatabase.collect { db ->
-                println("MainViewModel: Received fullDatabase update: ${db != null}")
                 if (db != null) {
-                    println("MainViewModel: Database received successfully, customers: ${db.customers.size}, bills: ${db.bills.size}")
                     _dbState.value = UiState.Success(db)
                 }
             }
         }
         viewModelScope.launch {
-            println("MainViewModel: Starting to collect dailyReport from LiveSyncManager")
-            // Collect live daily report updates
             LiveSyncManager.dailyReport.collect { report ->
-                println("MainViewModel: Received dailyReport update: ${report != null}")
                 if (report != null) {
-                    println("MainViewModel: Report received successfully")
                     _reportState.value = UiState.Success(report)
                 }
             }
         }
         viewModelScope.launch {
-            println("MainViewModel: Starting to collect syncError from LiveSyncManager")
-            // Collect sync errors
             LiveSyncManager.syncError.collect { error ->
-                println("MainViewModel: Received syncError: $error")
                 if (error != null) {
-                    println("MainViewModel: Sync error detected, updating UI states")
                     _syncError.value = error
                     _dbState.value = UiState.Error(error)
                     _reportState.value = UiState.Error(error)
                 }
+            }
+        }
+
+        // IMMEDIATE one-shot fetch — critical after mutations (createBill, addCustomer, etc.)
+        // LiveSyncManager polls every 30s which is too slow for post-mutation refresh
+        viewModelScope.launch {
+            try {
+                println("MainViewModel: Immediate fetch started")
+                val db = ApiClient.apiService.getFullDatabase()
+                println("MainViewModel: Immediate DB received — customers: ${db.customers.size}, bills: ${db.bills.size}")
+                _dbState.value = UiState.Success(db)
+            } catch (e: Exception) {
+                println("MainViewModel: Immediate DB fetch failed: ${e.message}")
+                // Don't override existing good state — LiveSyncManager will retry
+            }
+        }
+        viewModelScope.launch {
+            try {
+                val report = ApiClient.apiService.getDailyReport()
+                _reportState.value = UiState.Success(report)
+            } catch (e: Exception) {
+                println("MainViewModel: Immediate report fetch failed: ${e.message}")
             }
         }
     }

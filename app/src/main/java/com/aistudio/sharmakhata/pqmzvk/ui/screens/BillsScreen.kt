@@ -372,7 +372,7 @@ private fun InvoiceCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Divider(color = CardBorder)
+            HorizontalDivider(color = CardBorder)
 
             Spacer(modifier = Modifier.height(8.dp))
 

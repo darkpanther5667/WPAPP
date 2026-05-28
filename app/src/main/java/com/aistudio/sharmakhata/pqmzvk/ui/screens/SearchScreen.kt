@@ -1,5 +1,6 @@
 package com.aistudio.sharmakhata.pqmzvk.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,16 +11,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
@@ -29,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -41,15 +40,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aistudio.sharmakhata.pqmzvk.data.model.Bill
 import com.aistudio.sharmakhata.pqmzvk.data.model.Customer
+import com.aistudio.sharmakhata.pqmzvk.ui.components.AppAvatar
 import com.aistudio.sharmakhata.pqmzvk.ui.components.EmptyState
 import com.aistudio.sharmakhata.pqmzvk.ui.components.ShimmerLoading
+import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,7 +67,7 @@ fun SearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Search") },
+                title = { Text("Search", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -83,10 +85,11 @@ fun SearchScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Search bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = Spacing.screenPadding, vertical = Spacing.medium),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
@@ -94,20 +97,24 @@ fun SearchScreen(
                     onValueChange = { searchQuery = it },
                     modifier = Modifier
                         .weight(1f)
-                        .height(56.dp),
-                    placeholder = { Text("Search customers and bills...") },
+                        .height(ComponentSize.textFieldHeight),
+                    placeholder = { Text("Search customers and bills...", color = TextTertiaryLight) },
                     leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null)
+                        Icon(Icons.Default.Search, contentDescription = null, tint = Slate400)
                     },
                     trailingIcon = if (searchQuery.isNotEmpty()) {
                         {
                             IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Slate500)
                             }
                         }
                     } else null,
                     singleLine = true,
-                    shape = RoundedCornerShape(28.dp)
+                    shape = SearchBarShape,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = IndigoPrimary,
+                        cursorColor = IndigoPrimary
+                    )
                 )
             }
 
@@ -170,16 +177,21 @@ fun SearchScreen(
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                horizontal = Spacing.screenPadding,
+                                vertical = Spacing.small
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.listItemGap)
                         ) {
                             if (filteredCustomers.isNotEmpty()) {
                                 item {
                                     Text(
-                                        text = "Customers",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        text = "CUSTOMERS",
+                                        style = SectionOverlineStyle,
+                                        modifier = Modifier.padding(
+                                            top = Spacing.small,
+                                            bottom = Spacing.medium
+                                        )
                                     )
                                 }
                                 items(filteredCustomers) { customer ->
@@ -188,16 +200,18 @@ fun SearchScreen(
                                         onClick = { onCustomerClick(customer.id) }
                                     )
                                 }
-                                item { Spacer(modifier = Modifier.height(16.dp)) }
+                                item { Spacer(modifier = Modifier.height(Spacing.sectionGap)) }
                             }
 
                             if (filteredBills.isNotEmpty()) {
                                 item {
                                     Text(
-                                        text = "Bills",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        text = "BILLS",
+                                        style = SectionOverlineStyle,
+                                        modifier = Modifier.padding(
+                                            top = Spacing.small,
+                                            bottom = Spacing.medium
+                                        )
                                     )
                                 }
                                 items(filteredBills) { bill ->
@@ -205,6 +219,7 @@ fun SearchScreen(
                                     BillSearchResult(
                                         bill = bill,
                                         customerName = customer?.name ?: "Unknown",
+                                        customer = customer,
                                         onClick = { onBillClick(bill.customerId, bill.id) }
                                     )
                                 }
@@ -222,36 +237,39 @@ private fun CustomerSearchResult(
     customer: Customer,
     onClick: () -> Unit
 ) {
+    val colorIndex = abs(customer.id.hashCode()) % AvatarColors.size
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
+        shape = ListCardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.low)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(Spacing.cardPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.Person,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(end = 12.dp)
+            AppAvatar(
+                name = customer.name,
+                size = ComponentSize.avatarMedium,
+                colorIndex = colorIndex
             )
+            Spacer(modifier = Modifier.width(Spacing.medium))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = customer.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = customer.phone ?: "",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = TextSecondaryLight
                 )
             }
         }
@@ -262,40 +280,62 @@ private fun CustomerSearchResult(
 private fun BillSearchResult(
     bill: Bill,
     customerName: String,
+    customer: Customer?,
     onClick: () -> Unit
 ) {
+    val isPaid = bill.status == "paid"
+    val statusColor = if (isPaid) BillPaid else BillUnpaid
+    val statusBg = if (isPaid) EmeraldContainer else ErrorContainer
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
+        shape = ListCardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.low)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(Spacing.cardPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.Receipt,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(end = 12.dp)
-            )
+            // Receipt icon in colored container
+            Box(
+                modifier = Modifier
+                    .size(ComponentSize.iconContainerMedium)
+                    .clip(ActionIconShape)
+                    .background(statusBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Receipt,
+                    contentDescription = null,
+                    tint = statusColor,
+                    modifier = Modifier.size(IconSize.small)
+                )
+            }
+            Spacer(modifier = Modifier.width(Spacing.medium))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = customerName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Bill ID: ${bill.id.take(8)}",
+                    text = "Bill #${bill.id.take(8)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = TextSecondaryLight
                 )
             }
+            // Bill total
+            Text(
+                text = "\u20B9${"%,.0f".format(bill.total)}",
+                style = AmountSmallStyle,
+                color = if (isPaid) AmountCredit else AmountDue
+            )
         }
     }
 }

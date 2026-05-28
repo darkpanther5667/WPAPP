@@ -2031,6 +2031,32 @@ app.post('/api/bill/create', async (req, res) => {
   }
 });
 
+// GET /api/items — Get unique items from past bills (stored items catalog)
+app.get('/api/items', async (req, res) => {
+  try {
+    const db = await readStoreDB(req.storeId);
+    const itemMap = {};
+    for (const bill of db.bills) {
+      if (bill.items) {
+        for (const item of bill.items) {
+          const key = item.name.toLowerCase().trim();
+          if (!key) continue;
+          if (!itemMap[key]) {
+            itemMap[key] = { name: item.name, price: item.price, count: 0, lastPrice: item.price };
+          }
+          itemMap[key].count++;
+          itemMap[key].lastPrice = item.price;
+        }
+      }
+    }
+    const items = Object.values(itemMap).sort((a, b) => b.count - a.count);
+    res.json({ success: true, items });
+  } catch (error) {
+    console.error('Error fetching items:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch items' });
+  }
+});
+
 // POST /api/bill/mark-paid - Mark a bill as paid
 app.post('/api/bill/mark-paid', async (req, res) => {
   try {

@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
+import com.aistudio.sharmakhata.pqmzvk.ui.components.AppAvatar
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
@@ -171,36 +172,22 @@ fun PaymentRecordingScreen(
                 // Customer info card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = CardShape,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = Elevation.low)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
+                            .padding(Spacing.xlarge),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.large)
                     ) {
-                        // Avatar
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(IndigoPrimary, IndigoDark)
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = customerName.firstOrNull()?.uppercase()?.toString() ?: "C",
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                        AppAvatar(
+                            name = customerName,
+                            size = ComponentSize.avatarLarge + 8.dp,
+                            colorIndex = kotlin.math.abs(customerId.hashCode()) % AvatarColors.size
+                        )
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -212,14 +199,14 @@ fun PaymentRecordingScreen(
                             if (pendingAmount > 0) {
                                 Text(
                                     text = "Pending: ${FormatUtils.formatCurrency(pendingAmount)}",
-                                    fontSize = 13.sp,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = ErrorRed,
                                     fontWeight = FontWeight.Medium
                                 )
                             } else {
                                 Text(
                                     text = "No pending amount",
-                                    fontSize = 13.sp,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = SuccessGreen,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -412,9 +399,9 @@ fun PaymentRecordingScreen(
                     onClick = { showConfirmDialog = true },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp),
+                        .height(ComponentSize.buttonHeight),
                     enabled = isValid && operationState !is OperationState.Loading,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = ButtonShape,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isCredit) ErrorRed else SuccessGreen
                     )

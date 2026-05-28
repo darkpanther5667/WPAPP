@@ -1,6 +1,5 @@
 package com.aistudio.sharmakhata.pqmzvk.ui.screens
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -55,56 +54,79 @@ fun DashboardScreen(
     val pullToRefreshState = rememberPullToRefreshState()
     val context = LocalContext.current
 
-    // Get business info from db
-    val businessName = remember(dbState) {
+    val shopName = remember(dbState) {
         when (dbState) {
             is UiState.Success -> (dbState as UiState.Success).data.shop?.name ?: "Grahbook"
             else -> "Grahbook"
         }
     }
 
+    val ownerName = remember(dbState) {
+        when (dbState) {
+            is UiState.Success -> (dbState as UiState.Success).data.shop?.owner ?: ""
+            else -> ""
+        }
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 0.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = Spacing.large, vertical = Spacing.medium),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Left: Shop name + greeting
+                    Column {
+                        Text(
+                            text = shopName,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            letterSpacing = (-0.3).sp
+                        )
+                        Text(
+                            text = ownerName.ifBlank { "Your Business" },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondaryLight
+                        )
+                    }
+                    // Right: Web dashboard icon + avatar
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.small)
                     ) {
+                        IconButton(onClick = onNavigateToWebView) {
+                            Icon(
+                                Icons.Outlined.Language,
+                                contentDescription = "Web Dashboard",
+                                tint = TextSecondaryLight,
+                                modifier = Modifier.size(IconSize.medium)
+                            )
+                        }
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(IndigoPrimary, IndigoDark)
-                                    )
-                                ),
+                                .size(ComponentSize.avatarSmall)
+                                .clip(CircleShape)
+                                .background(Brush.linearGradient(GradientIndigo)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "G",
+                                text = (shopName.firstOrNull()?.uppercase() ?: "G").toString(),
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
+                                fontSize = 14.sp
                             )
                         }
-                        Text("Grahbook", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, letterSpacing = (-0.5).sp)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                ),
-                actions = {
-                    IconButton(onClick = onNavigateToWebView) {
-                        Icon(Icons.Default.Language, contentDescription = "Web Dashboard", tint = IndigoPrimary)
-                    }
-                    IconButton(onClick = { viewModel.fetchData(context) }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextSecondaryLight)
                     }
                 }
-            )
+            }
         }
     ) { padding ->
 
@@ -133,10 +155,10 @@ fun DashboardScreen(
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.padding(32.dp)
+                            verticalArrangement = Arrangement.spacedBy(Spacing.medium),
+                            modifier = Modifier.padding(Spacing.xxxlarge)
                         ) {
-                            Icon(Icons.Default.Error, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(56.dp))
+                            Icon(Icons.Default.Error, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(IconSize.huge))
                             Text(
                                 "Could not load dashboard",
                                 style = MaterialTheme.typography.titleMedium,
@@ -152,7 +174,7 @@ fun DashboardScreen(
                             Button(
                                 onClick = { viewModel.fetchData(context) },
                                 colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = ButtonShape
                             ) { Text("Retry") }
                         }
                     }
@@ -161,7 +183,7 @@ fun DashboardScreen(
                     val report = (reportState as UiState.Success).data
                     DashboardContent(
                         report = report,
-                        businessName = businessName,
+                        shopName = shopName,
                         dbState = dbState,
                         onNavigateToCustomers = onNavigateToCustomers,
                         onCreateInvoice = onCreateInvoice,
@@ -178,10 +200,21 @@ fun DashboardScreen(
     }
 }
 
+// Activity item model
+private data class ActivityItem(
+    val icon: ImageVector,
+    val title: String,
+    val subtitle: String,
+    val amount: String,
+    val amountColor: Color,
+    val time: String,
+    val avatarColorIndex: Int
+)
+
 @Composable
 fun DashboardContent(
     report: DailyReport,
-    businessName: String,
+    shopName: String,
     dbState: UiState<FullDatabase>,
     onNavigateToCustomers: () -> Unit,
     onCreateInvoice: () -> Unit,
@@ -207,156 +240,206 @@ fun DashboardContent(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .padding(bottom = Spacing.large),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sectionGap)
     ) {
-        // ===== TOP GREETING SECTION =====
+        // ===== DATE + GREETING =====
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .padding(horizontal = Spacing.xlarge, vertical = Spacing.small)
         ) {
             Text(
-                text = "$greeting,",
+                text = currentDate,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextTertiaryLight
+            )
+            Spacer(modifier = Modifier.height(Spacing.xxsmall))
+            Text(
+                text = "$greeting!",
                 style = MaterialTheme.typography.titleMedium,
                 color = TextSecondaryLight,
                 fontWeight = FontWeight.Normal
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = businessName,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = currentDate,
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondaryLight
-            )
         }
 
-        // ===== QUICK STAT CARDS ROW =====
-        // Today's Sale | Total Customers | Pending Amount | Total Collection
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        // ===== SUMMARY CARDS (2x2 grid per spec) =====
+        // Card 1: Total Outstanding (red) | Card 2: Today's Collection (green)
+        // Card 3: Pending Bills (amber)   | Card 4: Active Customers (blue)
+        val totalOutstanding = report.outstanding.sumOf { it.balance }
+        val pendingBillCount = report.outstanding.size
+
+        val customerCount = when (dbState) {
+            is UiState.Success -> (dbState as UiState.Success).data.customers.size
+            else -> 0
+        }
+
+        Column(
+            modifier = Modifier.padding(horizontal = Spacing.large),
+            verticalArrangement = Arrangement.spacedBy(Spacing.medium)
         ) {
-            StatGradientCard(
-                label = "Today's Sale",
-                value = FormatUtils.formatCurrency(report.billsTotal),
-                icon = Icons.Default.TrendingUp,
-                gradientColors = listOf(IndigoPrimary, IndigoDark),
-                modifier = Modifier.weight(1f)
-            )
-            StatGradientCard(
-                label = "Customers",
-                value = when (dbState) {
-                    is UiState.Success -> (dbState as UiState.Success).data.customers.size.toString()
-                    else -> "0"
-                },
-                icon = Icons.Default.People,
-                gradientColors = listOf(EmeraldSecondary, EmeraldDark),
-                modifier = Modifier.weight(1f)
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.medium)
+            ) {
+                SummaryCard(
+                    label = "Total Outstanding",
+                    value = FormatUtils.formatCurrency(totalOutstanding),
+                    icon = Icons.Outlined.MoneyOff,
+                    iconTint = ErrorRed,
+                    iconBg = ErrorRed.copy(alpha = 0.1f),
+                    valueColor = ErrorRed,
+                    modifier = Modifier.weight(1f)
+                )
+                SummaryCard(
+                    label = "Today's Collection",
+                    value = FormatUtils.formatCurrency(report.paymentTotal),
+                    icon = Icons.Outlined.AccountBalanceWallet,
+                    iconTint = SuccessGreen,
+                    iconBg = SuccessGreen.copy(alpha = 0.1f),
+                    valueColor = SuccessGreen,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.medium)
+            ) {
+                SummaryCard(
+                    label = "Pending Bills",
+                    value = pendingBillCount.toString(),
+                    icon = Icons.Outlined.PendingActions,
+                    iconTint = AmberWarning,
+                    iconBg = AmberWarning.copy(alpha = 0.1f),
+                    valueColor = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                SummaryCard(
+                    label = "Active Customers",
+                    value = customerCount.toString(),
+                    icon = Icons.Outlined.People,
+                    iconTint = IndigoPrimary,
+                    iconBg = IndigoContainer,
+                    valueColor = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            StatGradientCard(
-                label = "Pending",
-                value = FormatUtils.formatCurrency(
-                    report.outstanding.sumOf { it.balance }
-                ),
-                icon = Icons.Default.PendingActions,
-                gradientColors = listOf(AmberWarning, AmberDark),
-                modifier = Modifier.weight(1f)
-            )
-            StatGradientCard(
-                label = "Collection",
-                value = FormatUtils.formatCurrency(report.paymentTotal),
-                icon = Icons.Default.AccountBalanceWallet,
-                gradientColors = listOf(OrangeDanger, Color(0xFFC2410C)),
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        // ===== QUICK ACTION GRID =====
+        // ===== QUICK ACTIONS =====
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = Spacing.xlarge)
         ) {
             Text(
-                text = "Quick Actions",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+                text = "QUICK ACTIONS",
+                style = SectionOverlineStyle,
+                color = TextTertiaryLight
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(Spacing.medium))
 
-            // 3x2 Grid
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.medium)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ActionCard(
-                        icon = Icons.Default.AddCircle,
-                        label = "New Invoice",
-                        gradient = listOf(IndigoPrimary, IndigoDark),
-                        onClick = onCreateInvoice,
-                        modifier = Modifier.weight(1f)
+                QuickActionTile(
+                    icon = Icons.Default.AddCircle,
+                    label = "New Invoice",
+                    gradient = GradientIndigo,
+                    onClick = onCreateInvoice,
+                    modifier = Modifier.weight(1f)
+                )
+                QuickActionTile(
+                    icon = Icons.Default.PersonAdd,
+                    label = "Add Customer",
+                    gradient = GradientEmerald,
+                    onClick = onAddCustomer,
+                    modifier = Modifier.weight(1f)
+                )
+                QuickActionTile(
+                    icon = Icons.Default.Payments,
+                    label = "Payment",
+                    gradient = GradientAmber,
+                    onClick = onRecordPayment,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(Spacing.medium))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.medium)
+            ) {
+                QuickActionTile(
+                    icon = Icons.Default.BarChart,
+                    label = "Reports",
+                    gradient = GradientOrange,
+                    onClick = onViewReports,
+                    modifier = Modifier.weight(1f)
+                )
+                QuickActionTile(
+                    icon = Icons.Default.Notifications,
+                    label = "Reminders",
+                    gradient = GradientPurple,
+                    onClick = onSendReminder,
+                    modifier = Modifier.weight(1f)
+                )
+                QuickActionTile(
+                    icon = Icons.Default.Message,
+                    label = "WhatsApp",
+                    gradient = GradientWhatsApp,
+                    onClick = onWhatsApp,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // ===== TODAY'S SALES BANNER =====
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.large),
+            shape = CardShape,
+            colors = CardDefaults.cardColors(containerColor = IndigoPrimary)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.large),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Today's Bills",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f)
                     )
-                    ActionCard(
-                        icon = Icons.Default.PersonAdd,
-                        label = "Add Customer",
-                        gradient = listOf(EmeraldSecondary, EmeraldDark),
-                        onClick = onAddCustomer,
-                        modifier = Modifier.weight(1f)
+                    Spacer(modifier = Modifier.height(Spacing.xsmall))
+                    Text(
+                        text = FormatUtils.formatCurrency(report.billsTotal),
+                        style = AmountDisplayStyle,
+                        color = Color.White,
+                        fontSize = 28.sp
                     )
-                    ActionCard(
-                        icon = Icons.Default.Payments,
-                        label = "Record Payment",
-                        gradient = listOf(AmberWarning, AmberDark),
-                        onClick = onRecordPayment,
-                        modifier = Modifier.weight(1f)
+                    Text(
+                        text = "${report.billsCount} bill${if (report.billsCount != 1) "s" else ""} created today",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.7f)
                     )
                 }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Box(
+                    modifier = Modifier
+                        .size(IconSize.xxlarge)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    ActionCard(
-                        icon = Icons.Default.BarChart,
-                        label = "View Reports",
-                        gradient = listOf(OrangeDanger, Color(0xFFC2410C)),
-                        onClick = onViewReports,
-                        modifier = Modifier.weight(1f)
-                    )
-                    ActionCard(
-                        icon = Icons.Default.Notifications,
-                        label = "Send Reminder",
-                        gradient = listOf(Color(0xFF8B5CF6), Color(0xFF6D28D9)),
-                        onClick = onSendReminder,
-                        modifier = Modifier.weight(1f)
-                    )
-                    ActionCard(
-                        icon = Icons.Default.Message,
-                        label = "WhatsApp",
-                        gradient = listOf(Color(0xFF25D366), Color(0xFF128C7E)),
-                        onClick = onWhatsApp,
-                        modifier = Modifier.weight(1f)
+                    Icon(
+                        Icons.Default.TrendingUp,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(IconSize.medium)
                     )
                 }
             }
@@ -366,80 +449,124 @@ fun DashboardContent(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = Spacing.xlarge)
         ) {
-            Text(
-                text = "Recent Activity",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "RECENT ACTIVITY",
+                    style = SectionOverlineStyle,
+                    color = TextTertiaryLight
+                )
+                TextButton(onClick = onNavigateToCustomers) {
+                    Text(
+                        "View All",
+                        color = IndigoPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(Spacing.medium))
 
             when (dbState) {
                 is UiState.Success -> {
                     val db = (dbState as UiState.Success).data
+                    val recentBills = db.bills
+                        .sortedByDescending { it.createdAt }
+                        .take(5)
                     val recentTransactions = db.transactions
                         .sortedByDescending { it.timestamp }
                         .take(5)
 
-                    if (recentTransactions.isEmpty() && db.bills.isEmpty()) {
+                    if (recentBills.isEmpty() && recentTransactions.isEmpty()) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = CardShape,
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            elevation = CardDefaults.cardElevation(defaultElevation = Elevation.flat)
                         ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(24.dp),
+                                    .padding(Spacing.xxlarge),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(Spacing.small)
                             ) {
                                 Icon(
                                     Icons.Outlined.History,
                                     contentDescription = null,
-                                    tint = TextSecondaryLight,
-                                    modifier = Modifier.size(36.dp)
+                                    tint = TextTertiaryLight,
+                                    modifier = Modifier.size(IconSize.xlarge)
                                 )
                                 Text(
                                     "No recent activity",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = TextSecondaryLight
                                 )
+                                Text(
+                                    "Bills and payments will appear here",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextTertiaryLight
+                                )
                             }
                         }
                     } else {
-                        val recentBills = db.bills
-                            .sortedByDescending { it.createdAt }
-                            .take(3)
+                        // Merge and sort by date, take top 6
+                        val items = mutableListOf<ActivityItem>()
 
                         recentBills.forEach { bill ->
                             val customer = db.customers.find { it.id == bill.customerId }
-                            ActivityTimelineItem(
-                                icon = Icons.Default.Receipt,
-                                title = "Bill #${bill.id.take(8)}",
-                                subtitle = customer?.name ?: "Unknown",
-                                amount = FormatUtils.formatCurrency(bill.total),
-                                amountColor = if (bill.status == "paid") SuccessGreen else AmberWarning,
-                                time = FormatUtils.formatShortDate(bill.createdAt),
-                                isLast = bill == recentBills.last() && recentTransactions.isEmpty()
+                            val name = customer?.name ?: "Unknown"
+                            val colorIndex = (customer?.id?.hashCode()?.mod(AvatarColors.size))?.let { kotlin.math.abs(it) } ?: 0
+                            items.add(
+                                ActivityItem(
+                                    icon = Icons.Default.Receipt,
+                                    title = "Bill #${bill.id.take(8)}",
+                                    subtitle = name,
+                                    amount = FormatUtils.formatCurrency(bill.total),
+                                    amountColor = if (bill.status == "paid") SuccessGreen else AmountDue,
+                                    time = FormatUtils.formatShortDate(bill.createdAt),
+                                    avatarColorIndex = colorIndex
+                                )
                             )
                         }
 
-                        recentTransactions.forEachIndexed { index, tx ->
+                        recentTransactions.forEach { tx ->
                             val customer = db.customers.find { it.id == tx.customerId }
+                            val name = customer?.name ?: "Unknown"
                             val isPayment = tx.type == "payment"
-                            ActivityTimelineItem(
-                                icon = if (isPayment) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
-                                title = if (isPayment) "Payment received" else "Credit given",
-                                subtitle = customer?.name ?: "Unknown",
-                                amount = "${if (isPayment) "+" else "-"}${FormatUtils.formatCurrency(tx.amount)}",
-                                amountColor = if (isPayment) SuccessGreen else ErrorRed,
-                                time = FormatUtils.formatShortDate(tx.timestamp),
-                                isLast = index == recentTransactions.lastIndex
+                            val colorIndex = (customer?.id?.hashCode()?.mod(AvatarColors.size))?.let { kotlin.math.abs(it) } ?: 0
+                            items.add(
+                                ActivityItem(
+                                    icon = if (isPayment) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
+                                    title = if (isPayment) "Payment" else "Credit",
+                                    subtitle = name,
+                                    amount = "${if (isPayment) "+" else "-"}${FormatUtils.formatCurrency(tx.amount)}",
+                                    amountColor = if (isPayment) SuccessGreen else ErrorRed,
+                                    time = FormatUtils.formatShortDate(tx.timestamp),
+                                    avatarColorIndex = colorIndex
+                                )
                             )
+                        }
+
+                        val sortedItems = items.take(6)
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = CardShape,
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = Elevation.flat)
+                        ) {
+                            Column(modifier = Modifier.padding(vertical = Spacing.small)) {
+                                sortedItems.forEachIndexed { index, item ->
+                                    ActivityRow(item, index == sortedItems.lastIndex)
+                                }
+                            }
                         }
                     }
                 }
@@ -450,91 +577,82 @@ fun DashboardContent(
                             .height(100.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = IndigoPrimary)
+                        CircularProgressIndicator(modifier = Modifier.size(IconSize.medium), color = IndigoPrimary)
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // View All button
-            OutlinedButton(
-                onClick = onNavigateToCustomers,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = IndigoPrimary)
-            ) {
-                Text("View All Activity", fontWeight = FontWeight.Medium)
-            }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Spacing.large))
     }
 }
 
+// ===== SUMMARY CARD (white card with icon, label, value) =====
 @Composable
-fun StatGradientCard(
+fun SummaryCard(
     label: String,
     value: String,
     icon: ImageVector,
-    gradientColors: List<Color>,
+    iconTint: Color,
+    iconBg: Color,
+    valueColor: Color,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+        shape = CardShape,
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.low),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.linearGradient(
-                        colors = gradientColors,
-                        start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                        end = androidx.compose.ui.geometry.Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                    )
-                )
-                .padding(14.dp)
+                .padding(Spacing.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(Spacing.small)
         ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+            // Icon in tinted circle
+            Box(
+                modifier = Modifier
+                    .size(ComponentSize.iconContainerMedium)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(iconBg),
+                contentAlignment = Alignment.Center
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = label,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.85f),
-                        letterSpacing = 0.5.sp
-                    )
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Text(
-                    text = value,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(IconSize.small)
                 )
             }
+
+            // Label
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondaryLight,
+                letterSpacing = 0.3.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            // Value (large, per spec: 28sp bold)
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = valueColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 22.sp
+            )
         }
     }
 }
 
+// ===== QUICK ACTION TILE =====
 @Composable
-fun ActionCard(
+fun QuickActionTile(
     icon: ImageVector,
     label: String,
     gradient: List<Color>,
@@ -542,136 +660,110 @@ fun ActionCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        modifier = modifier.clickable(onClick = onClick),
+        shape = ActionCardShape,
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.low),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(Spacing.medium),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(Spacing.small)
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        Brush.linearGradient(colors = gradient)
-                    ),
+                    .size(ComponentSize.iconContainerLarge)
+                    .clip(ActionIconShape)
+                    .background(Brush.linearGradient(colors = gradient)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     icon,
                     contentDescription = label,
                     tint = Color.White,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(IconSize.medium)
                 )
             }
             Text(
                 text = label,
-                fontSize = 10.sp,
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 12.sp
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
 }
 
+// ===== ACTIVITY ROW =====
 @Composable
-fun ActivityTimelineItem(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    amount: String,
-    amountColor: Color,
-    time: String,
-    isLast: Boolean = false
-) {
+private fun ActivityRow(item: ActivityItem, isLast: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 8.dp),
-        verticalAlignment = Alignment.Top
+            .padding(
+                start = Spacing.large,
+                end = Spacing.large,
+                top = Spacing.small,
+                bottom = Spacing.small
+            ),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Timeline indicator
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.width(28.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(IndigoPrimary.copy(alpha = 0.3f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(IndigoPrimary)
-                )
-            }
-            if (!isLast) {
-                Box(
-                    modifier = Modifier
-                        .width(2.dp)
-                        .height(40.dp)
-                        .background(CardBorder)
-                )
-            } else {
-                Spacer(modifier = Modifier.height(40.dp))
-            }
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Card(
+        // Mini avatar
+        val gradient = AvatarColors[item.avatarColorIndex % AvatarColors.size]
+        Box(
             modifier = Modifier
-                .weight(1f)
-                .padding(bottom = if (isLast) 0.dp else 8.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                .size(ComponentSize.avatarSmall)
+                .clip(CircleShape)
+                .background(Brush.linearGradient(colors = gradient)),
+            contentAlignment = Alignment.Center
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "$subtitle • $time",
-                        fontSize = 11.sp,
-                        color = TextSecondaryLight,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Text(
-                    text = amount,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = amountColor
-                )
-            }
+            Icon(
+                item.icon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(IconSize.xsmall)
+            )
         }
+
+        Spacer(modifier = Modifier.width(Spacing.medium))
+
+        // Text content
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "${item.subtitle} \u2022 ${item.time}",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondaryLight,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        // Amount
+        Text(
+            text = item.amount,
+            style = AmountSmallStyle,
+            color = item.amountColor
+        )
+    }
+
+    if (!isLast) {
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = Spacing.large),
+            thickness = 0.5.dp,
+            color = DividerColor
+        )
     }
 }

@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +70,7 @@ import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.GrahbookTheme
+import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.BuildConfig
 import com.aistudio.sharmakhata.pqmzvk.util.SessionManager
 import java.text.SimpleDateFormat
@@ -457,8 +459,8 @@ fun BottomNavigationBar(
   )
 
   NavigationBar(
-    containerColor = Color.White,
-    tonalElevation = 8.dp
+    containerColor = MaterialTheme.colorScheme.surface,
+    tonalElevation = 4.dp
   ) {
     items.forEach { item ->
       val selected = currentScreen == item.screen
@@ -469,22 +471,23 @@ fun BottomNavigationBar(
           Icon(
             imageVector = item.icon,
             contentDescription = item.label,
-            tint = if (selected) Color(0xFF25d366) else Color(0xFF64748b)
+            tint = if (selected) IndigoPrimary else Slate400
           )
         },
         label = {
           Text(
             text = item.label,
-            color = if (selected) Color(0xFF25d366) else Color(0xFF64748b),
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+            color = if (selected) IndigoPrimary else Slate500,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            style = MaterialTheme.typography.labelSmall
           )
         },
         colors = NavigationBarItemDefaults.colors(
-          selectedIconColor = Color(0xFF25d366),
-          selectedTextColor = Color(0xFF25d366),
-          unselectedIconColor = Color(0xFF64748b),
-          unselectedTextColor = Color(0xFF64748b),
-          indicatorColor = Color(0xFF25d366).copy(alpha = 0.1f)
+          selectedIconColor = IndigoPrimary,
+          selectedTextColor = IndigoPrimary,
+          unselectedIconColor = Slate400,
+          unselectedTextColor = Slate500,
+          indicatorColor = IndigoContainer
         )
       )
     }
@@ -596,52 +599,53 @@ fun BillOverviewCard(
   bill: com.aistudio.sharmakhata.pqmzvk.data.model.Bill,
   onCustomerClick: (String) -> Unit
 ) {
+  val isPaid = bill.status == "paid"
   Card(
     modifier = Modifier
       .fillMaxWidth()
       .clickable { onCustomerClick(bill.customerId) },
-    shape = RoundedCornerShape(12.dp),
+    shape = CardShape,
     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    elevation = CardDefaults.cardElevation(defaultElevation = Elevation.low)
   ) {
     Row(
-      modifier = Modifier.padding(16.dp),
+      modifier = Modifier.padding(Spacing.large),
       verticalAlignment = Alignment.CenterVertically
     ) {
       Box(
         modifier = Modifier
-          .size(48.dp)
-          .clip(RoundedCornerShape(8.dp))
-          .background(Color(0xFF25d366).copy(alpha = 0.1f)),
+          .size(ComponentSize.iconContainerLarge)
+          .clip(ActionIconShape)
+          .background(if (isPaid) SuccessGreen.copy(alpha = 0.1f) else IndigoContainer),
         contentAlignment = Alignment.Center
       ) {
         Icon(
           Icons.Default.Receipt,
           contentDescription = null,
-          tint = Color(0xFF25d366),
-          modifier = Modifier.padding(12.dp)
+          tint = if (isPaid) SuccessGreen else IndigoPrimary,
+          modifier = Modifier.size(IconSize.small)
         )
       }
       
-      Spacer(modifier = Modifier.width(16.dp))
+      Spacer(modifier = Modifier.width(Spacing.large))
       
       Column(modifier = Modifier.weight(1f)) {
         Text(
-          text = "Bill #${bill.id.take(8)}",
-          style = MaterialTheme.typography.titleMedium,
+          text = "Bill #${bill.id.take(8).uppercase()}",
+          style = MaterialTheme.typography.titleSmall,
           color = MaterialTheme.colorScheme.onSurface,
-          fontWeight = FontWeight.Bold
+          fontWeight = FontWeight.SemiBold
         )
         Text(
-          text = "₹${bill.total}",
-          style = MaterialTheme.typography.bodyLarge,
-          color = Color(0xFF25d366),
+          text = FormatUtils.formatCurrency(bill.total),
+          style = AmountSmallStyle,
+          color = if (isPaid) SuccessGreen else MaterialTheme.colorScheme.onSurface,
           fontWeight = FontWeight.Bold
         )
         Text(
           text = FormatUtils.formatDate(bill.createdAt),
           style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
+          color = TextSecondaryLight
         )
       }
     }
@@ -661,14 +665,26 @@ fun ProfileScreen(
     is UiState.Success -> s.data.shop?.name ?: "My Store"
     else -> "My Store"
   }
+  val ownerName = when (val s = dbState) {
+    is UiState.Success -> s.data.shop?.owner ?: ""
+    else -> ""
+  }
+  val customerCount = when (val s = dbState) {
+    is UiState.Success -> s.data.customers.size
+    else -> 0
+  }
+  val billCount = when (val s = dbState) {
+    is UiState.Success -> s.data.bills.size
+    else -> 0
+  }
   
   Scaffold(
     topBar = {
       TopAppBar(
-        title = { Text("Profile") },
+        title = { Text("Profile", fontWeight = FontWeight.SemiBold) },
         colors = TopAppBarDefaults.topAppBarColors(
-          containerColor = MaterialTheme.colorScheme.background,
-          titleContentColor = MaterialTheme.colorScheme.onBackground
+          containerColor = MaterialTheme.colorScheme.surface,
+          titleContentColor = MaterialTheme.colorScheme.onSurface
         )
       )
     }
@@ -677,67 +693,126 @@ fun ProfileScreen(
       modifier = Modifier
         .fillMaxSize()
         .padding(padding)
-        .padding(16.dp),
-      verticalArrangement = Arrangement.spacedBy(24.dp)
+        .padding(Spacing.large),
+      verticalArrangement = Arrangement.spacedBy(Spacing.sectionGap)
     ) {
       // Profile Card
       Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = CardShape,
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.low),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
       ) {
         Column(
-          modifier = Modifier.padding(24.dp),
+          modifier = Modifier.padding(Spacing.xxlarge),
           horizontalAlignment = Alignment.CenterHorizontally,
-          verticalArrangement = Arrangement.spacedBy(16.dp)
+          verticalArrangement = Arrangement.spacedBy(Spacing.large)
         ) {
           Box(
             modifier = Modifier
-              .size(80.dp)
+              .size(ComponentSize.avatarLarge + 28.dp)
               .clip(CircleShape)
-              .background(Color(0xFF25d366).copy(alpha = 0.1f)),
+              .background(Brush.linearGradient(GradientIndigo)),
             contentAlignment = Alignment.Center
           ) {
-            Icon(
-              Icons.Default.Person,
-              contentDescription = "Profile",
-              tint = Color(0xFF25d366),
-              modifier = Modifier.size(40.dp)
+            Text(
+              text = (storeName.firstOrNull()?.uppercase() ?: "S").toString(),
+              color = Color.White,
+              style = MaterialTheme.typography.headlineSmall,
+              fontWeight = FontWeight.Bold
             )
           }
           
-          Text(
-            text = storeName,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-          )
-          
-          Text(
-            text = if (token != null) "Logged in" else "Not logged in",
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (token != null) Color(0xFF22C55E) else MaterialTheme.colorScheme.error
-          )
+          Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+              text = storeName,
+              style = MaterialTheme.typography.titleLarge,
+              fontWeight = FontWeight.Bold,
+              color = MaterialTheme.colorScheme.onSurface
+            )
+            if (ownerName.isNotBlank()) {
+              Text(
+                text = ownerName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondaryLight
+              )
+            }
+            Spacer(modifier = Modifier.height(Spacing.small))
+            // Status badge
+            Box(
+              modifier = Modifier
+                .clip(BadgeShape)
+                .background(if (token != null) BadgePaidBg else BadgeUnpaidBg)
+                .padding(horizontal = Spacing.medium, vertical = Spacing.xsmall)
+            ) {
+              Text(
+                text = if (token != null) "Active" else "Not logged in",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (token != null) BadgePaidText else BadgeUnpaidText
+              )
+            }
+          }
+        }
+      }
+
+      // Stats row
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.medium)
+      ) {
+        Card(
+          modifier = Modifier.weight(1f),
+          shape = CardShape,
+          elevation = CardDefaults.cardElevation(defaultElevation = Elevation.flat),
+          colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+          Column(
+            modifier = Modifier.fillMaxWidth().padding(Spacing.cardPadding),
+            horizontalAlignment = Alignment.CenterHorizontally
+          ) {
+            Text(text = customerCount.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = IndigoPrimary)
+            Text(text = "Customers", style = MaterialTheme.typography.labelSmall, color = TextSecondaryLight)
+          }
+        }
+        Card(
+          modifier = Modifier.weight(1f),
+          shape = CardShape,
+          elevation = CardDefaults.cardElevation(defaultElevation = Elevation.flat),
+          colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+          Column(
+            modifier = Modifier.fillMaxWidth().padding(Spacing.cardPadding),
+            horizontalAlignment = Alignment.CenterHorizontally
+          ) {
+            Text(text = billCount.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = EmeraldSecondary)
+            Text(text = "Bills", style = MaterialTheme.typography.labelSmall, color = TextSecondaryLight)
+          }
         }
       }
       
       // App Info
       Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.flat),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
       ) {
         Column(
-          modifier = Modifier.padding(16.dp),
-          verticalArrangement = Arrangement.spacedBy(12.dp)
+          modifier = Modifier.padding(Spacing.large),
+          verticalArrangement = Arrangement.spacedBy(Spacing.xsmall)
         ) {
           Text(
-            text = "App Information",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
+            text = "APP INFORMATION",
+            style = SectionOverlineStyle,
+            color = TextTertiaryLight
           )
+          Spacer(modifier = Modifier.height(Spacing.small))
           
           InfoRow("Version", BuildConfig.VERSION_NAME)
+          HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
           InfoRow("Build", BuildConfig.BUILD_TYPE)
+          HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
           InfoRow("Sync Status", if (token != null) "Active" else "Inactive")
         }
       }
@@ -745,15 +820,15 @@ fun ProfileScreen(
       // Logout Button
       Button(
         onClick = onLogout,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().height(ComponentSize.buttonHeight),
         colors = ButtonDefaults.buttonColors(
           containerColor = MaterialTheme.colorScheme.error
         ),
-        shape = RoundedCornerShape(12.dp)
+        shape = ButtonShape
       ) {
-        Icon(Icons.Default.ExitToApp, contentDescription = null)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text("Logout")
+        Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(IconSize.small))
+        Spacer(modifier = Modifier.width(Spacing.small))
+        Text("Logout", style = MaterialTheme.typography.labelLarge)
       }
     }
   }

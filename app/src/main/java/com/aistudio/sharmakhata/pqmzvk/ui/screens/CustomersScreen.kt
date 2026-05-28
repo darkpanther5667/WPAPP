@@ -4,8 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -28,12 +29,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.sharmakhata.pqmzvk.data.model.Customer
 import com.aistudio.sharmakhata.pqmzvk.data.model.FullDatabase
+import com.aistudio.sharmakhata.pqmzvk.ui.components.AppAvatar
 import com.aistudio.sharmakhata.pqmzvk.ui.components.EmptyState
 import com.aistudio.sharmakhata.pqmzvk.ui.components.ShimmerListItem
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,12 +50,13 @@ fun CustomersScreen(
     val dbState by viewModel.dbState.collectAsState()
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
+    var selectedFilter by remember { mutableStateOf("All") }
     val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Customers", fontWeight = FontWeight.SemiBold) },
+                title = { Text("Khata Book", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -60,7 +64,7 @@ fun CustomersScreen(
                 },
                 actions = {
                     IconButton(onClick = onNavigateToSearch) {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
+                        Icon(Icons.Default.Search, contentDescription = "Search", tint = TextSecondaryLight)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -74,7 +78,7 @@ fun CustomersScreen(
                 onClick = onAddCustomer,
                 containerColor = IndigoPrimary,
                 contentColor = Color.White,
-                shape = RoundedCornerShape(16.dp)
+                shape = FabShape
             ) {
                 Icon(Icons.Default.PersonAdd, contentDescription = "Add customer")
             }
@@ -97,33 +101,22 @@ fun CustomersScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp)
+                            .padding(Spacing.large)
                     ) {
                         repeat(6) {
                             ShimmerListItem()
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(Spacing.small))
                         }
                     }
                 }
                 is UiState.Error -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(Icons.Default.Person, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(48.dp))
-                        Text(
-                            "Error: ${(dbState as UiState.Error).message}",
-                            color = ErrorRed,
-                            textAlign = TextAlign.Center
-                        )
-                        Button(
-                            onClick = { viewModel.fetchData(context) },
-                            colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary)
-                        ) { Text("Retry") }
-                    }
+                    EmptyState(
+                        message = "Error loading customers",
+                        description = (dbState as UiState.Error).message,
+                        icon = Icons.Default.Error,
+                        actionLabel = "Retry",
+                        onAction = { viewModel.fetchData(context) }
+                    )
                 }
                 is UiState.Success -> {
                     val db = (dbState as UiState.Success).data
@@ -136,7 +129,15 @@ fun CustomersScreen(
                             onAction = onAddCustomer
                         )
                     } else {
-                        CustomersList(db, onCustomerClick, onAddCustomer, searchQuery) { searchQuery = it }
+                        CustomersList(
+                            db = db,
+                            onCustomerClick = onCustomerClick,
+                            onAddCustomer = onAddCustomer,
+                            searchQuery = searchQuery,
+                            onSearchChange = { searchQuery = it },
+                            selectedFilter = selectedFilter,
+                            onFilterChange = { selectedFilter = it }
+                        )
                     }
                 }
             }
@@ -150,11 +151,30 @@ fun CustomersList(
     onCustomerClick: (String) -> Unit,
     onAddCustomer: () -> Unit,
     searchQuery: String,
-    onSearchChange: (String) -> Unit
+    onSearchChange: (String) -> Unit,
+    selectedFilter: String,
+    onFilterChange: (String) -> Unit
 ) {
-    val customers = db.customers.filter { customer ->
-        customer.name.contains(searchQuery, ignoreCase = true) ||
-        (customer.phone?.contains(searchQuery, ignoreCase = true) == true)
+    // Calculate balances for filtering
+    fun getBalance(customer: Customer): Double {
+        val transactions = db.transactions.filter { it.customerId == customer.id }
+        val bills = db.bills.filter { it.customerId == customer.id }
+        val payments = transactions.filter { it.type == "payment" }.sumOf { it.amount }
+        val credits = transactions.filter { it.type == "credit" }.sumOf { it.amount }
+        val billTotal = bills.sumOf { it.total }
+        return credits + billTotal - payments
+    }
+
+    val filteredCustomers = db.customers.filter { customer ->
+        val matchesSearch = customer.name.contains(searchQuery, ignoreCase = true) ||
+            (customer.phone?.contains(searchQuery, ignoreCase = true) == true)
+        val balance = getBalance(customer)
+        val matchesFilter = when (selectedFilter) {
+            "High Balance" -> balance > 0
+            "Cleared" -> balance <= 0
+            else -> true
+        }
+        matchesSearch && matchesFilter
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -162,70 +182,136 @@ fun CustomersList(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = onSearchChange,
-            placeholder = { Text("Search customers...") },
+            placeholder = { Text("Search by name or phone...", color = TextTertiaryLight) },
             leadingIcon = {
                 Icon(Icons.Default.Search, contentDescription = null, tint = IndigoPrimary)
             },
             trailingIcon = if (searchQuery.isNotEmpty()) {
                 {
                     IconButton(onClick = { onSearchChange("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextSecondaryLight)
                     }
                 }
             } else null,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(14.dp),
+                .padding(horizontal = Spacing.large, vertical = Spacing.small),
+            shape = SearchBarShape,
             colors = TextFieldDefaults.colors(
                 focusedIndicatorColor = IndigoPrimary,
                 unfocusedIndicatorColor = CardBorder,
                 focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedTextColor = TextPrimaryLight,
+                unfocusedTextColor = TextPrimaryLight
             ),
             singleLine = true
         )
 
-        if (customers.isEmpty()) {
+        // Filter Chips
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.large, vertical = Spacing.small),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.small)
+        ) {
+            item {
+                FilterChip(
+                    selected = selectedFilter == "All",
+                    onClick = { onFilterChange("All") },
+                    label = { Text("All (${db.customers.size})") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = IndigoPrimary,
+                        selectedLabelColor = Color.White,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        labelColor = TextSecondaryLight
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                )
+            }
+            item {
+                FilterChip(
+                    selected = selectedFilter == "High Balance",
+                    onClick = { onFilterChange("High Balance") },
+                    label = { Text("High Balance") },
+                    leadingIcon = if (selectedFilter == "High Balance") {
+                        { Icon(Icons.Default.TrendingUp, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    } else null,
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = ErrorRed,
+                        selectedLabelColor = Color.White,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        labelColor = TextSecondaryLight
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                )
+            }
+            item {
+                FilterChip(
+                    selected = selectedFilter == "Cleared",
+                    onClick = { onFilterChange("Cleared") },
+                    label = { Text("Cleared") },
+                    leadingIcon = if (selectedFilter == "Cleared") {
+                        { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    } else null,
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = SuccessGreen,
+                        selectedLabelColor = Color.White,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        labelColor = TextSecondaryLight
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                )
+            }
+        }
+
+        if (filteredCustomers.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(32.dp),
+                    .padding(Spacing.xxxlarge),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.medium)
                 ) {
                     Icon(
                         Icons.Outlined.PersonSearch,
                         contentDescription = null,
-                        tint = TextSecondaryLight,
-                        modifier = Modifier.size(72.dp)
+                        tint = TextTertiaryLight,
+                        modifier = Modifier.size(IconSize.huge)
                     )
                     Text(
-                        text = if (searchQuery.isNotEmpty()) "No customers found matching \"$searchQuery\"" else "No customers yet",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        text = if (searchQuery.isNotEmpty()) "No customers matching \"$searchQuery\""
+                        else "No ${selectedFilter.lowercase()} customers",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextSecondaryLight,
                         textAlign = TextAlign.Center
                     )
                     if (searchQuery.isNotEmpty()) {
                         TextButton(onClick = { onSearchChange("") }) {
-                            Text("Clear search", color = IndigoPrimary)
+                            Text("Clear search", color = IndigoPrimary, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
             }
         } else {
             LazyColumn(
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 80.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                contentPadding = PaddingValues(
+                    start = Spacing.large,
+                    end = Spacing.large,
+                    top = Spacing.small,
+                    bottom = 80.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(Spacing.listItemGap)
             ) {
-                items(customers, key = { it.id }) { customer ->
+                itemsIndexed(filteredCustomers, key = { _, c -> c.id }) { index, customer ->
                     CustomerCard(
                         customer = customer,
                         db = db,
+                        colorIndex = abs(customer.id.hashCode()) % AvatarColors.size,
                         onClick = { onCustomerClick(customer.id) }
                     )
                 }
@@ -238,6 +324,7 @@ fun CustomersList(
 fun CustomerCard(
     customer: Customer,
     db: FullDatabase,
+    colorIndex: Int,
     onClick: () -> Unit
 ) {
     // Calculate balance
@@ -249,56 +336,43 @@ fun CustomerCard(
     val balance = credits + billTotal - payments
 
     val balanceColor = when {
-        balance > 0 -> ErrorRed
-        balance < 0 -> SuccessGreen
-        else -> TextSecondaryLight
+        balance > 0 -> AmountDue
+        balance < 0 -> AmountCredit
+        else -> AmountNeutral
     }
-    val balancePrefix = when {
-        balance > 0 -> "₹"
-        balance < 0 -> "+₹"
-        else -> "₹"
+    val balanceLabel = when {
+        balance > 0 -> "Due"
+        balance < 0 -> "You Get"
+        else -> "Settled"
     }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = ListCardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.low)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(Spacing.cardPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar - first letter in gradient circle
-            Box(
-                modifier = Modifier
-                    .size(50.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(IndigoPrimary, IndigoDark)
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = customer.name.firstOrNull()?.uppercase()?.toString() ?: "C",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            // Colored avatar
+            AppAvatar(
+                name = customer.name,
+                size = ComponentSize.avatarLarge,
+                colorIndex = colorIndex
+            )
 
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(Spacing.medium))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = customer.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -306,14 +380,14 @@ fun CustomerCard(
                 )
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xsmall),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Default.Phone,
                         contentDescription = null,
-                        tint = IndigoPrimary.copy(alpha = 0.7f),
-                        modifier = Modifier.size(14.dp)
+                        tint = IndigoPrimary.copy(alpha = 0.6f),
+                        modifier = Modifier.size(IconSize.xsmall)
                     )
                     Text(
                         text = customer.phone ?: "No phone",
@@ -328,30 +402,26 @@ fun CustomerCard(
             // Balance amount
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = "${balancePrefix}${FormatUtils.formatCurrency(kotlin.math.abs(balance))}",
-                    style = MaterialTheme.typography.titleSmall,
+                    text = FormatUtils.formatCurrency(abs(balance)),
+                    style = AmountSmallStyle,
                     fontWeight = FontWeight.Bold,
                     color = balanceColor
                 )
                 Text(
-                    text = when {
-                        balance > 0 -> "Due"
-                        balance < 0 -> "You Get"
-                        else -> "Settled"
-                    },
-                    fontSize = 10.sp,
+                    text = balanceLabel,
+                    style = MaterialTheme.typography.labelSmall,
                     color = balanceColor,
                     fontWeight = FontWeight.Medium
                 )
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(Spacing.small))
 
             Icon(
                 Icons.Default.ChevronRight,
                 contentDescription = "View details",
-                tint = TextSecondaryLight,
-                modifier = Modifier.size(20.dp)
+                tint = TextTertiaryLight,
+                modifier = Modifier.size(IconSize.medium)
             )
         }
     }

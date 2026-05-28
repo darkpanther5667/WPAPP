@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -16,13 +18,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aistudio.sharmakhata.pqmzvk.data.model.Bill
 import com.aistudio.sharmakhata.pqmzvk.data.model.Transaction
+import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,15 +39,15 @@ fun LedgerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Customer Ledger") },
+                title = { Text("Ledger", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }
@@ -57,14 +60,26 @@ fun LedgerScreen(
         ) {
             when (dbState) {
                 is UiState.Loading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = IndigoPrimary
+                    )
                 }
                 is UiState.Error -> {
-                    Text(
-                        text = "Error: ${(dbState as UiState.Error).message}",
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(Spacing.xxxlarge),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(Spacing.medium)
+                    ) {
+                        Icon(Icons.Default.Error, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(IconSize.xlarge))
+                        Text(
+                            text = "Error: ${(dbState as UiState.Error).message}",
+                            color = ErrorRed,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
                 is UiState.Success -> {
                     val db = (dbState as UiState.Success).data
@@ -73,7 +88,16 @@ fun LedgerScreen(
                     val bills = db.bills.filter { it.customerId == customerId }
                     
                     if (customer == null) {
-                        Text("Customer not found", modifier = Modifier.align(Alignment.Center))
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .padding(Spacing.xxxlarge),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Outlined.PersonOff, contentDescription = null, tint = TextTertiaryLight, modifier = Modifier.size(IconSize.huge))
+                            Spacer(modifier = Modifier.height(Spacing.medium))
+                            Text("Customer not found", color = TextSecondaryLight, style = MaterialTheme.typography.bodyMedium)
+                        }
                     } else {
                         LedgerContent(customerName = customer.name, transactions = transactions, bills = bills)
                     }
@@ -85,38 +109,73 @@ fun LedgerScreen(
 
 @Composable
 fun LedgerContent(customerName: String, transactions: List<Transaction>, bills: List<Bill>) {
-    // Combine and sort events by date
     val events = remember(transactions, bills) {
         val list = mutableListOf<LedgerEvent>()
         transactions.forEach {
             list.add(LedgerEvent(it.timestamp, it.type, it.amount, it.note ?: ""))
         }
         bills.forEach {
-            list.add(LedgerEvent(it.createdAt, "bill", it.total, "Bill Generated - Status: ${it.status}"))
+            list.add(LedgerEvent(it.createdAt, "bill", it.total, "Bill - ${it.status.replaceFirstChar { c -> c.uppercase() }}"))
         }
         list.sortedByDescending { it.dateIso }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        // Header banner
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.primaryContainer
+            color = IndigoPrimary
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Ledger for", style = MaterialTheme.typography.labelLarge)
-                Text(text = customerName, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Column(modifier = Modifier.padding(Spacing.large)) {
+                Text(
+                    text = "Ledger for",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+                Text(
+                    text = customerName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(Spacing.xsmall))
+                Text(
+                    text = "${events.size} entries",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
             }
         }
 
         if (events.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
-                Text("No history available", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.medium)
+                ) {
+                    Icon(
+                        Icons.Outlined.History,
+                        contentDescription = null,
+                        tint = TextTertiaryLight,
+                        modifier = Modifier.size(IconSize.huge)
+                    )
+                    Text(
+                        "No history available",
+                        color = TextSecondaryLight,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(Spacing.large),
+                verticalArrangement = Arrangement.spacedBy(Spacing.medium)
             ) {
                 items(events) { event ->
                     LedgerEventCard(event)
@@ -128,46 +187,87 @@ fun LedgerContent(customerName: String, transactions: List<Transaction>, bills: 
 
 @Composable
 fun LedgerEventCard(event: LedgerEvent) {
-    val isCreditOrBill = event.type == "credit" || event.type == "bill"
-    val color = if (isCreditOrBill) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-    val sign = if (isCreditOrBill) "-" else "+"
+    val isPayment = event.type == "payment"
+    val isCredit = event.type == "credit"
+    val isBill = event.type == "bill"
+
+    val amountColor = when {
+        isPayment -> SuccessGreen
+        isCredit -> ErrorRed
+        else -> IndigoPrimary
+    }
+    val sign = if (isPayment) "+" else "-"
+    val icon = when {
+        isPayment -> Icons.Outlined.ArrowDownward
+        isCredit -> Icons.Outlined.ArrowUpward
+        else -> Icons.Outlined.Receipt
+    }
+    val iconBg = when {
+        isPayment -> SuccessGreen.copy(alpha = 0.1f)
+        isCredit -> ErrorRed.copy(alpha = 0.1f)
+        else -> IndigoContainer
+    }
+    val label = when {
+        isPayment -> "Payment Received"
+        isCredit -> "Credit Given"
+        else -> "Bill Created"
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = ListCardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.flat)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.padding(Spacing.cardPadding),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            // Icon
+            Box(
+                modifier = Modifier
+                    .size(ComponentSize.iconContainerMedium)
+                    .background(iconBg, ActionIconShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = amountColor,
+                    modifier = Modifier.size(IconSize.small)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(Spacing.medium))
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = event.type.replaceFirstChar { it.uppercase() },
-                    style = MaterialTheme.typography.titleMedium,
+                    text = label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = FormatUtils.formatDateTime(event.dateIso),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = TextSecondaryLight
                 )
                 if (event.description.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = event.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextTertiaryLight,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
+
             Text(
                 text = "$sign${FormatUtils.formatCurrency(event.amount)}",
-                style = MaterialTheme.typography.titleMedium,
+                style = AmountSmallStyle,
                 fontWeight = FontWeight.Bold,
-                color = color
+                color = amountColor
             )
         }
     }
@@ -179,4 +279,3 @@ data class LedgerEvent(
     val amount: Double,
     val description: String
 )
-

@@ -45,6 +45,9 @@ interface ApiService {
 
     @POST("api/bill/mark-paid")
     suspend fun markBillPaid(@Body request: MarkBillPaidRequest): retrofit2.Response<BasicSuccessResponse>
+
+    @GET("api/items")
+    suspend fun getStoredItems(): StoredItemsResponse
 }
 
 data class AddCustomerRequest(
@@ -139,4 +142,17 @@ data class RegisterStoreResponse(
     val status: String,
     val store_id: String? = null,
     val message: String? = null
+)
+
+data class StoredItemsResponse(
+    val success: Boolean,
+    val items: List<StoredItem> = emptyList(),
+    val message: String? = null
+)
+
+data class StoredItem(
+    val name: String,
+    val price: Double,
+    val count: Int = 0,
+    val lastPrice: Double = 0.0
 )

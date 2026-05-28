@@ -29,10 +29,12 @@ import com.aistudio.sharmakhata.pqmzvk.data.model.Customer
 import com.aistudio.sharmakhata.pqmzvk.data.model.FullDatabase
 import com.aistudio.sharmakhata.pqmzvk.data.model.Transaction
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
+import com.aistudio.sharmakhata.pqmzvk.ui.components.AppAvatar
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -176,38 +178,25 @@ fun CustomerDetailContent(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(20.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                .padding(Spacing.large),
+            shape = CardShape,
+            elevation = CardDefaults.cardElevation(defaultElevation = Elevation.low),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
+                    .padding(Spacing.xlarge),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Large avatar
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(IndigoPrimary, IndigoDark)
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = customer.name.firstOrNull()?.uppercase()?.toString() ?: "C",
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                // Large avatar with gradient
+                AppAvatar(
+                    name = customer.name,
+                    size = 72.dp,
+                    colorIndex = abs(customer.id.hashCode()) % AvatarColors.size
+                )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(Spacing.medium))
 
                 Text(
                     text = customer.name,
@@ -218,9 +207,9 @@ fun CustomerDetailContent(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.small)
                 ) {
-                    Icon(Icons.Default.Phone, contentDescription = null, tint = IndigoPrimary, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Phone, contentDescription = null, tint = IndigoPrimary, modifier = Modifier.size(IconSize.xsmall))
                     Text(
                         text = customer.phone ?: "No phone",
                         style = MaterialTheme.typography.bodyMedium,
@@ -253,7 +242,7 @@ fun CustomerDetailContent(
             )
             StatsCard(
                 label = "Outstanding",
-                value = bills.size.toString(), // count of outstanding bills
+                value = bills.filter { it.status != "paid" }.size.toString(),
                 icon = Icons.Outlined.PendingActions,
                 color = AmberWarning,
                 modifier = Modifier.weight(1f)
