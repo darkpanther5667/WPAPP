@@ -125,11 +125,7 @@ function normalizePhone(phone) {
   if (!phone) return '';
   let p = String(phone).trim();
   // Strip all non-digit characters
-  if (p.startsWith('+')) {
-    p = p.replace(/[^\d]/g, '');
-  } else {
-    p = p.replace(/[^\d]/g, '');
-  }
+  p = p.replace(/[^\d]/g, '');
   // If 10 digits, assume Indian number and prepend country code 91
   if (p.length === 10) {
     p = '91' + p;
@@ -1803,12 +1799,14 @@ app.post('/api/auth/request-code', async (req, res) => {
     const { storeId, phone } = req.body || {};
     let sid = String(storeId || '').trim();
     const p = normalizePhone(phone);
+    console.log('Login request - Original phone:', phone, 'Normalized:', p);
     if (!p) return res.status(400).json({ success: false, message: 'phone is required' });
 
     // Build phone variants for backwards-compatible lookups
     const phoneVariants = [p];
     if (p.startsWith('91') && p.length === 12) phoneVariants.push(p.slice(2));
     else if (p.length === 10) phoneVariants.push('91' + p);
+    console.log('Phone variants:', phoneVariants);
 
     const database = await connectDB();
     if (!database) return res.status(500).json({ success: false, message: 'Server DB not configured' });
@@ -1816,6 +1814,7 @@ app.post('/api/auth/request-code', async (req, res) => {
     // If no storeId provided, look up store by phone via staff collection
     if (!sid) {
       const staffEntry = await database.collection('staff').findOne({ phone: { $in: phoneVariants }, status: { $ne: 'disabled' } });
+      console.log('Staff entry lookup result:', staffEntry);
       if (!staffEntry) return res.status(404).json({ success: false, message: 'No store found for this phone number. Please register first.' });
       sid = staffEntry.store_id;
     }
@@ -1824,6 +1823,7 @@ app.post('/api/auth/request-code', async (req, res) => {
     if (!store) return res.status(404).json({ success: false, message: 'Store not found' });
 
     const staff = await database.collection('staff').findOne({ phone: { $in: phoneVariants }, store_id: sid, status: { $ne: 'disabled' } });
+    console.log('Staff lookup with store_id:', staff);
     if (!staff) return res.status(403).json({ success: false, message: 'Phone not authorized for this store' });
 
     const code = String(Math.floor(100000 + Math.random() * 900000));
@@ -1846,7 +1846,12 @@ app.post('/api/auth/request-code', async (req, res) => {
       `Code: *${code}*\n\n` +
       `Valid for 10 minutes.`;
 
-    await sendWhatsAppMessage(p, msg);
+    const whatsappSent = await sendWhatsAppMessage(p, msg);
+    if (!whatsappSent) {
+      console.error('WhatsApp message failed to send for OTP request');
+      return res.status(500).json({ success: false, message: 'Failed to send OTP via WhatsApp. Please try again.' });
+    }
+    
     return res.json({ success: true });
   } catch (error) {
     console.error('Error requesting login code:', error);

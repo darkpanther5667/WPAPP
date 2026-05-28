@@ -56,10 +56,17 @@ fun LoginScreen(
                 }
             }
             is OperationState.Error -> {
-                snackbarHostState.showSnackbar(
+                val result = snackbarHostState.showSnackbar(
                     message = state.message,
+                    actionLabel = if (state.message.contains("internet", ignoreCase = true) || 
+                                       state.message.contains("timeout", ignoreCase = true) ||
+                                       state.message.contains("connect", ignoreCase = true)) "Retry" else null,
                     withDismissAction = true
                 )
+                if (result == SnackbarResult.ActionPerformed && !isOtpStage) {
+                    // Retry sending OTP if user clicked retry
+                    viewModel.requestLoginCode("", phoneNumber)
+                }
                 viewModel.resetOperationState()
             }
             else -> {}
@@ -177,6 +184,7 @@ fun LoginScreen(
                             OutlinedTextField(
                                 value = phoneNumber,
                                 onValueChange = { newVal ->
+                                    // Allow only digits, max 10 characters
                                     if (newVal.length <= 10 && newVal.all { it.isDigit() }) {
                                         phoneNumber = newVal
                                     }
@@ -184,6 +192,13 @@ fun LoginScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 label = { Text("Phone Number") },
                                 placeholder = { Text("9876543210") },
+                                supportingText = { 
+                                    if (phoneNumber.isNotEmpty() && phoneNumber.length < 10) {
+                                        Text("Enter 10-digit mobile number", color = MaterialTheme.colorScheme.error)
+                                    } else {
+                                        Text("Enter your 10-digit Indian mobile number")
+                                    }
+                                },
                                 leadingIcon = {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically
@@ -204,14 +219,15 @@ fun LoginScreen(
                                 colors = TextFieldDefaults.colors(
                                     focusedTextColor = TextPrimaryLight,
                                     unfocusedTextColor = TextPrimaryLight,
-                                    focusedIndicatorColor = IndigoPrimary,
+                                    focusedIndicatorColor = if (phoneNumber.length == 10) IndigoPrimary else MaterialTheme.colorScheme.error,
                                     unfocusedIndicatorColor = CardBorder,
                                     focusedContainerColor = BackgroundLight,
                                     unfocusedContainerColor = BackgroundLight,
-                                    focusedLabelColor = IndigoPrimary,
+                                    focusedLabelColor = if (phoneNumber.length == 10) IndigoPrimary else MaterialTheme.colorScheme.error,
                                     unfocusedLabelColor = TextSecondaryLight,
                                     cursorColor = IndigoPrimary
-                                )
+                                ),
+                                isError = phoneNumber.isNotEmpty() && phoneNumber.length < 10
                             )
 
                             Button(
@@ -221,7 +237,9 @@ fun LoginScreen(
                                     .height(52.dp),
                                 enabled = phoneNumber.length == 10 && operationState !is OperationState.Loading,
                                 shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary)
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (phoneNumber.length == 10) IndigoPrimary else MaterialTheme.colorScheme.surfaceVariant
+                                )
                             ) {
                                 if (operationState is OperationState.Loading) {
                                     CircularProgressIndicator(
