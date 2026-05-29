@@ -35,17 +35,27 @@ fun LoginScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // Get stored storeId from registration (empty if not registered yet)
-    val storeId = remember { com.aistudio.sharmakhata.pqmzvk.util.SessionManager.storeId ?: "" }
-
     var phoneNumber by remember { mutableStateOf("") }
     var otp by remember { mutableStateOf("") }
     var isOtpStage by remember { mutableStateOf(false) }
 
-    // Clear any stale operation state from previous screens (e.g. registration success)
+    // Load session (reads storeId + phone from persistent storage)
     LaunchedEffect(Unit) {
+        com.aistudio.sharmakhata.pqmzvk.util.SessionManager.load(context)
         viewModel.resetOperationState()
+        // Pre-fill phone from stored registration if available
+        if (phoneNumber.isEmpty()) {
+            com.aistudio.sharmakhata.pqmzvk.util.SessionManager.phone?.let { storedPhone ->
+                val digits = storedPhone.filter { it.isDigit() }
+                if (digits.length >= 10) {
+                    phoneNumber = digits.takeLast(10)
+                }
+            }
+        }
     }
+
+    // Read storeId fresh each time (not cached in remember) so registration's save is picked up
+    val storeId = com.aistudio.sharmakhata.pqmzvk.util.SessionManager.storeId ?: ""
 
     LaunchedEffect(operationState) {
         when (val state = operationState) {
