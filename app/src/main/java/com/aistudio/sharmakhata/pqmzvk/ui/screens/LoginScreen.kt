@@ -408,17 +408,6 @@ fun LoginScreen(
                                 }
                             }
 
-                            // Register link (always visible)
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("New here?", color = TextSecondaryLight, fontSize = 13.sp)
-                                TextButton(onClick = onRegisterStore) {
-                                    Text("Register your store", color = StitchTeal, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-                        } else {
                             // ── OTP Stage ──
                             Icon(
                                 Icons.Default.Shield,
