@@ -297,6 +297,21 @@ async function writeDB(data) {
   }
 }
 
+// POST /api/admin/clear-all — Wipe all stores, customers, staff, bills, transactions
+app.post('/api/admin/clear-all', async (req, res) => {
+  try {
+    const empty = { shop: {}, customers: [], transactions: [], bills: [], staff: [], stores: [] };
+    await writeDB(empty);
+    // Also reset local cache
+    cachedDB = empty;
+    console.log('🗑️ All data cleared successfully');
+    return res.json({ success: true, message: 'All data cleared. Everyone starts fresh.' });
+  } catch (error) {
+    console.error('Error clearing data:', error);
+    return res.status(500).json({ success: false, message: 'Failed to clear data' });
+  }
+});
+
 // ─── UTILITY HELPERS ───────────────────────────────────────────────────────────
 
 // Format date as DD/MM/YYYY (Indian standard)
