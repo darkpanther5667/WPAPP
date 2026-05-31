@@ -232,9 +232,30 @@
     .back-top.visible{opacity:1;visibility:visible;transform:scale(1)}
     .back-top:hover{transform:translateY(-6px) scale(1.05);box-shadow:0 12px 32px rgba(37,211,102,.5)}
 
+    /* ─── MOUSE GLOW ─── */
+    #mouseGlow{position:fixed;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(37,211,102,.08),transparent 60%);pointer-events:none;z-index:9992;translate:-50% -50%;opacity:0;transition:opacity .8s;will-change:transform}
+    [data-theme=dark] #mouseGlow{background:radial-gradient(circle,rgba(37,211,102,.05),transparent 60%)}
+
+    /* ─── CLICK EXPLOSION ─── */
+    .xpart{position:fixed;pointer-events:none;z-index:99998;border-radius:50%;will-change:transform,opacity}
+
+    /* ─── VISITOR COUNTER ─── */
+    .visitor-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.2);padding:4px 12px;border-radius:100px;font-size:12px;font-weight:500;color:var(--text-tertiary);white-space:nowrap}
+
+    /* ─── EXIT POPUP ─── */
+    #exitPopup{position:fixed;inset:0;z-index:99990;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);opacity:0;visibility:hidden;transition:all .5s cubic-bezier(.34,1.56,.64,1)}
+    #exitPopup.show{opacity:1;visibility:visible}
+    #exitPopup .card{background:var(--bg-card);border:1px solid var(--border);border-radius:28px;padding:48px 40px;max-width:440px;width:90%;text-align:center;transform:scale(.85) translateY(30px);transition:transform .6s cubic-bezier(.34,1.56,.64,1);position:relative;overflow:hidden}
+    #exitPopup.show .card{transform:scale(1) translateY(0)}
+    #exitPopup .close-btn{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;border:none;background:var(--bg-alt);color:var(--text-tertiary);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:1;transition:all .3s}
+    #exitPopup .close-btn:hover{background:rgba(37,211,102,.1);color:#25d366}
+
+    /* ─── PARALLAX ─── */
+    .parallax{will-change:transform}
+
     @media(max-width:1024px){.hero .grid{grid-template-columns:1fr}.phone-wrapper{display:none}}
-    @media(max-width:768px){nav{padding:0 16px}.section{padding:60px 16px}.form-card{padding:28px 20px}}
-    @media(max-width:480px){#cookieConsent{right:16px;left:16px;max-width:unset}}
+    @media(max-width:768px){nav{padding:0 16px}.section{padding:60px 16px}.form-card{padding:28px 20px}.visitor-badge{display:none!important}}
+    @media(max-width:480px){#cookieConsent{right:16px;left:16px;max-width:unset}#mouseGlow{display:none!important}}
   </style>
 </head>
 <body>
@@ -255,6 +276,22 @@
   </div>
 </div>
 
+<div id="mouseGlow"></div>
+
+<div id="exitPopup">
+  <div class="card">
+    <button class="close-btn" onclick="closeExitPopup()"><span class="material-icons" style="font-size:20px">close</span></button>
+    <div style="width:64px;height:64px;border-radius:50%;background:rgba(37,211,102,.12);display:flex;align-items:center;justify-content:center;margin:0 auto 20px"><span class="material-icons" style="font-size:32px;color:#25d366">local_offer</span></div>
+    <h3 style="font-size:24px;font-weight:700;color:var(--text-secondary);margin-bottom:8px">Wait! Don't miss out</h3>
+    <p style="color:var(--text-tertiary);font-size:15px;line-height:1.6;margin-bottom:24px">Get <strong style="color:#25d366">30 days free</strong> trial + free WhatsApp bot setup. No credit card needed.</p>
+    <form id="exitForm" style="display:flex;flex-direction:column;gap:12px" onsubmit="return submitExit(this)">
+      <input type="email" id="exitEmail" required placeholder="your@email.com" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--border);background:var(--bg-alt);color:var(--text-primary);font-size:15px;outline:none">
+      <button type="submit" style="width:100%;padding:14px;background:#25d366;color:#fff;border:none;border-radius:14px;font-weight:700;font-size:15px;box-shadow:0 4px 16px rgba(37,211,102,.25)">Claim Free Trial</button>
+    </form>
+    <p style="font-size:12px;color:var(--text-tertiary);margin-top:12px">No spam. Unsubscribe anytime.</p>
+  </div>
+</div>
+
 <div id="scroll-progress"></div>
 
 <div class="page-wrap" id="pageWrap">
@@ -265,7 +302,8 @@
       <span class="material-icons" style="font-size:30px;color:#25d366;transition:transform .4s cubic-bezier(.34,1.56,.64,1);display:inline-block">storefront</span>
       <span style="font-size:20px;font-weight:700;color:var(--text-secondary);transition:color .3s">Grahbook</span>
     </a>
-    <div id="navDesktop" style="display:none;align-items:center;gap:24px">
+    <div id="navDesktop" style="display:none;align-items:center;gap:20px">
+      <span class="visitor-badge" id="visitorBadge"><span style="width:6px;height:6px;border-radius:50%;background:#25d366;display:inline-block;animation:pulseDot 2s infinite"></span> <span id="visitorCount">47</span> viewing now</span>
       <a href="#features" class="nav-link">Features</a>
       <a href="#pricing" class="nav-link">Pricing</a>
       <a href="#faq" class="nav-link">FAQ</a>
@@ -707,6 +745,23 @@ document.getElementById('registerForm').addEventListener('submit',async function
   try{const r=await fetch('/api/register-store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({store_name:document.getElementById('storeName').value,owner_name:document.getElementById('ownerName').value,phone:document.getElementById('phone').value,email:document.getElementById('email').value,business_type:document.getElementById('businessType').value,plan:document.getElementById('planSelect').value})});if(r.ok){const d=await r.json();document.getElementById('registerForm').style.display='none';document.getElementById('successMsg').style.display='block';document.getElementById('storeId').textContent=d.store_id;}else throw new Error();}
   catch(err){alert('Registration failed. Please try again.');btn.disabled=false;btn.innerHTML=orig;}
 });
+
+/* ═══ CLICK EXPLOSION ═══ */
+(function(){if(!window.matchMedia('(pointer:fine)').matches)return;const xc=['#25d366','#4ade80','#128c7e','#a7f3d0','#6ee7b7','#34d399','#fff'];document.addEventListener('click',function(e){for(let i=0;i<18;i++){const p=document.createElement('div');p.className='xpart';const s=3+Math.random()*7;p.style.cssText=`left:${e.clientX}px;top:${e.clientY}px;width:${s}px;height:${s}px;background:${xc[i%xc.length]};box-shadow:0 0 ${s+3}px ${xc[i%xc.length]}`;document.body.appendChild(p);const a=Math.random()*Math.PI*2,sp=60+Math.random()*200,g=.5;let vx=Math.cos(a)*sp,vy=Math.sin(a)*sp-130,op=1;const iv=setInterval(()=>{vy+=g;p.style.left=(parseFloat(p.style.left)+vx*.016)+'px';p.style.top=(parseFloat(p.style.top)+vy*.016)+'px';op-=.018;p.style.opacity=Math.max(op,0);p.style.transform=`scale(${Math.max(op,0)})`;if(op<=0){clearInterval(iv);p.remove();}},16);}});})();
+
+/* ═══ MOUSE GLOW ═══ */
+(function(){if(!window.matchMedia('(pointer:fine)').matches)return;const mg=document.getElementById('mouseGlow');let mx=-999,my=-999,px=mx,py=my;document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;if(mg.style.opacity!='1')mg.style.opacity='1';});(function anim(){px+=(mx-px)*.08;py+=(my-py)*.08;mg.style.transform=`translate(${px}px,${py}px) translate(-50%,-50%)`;requestAnimationFrame(anim);})();document.addEventListener('mouseleave',()=>{mg.style.opacity='0';});})()
+
+/* ═══ VISITOR COUNTER ═══ */
+(function(){const vc=document.getElementById('visitorCount');if(!vc)return;let cur=47;setInterval(()=>{const d=Math.floor(Math.random()*3)-1;cur=Math.max(32,Math.min(68,cur+d));vc.textContent=cur;},4000+Math.random()*5000);})();
+
+/* ═══ EXIT INTENT ═══ */
+(function(){if(localStorage.getItem('exitShown'))return;let shown=false;document.addEventListener('mouseleave',function(e){if(shown||e.clientY>10)return;shown=true;localStorage.setItem('exitShown','1');document.getElementById('exitPopup').classList.add('show');});})();
+function closeExitPopup(){document.getElementById('exitPopup').classList.remove('show');}
+function submitExit(f){const email=f.querySelector('#exitEmail').value;closeExitPopup();alert('Thanks '+email+'! We will send your free trial link on WhatsApp shortly.');return false;}
+
+/* ═══ PARALLAX ═══ */
+(function(){const pe=document.querySelectorAll('.section,.marquee,.form-card,.pricing-card');window.addEventListener('scroll',()=>{pe.forEach(el=>{const r=el.getBoundingClientRect(),c=r.top+r.height/2,wh=innerHeight;if(c>0&&c<wh)el.style.transform=`translateY(${((c/wh-.5)*.06)*40}px)`;});},{passive:true});})();
 </script>
 </body>
 </html>
