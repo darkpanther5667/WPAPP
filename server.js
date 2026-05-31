@@ -26,7 +26,7 @@ app.set('trust proxy', 1);
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
@@ -160,13 +160,26 @@ async function readStoreDB(storeId) {
         }
       : (sid === 'default' && db.shop ? db.shop : {});
 
+  const OVERDUE_DAYS = 30;
+  const now = new Date();
+  const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === sid).map(b => {
+    if (b.status === 'unpaid' && b.created_at) {
+      const billDate = new Date(b.created_at);
+      const daysDiff = (now - billDate) / (1000 * 60 * 60 * 24);
+      if (daysDiff > OVERDUE_DAYS) {
+        // Return a new object — do NOT mutate the cached original
+        return { ...b, status: 'overdue' };
+      }
+    }
+    return b;
+  });
+
   return {
     shop,
     customers: (db.customers || []).filter(c => (c.store_id || 'default') === sid),
     transactions: (db.transactions || []).filter(t => (t.store_id || 'default') === sid),
-    bills: (db.bills || []).filter(b => (b.store_id || 'default') === sid),
+    bills: storeBills,
     staff: (db.staff || []).filter(s => (s.store_id || 'default') === sid),
-    stores: db.stores || [],
   };
 }
 
@@ -383,7 +396,7 @@ async function addCustomerTool(name, phone, storeId) {
   return { success: true, customer: newCustomer };
 }
 
-async function recordPaymentTool(customerId, amount, note, staffPhone, storeId) {
+async function recordPaymentTool(customerId, amount, note, staffPhone, storeId, paymentMode) {
   const db = await readDB();
   const storeCustomers = (db.customers || []).filter(c => (c.store_id || 'default') === (storeId || 'default'));
   const customer = storeCustomers.find(c => c.id === customerId);
@@ -394,6 +407,7 @@ async function recordPaymentTool(customerId, amount, note, staffPhone, storeId) 
     customer_id: customerId,
     type: 'payment',
     amount: Number(amount),
+    payment_mode: paymentMode || 'cash',
     note: note || 'Payment recorded via AI Bot',
     staff_phone: staffPhone || 'system',
     timestamp: new Date().toISOString(),
@@ -448,7 +462,7 @@ async function addItemToUnpaidBillTool(customerId, itemName, price, qty, storeId
     db.bills.push(currentBill);
   }
   const quantity = Number(qty) || 1;
-  currentBill.items.push({ name: itemName, qty: quantity, price: Number(price) });
+  currentBill.items.push({ name: itemName, qty: quantity, price: Number(price), hsn_code: '', gst_rate: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, total_with_tax: 0 });
   currentBill.total += Number(price) * quantity;
   await writeDB(db);
   // Invalidate cache to ensure AI gets fresh data
@@ -468,7 +482,7 @@ async function generateBillTool(customerId, amount, storeId) {
   db.bills.push({
     id: newBillId,
     customer_id: customerId,
-    items: [{ name: 'General Grocery Item', qty: 1, price: Number(amount) }],
+    items: [{ name: 'General Grocery Item', qty: 1, price: Number(amount), hsn_code: '', gst_rate: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, total_with_tax: 0 }],
     total: Number(amount),
     status: 'unpaid',
     store_id: storeId || 'default',
@@ -521,27 +535,7 @@ async function getBillPdfTool(customerId, storeId) {
   // Find the latest unpaid bill for this customer
   const unpaidBill = db.bills.find(b => b.customer_id === customerId && b.status === 'unpaid');
   if (!unpaidBill) {
-    // If no unpaid bill, create a simple bill for demo purposes
-    const newBillId = genId('b');
-    const timestampIso = new Date().toISOString();
-    const newBill = {
-      id: newBillId,
-      customer_id: customerId,
-      items: [{ name: 'General Grocery Item', qty: 1, price: 100 }],
-      total: 100,
-      status: 'unpaid',
-      store_id: storeId || 'default',
-      created_at: timestampIso,
-      paid_at: null
-    };
-    db.bills.push(newBill);
-    await writeDB(db);
-    return {
-      success: true,
-      billId: newBillId,
-      pdfUrl: `/api/bill/${newBillId}/pdf`,
-      message: 'PDF generated for newly created bill'
-    };
+    return { error: `No unpaid bill found for customer '${(customer.name || customerId)}'. Please create a bill first.` };
   }
 
   return {
@@ -1009,8 +1003,9 @@ BASIC RULES:
       });
     }
 
-    const finalResponse = response.choices[0].message.content.trim();
-    
+    const msgContent = response.choices[0].message.content;
+    const finalResponse = (msgContent || '').trim() || '✅ Done! What else can I help you with?';
+
     // Add to conversation history
     addToHistory(staffPhone, messageText, finalResponse);
     
@@ -1116,16 +1111,17 @@ function scheduleDaily(hour, minuteIST, fn) {
 
 async function sendDailyReport() {
   const db = await readDB();
+  const shop = db.shop || {};
   const todayString = new Date().toISOString().substring(0, 10);
 
-  const billsToday = db.bills.filter(b => b.created_at.startsWith(todayString));
-  const billsTotal = billsToday.reduce((sum, b) => sum + b.total, 0);
-  const paidToday = billsToday.filter(b => b.status === 'paid').reduce((sum, b) => sum + b.total, 0);
+  const billsToday = (db.bills || []).filter(b => b.created_at && b.created_at.startsWith(todayString));
+  const billsTotal = billsToday.reduce((sum, b) => sum + (b.total || 0), 0);
+  const paidToday = billsToday.filter(b => b.status === 'paid').reduce((sum, b) => sum + (b.total || 0), 0);
 
-  const collectionsToday = db.transactions.filter(t => t.type === 'payment' && t.timestamp.startsWith(todayString));
-  const paymentTotal = collectionsToday.reduce((sum, t) => sum + t.amount, 0);
+  const collectionsToday = (db.transactions || []).filter(t => t.type === 'payment' && t.timestamp && t.timestamp.startsWith(todayString));
+  const paymentTotal = collectionsToday.reduce((sum, t) => sum + (t.amount || 0), 0);
 
-  const totalOutstanding = db.customers.reduce((sum, c) => {
+  const totalOutstanding = (db.customers || []).reduce((sum, c) => {
     const bal = getCustomerOutstanding(c.id, db.transactions, db.bills);
     return sum + (bal > 0 ? bal : 0);
   }, 0);
@@ -1139,7 +1135,7 @@ async function sendDailyReport() {
     `🧾 Bills today: ${billsToday.length} (Paid: ${billsToday.filter(b => b.status === 'paid').length})\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `📊 Total outstanding (sab customers): *${fmtRs(totalOutstanding)}*\n` +
-    `👥 Total customers: ${db.customers.length}\n` +
+    `👥 Total customers: ${(db.customers || []).length}\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `_${shop.name || 'General Store'} Bot 🤖_`;
 
@@ -1329,7 +1325,8 @@ app.post('/webhook', async (req, res) => {
     // ── DAILY REPORT PDF ─────────────────────────────────────────────────────────
     } else if (action.type === 'daily_report_pdf') {
       const todayString = new Date().toISOString().substring(0, 10);
-      const pdfUrl = `http://localhost:${PORT}/api/report/${todayString}/pdf`;
+      const baseUrl = getPublicBaseUrl(req);
+      const pdfUrl = `${baseUrl}/api/report/${todayString}/pdf`;
       
       // Send PDF to all staff members
       let sentCount = 0;
@@ -1347,7 +1344,7 @@ app.post('/webhook', async (req, res) => {
 
     // ── SEND PAYMENT REMINDERS ───────────────────────────────────────────────────
     } else if (action.type === 'send_reminders') {
-      const shop = db.shop;
+      const shop = db.shop || {};
       let sentCount = 0;
       for (const c of db.customers) {
         const bal = getCustomerOutstanding(c.id, db.transactions, db.bills);
@@ -1493,7 +1490,7 @@ app.post('/webhook', async (req, res) => {
         };
         fullDb.bills.push(currentBill);
       }
-      currentBill.items.push({ name: itemName, qty: 1, price });
+      currentBill.items.push({ name: itemName, qty: 1, price, hsn_code: '', gst_rate: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, total_with_tax: 0 });
       currentBill.total += price;
       await writeDB(fullDb);
       cachedDB = null; dbCacheTimestamp = 0;
@@ -1549,7 +1546,8 @@ app.post('/webhook', async (req, res) => {
       if (!unpaidBill) {
         replyText = `❌ *${customerName}* ka koi unpaid bill nahi hai. Pehle bill banayein.`;
       } else {
-        const pdfUrl = `http://localhost:${PORT}/api/bill/${unpaidBill.id}/pdf`;
+        const baseUrl = getPublicBaseUrl(req);
+        const pdfUrl = `${baseUrl}/api/bill/${unpaidBill.id}/pdf`;
         const customer = db.customers.find(c => c.id === customerId);
         if (customer && customer.phone) {
           await sendWhatsAppDocument(customer.phone, pdfUrl, `invoice-${unpaidBill.id}.pdf`, `🧾 Your invoice from ${shop.name || 'General Store'}`);
@@ -1569,7 +1567,8 @@ app.post('/webhook', async (req, res) => {
       const { customerId, customerName } = action;
       const customer = db.customers.find(c => c.id === customerId);
       const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
-      const pdfUrl = `http://localhost:${PORT}/api/customer/${customerId}/statement/pdf`;
+      const baseUrl = getPublicBaseUrl(req);
+      const pdfUrl = `${baseUrl}/api/customer/${customerId}/statement/pdf`;
       if (customer && customer.phone) {
         await sendWhatsAppDocument(customer.phone, pdfUrl, `statement-${customer.name.replace(/\s+/g, '_')}.pdf`, `📊 Your account statement from ${shop.name || 'General Store'}`);
       }
@@ -1617,8 +1616,12 @@ app.post('/webhook', async (req, res) => {
   return res.sendStatus(200);
 });
 
-// GET /api/test-wa — Diagnostic route to test WhatsApp API
+// GET /api/test-wa — Diagnostic route to test WhatsApp API (requires X-ADMIN-KEY)
 app.get('/api/test-wa', async (req, res) => {
+  const adminKey = process.env.ADMIN_KEY;
+  if (adminKey && req.get('X-ADMIN-KEY') !== adminKey) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
   const token = process.env.WHATSAPP_TOKEN;
   const phoneId = process.env.PHONE_NUMBER_ID;
   const target = req.query.phone || '918052402633';
@@ -1685,7 +1688,7 @@ app.get('/api/test-db', async (req, res) => {
       phone: '918052402633'
     });
   } catch (error) {
-    return res.json({ status: 'Connection failed', error: error.message, stack: error.stack });
+    return res.json({ status: 'Connection failed' });
   }
 });
 
@@ -1753,7 +1756,7 @@ app.post('/api/auth/request-code', async (req, res) => {
     return res.json({ success: true });
   } catch (error) {
     console.error('Error requesting login code:', error);
-    return res.status(500).json({ success: false, message: 'Failed to request code', error: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to request code' });
   }
 });
 
@@ -1903,10 +1906,12 @@ app.post('/api/customer/add', async (req, res) => {
 // POST /api/payment/add - Record a payment
 app.post('/api/payment/add', async (req, res) => {
   try {
-    const { customerId, amount, note } = req.body;
-    if (!customerId || !amount) {
-      return res.status(400).json({ success: false, message: 'Customer ID and amount are required' });
+    const { customerId, amount, note, payment_mode, type } = req.body;
+    const txType = type === 'credit' ? 'credit' : 'payment';
+    if (!customerId || amount === undefined || amount === null || isNaN(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, message: 'Customer ID and valid positive amount are required' });
     }
+    const parsedAmount = Number(amount);
 
     const db = await readStoreDB(req.storeId);
     const customer = db.customers.find(c => c.id === customerId);
@@ -1918,8 +1923,9 @@ app.post('/api/payment/add', async (req, res) => {
     db.transactions.push({
       id: newTxId,
       customer_id: customerId,
-      type: 'payment',
+      type: txType,
       amount: Number(amount),
+      payment_mode: payment_mode || 'cash',
       note: note || 'Payment recorded via Mobile App',
       staff_phone: 'mobile_app',
       timestamp: new Date().toISOString(),
@@ -1932,7 +1938,7 @@ app.post('/api/payment/add', async (req, res) => {
     dbCacheTimestamp = 0;
 
     const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
-    res.json({ success: true, customerName: customer.name, amount: Number(amount), remainingOutstanding: balance });
+    res.json({ success: true, customerName: customer.name, amount: parsedAmount, remainingOutstanding: balance });
   } catch (error) {
     console.error('Error adding payment:', error);
     res.status(500).json({ success: false, message: 'Failed to add payment' });
@@ -1943,8 +1949,8 @@ app.post('/api/payment/add', async (req, res) => {
 app.post('/api/bill/create', async (req, res) => {
   try {
     const { customerId, amount, items } = req.body;
-    if (!customerId || !amount) {
-      return res.status(400).json({ success: false, message: 'Customer ID and amount are required' });
+    if (!customerId || amount === undefined || amount === null || isNaN(Number(amount))) {
+      return res.status(400).json({ success: false, message: 'Customer ID and valid amount are required' });
     }
 
     const db = await readStoreDB(req.storeId);
@@ -1956,13 +1962,20 @@ app.post('/api/bill/create', async (req, res) => {
     const newBillId = genId('b');
     const timestampIso = new Date().toISOString();
 
-    const billItems = items && items.length > 0 
-      ? items.map(item => ({
+    const billItems = items && items.length > 0
+      ? items.filter(item => item.name && item.name.trim()).map(item => ({
           name: item.name,
-          qty: item.qty || 1,
-          price: Number(item.price)
+          qty: Math.max(1, parseInt(item.qty) || 1),
+          price: Math.max(0, Number(item.price) || 0),
+          hsn_code: item.hsn_code || '',
+          gst_rate: item.gst_rate || 0,
+          taxable: item.taxable || 0,
+          cgst: item.cgst || 0,
+          sgst: item.sgst || 0,
+          igst: item.igst || 0,
+          total_with_tax: item.total_with_tax || 0
         }))
-      : [{ name: 'General Grocery Item', qty: 1, price: Number(amount) }];
+      : [{ name: 'General Grocery Item', qty: 1, price: Math.max(0, Number(amount) || 0) }];
 
     // Always calculate total from items (server is source of truth)
     const calculatedTotal = billItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
@@ -2051,6 +2064,68 @@ app.post('/api/bill/mark-paid', async (req, res) => {
 // ─── REST API ROUTES ───────────────────────────────────────────────────────────
 
 app.get('/api/db', async (req, res) => res.json(await readStoreDB(req.storeId)));
+
+/**
+ * GET /api/db/changes — Delta sync endpoint.
+ * Returns only records that changed since the given ISO 8601 timestamp.
+ * If `since` is missing or empty, returns a full dump (same as /api/db).
+ */
+app.get('/api/db/changes', async (req, res) => {
+  try {
+    const since = req.query.since;
+    if (!since) {
+      // No since param — return full DB (first-sync path)
+      return res.json(await readStoreDB(req.storeId));
+    }
+
+    const db = await readDB();
+    const sid = req.storeId || 'default';
+    const sinceDate = new Date(since);
+
+    const storeCustomers = (db.customers || []).filter(c => (c.store_id || 'default') === sid);
+    const storeTransactions = (db.transactions || []).filter(t => (t.store_id || 'default') === sid);
+    const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === sid);
+    const storeStaff = (db.staff || []).filter(s => (s.store_id || 'default') === sid);
+
+    // Filter by last modified: we check created_at, paid_at, timestamp
+    const newCustomers = storeCustomers.filter(c =>
+      c.created_at && new Date(c.created_at) > sinceDate
+    );
+    const newTransactions = storeTransactions.filter(t =>
+      t.timestamp && new Date(t.timestamp) > sinceDate
+    );
+    const newBills = storeBills.filter(b =>
+      (b.created_at && new Date(b.created_at) > sinceDate) ||
+      (b.paid_at && new Date(b.paid_at) > sinceDate)
+    );
+    // Items inside bills don't have independent timestamps, so a bill
+    // whose items changed is returned as part of the updated bills list.
+
+    const serverTime = new Date().toISOString();
+
+    return res.json({
+      customers: newCustomers,
+      transactions: newTransactions,
+      bills: newBills,
+      server_time: serverTime,
+    });
+  } catch (error) {
+    console.error('Error in delta sync:', error);
+    // Fallback: return full DB so the client isn't stuck
+    const full = await readDB();
+    const sid = req.storeId || 'default';
+    return res.json({
+      fallback_full_db: {
+        shop: full.shop,
+        customers: (full.customers || []).filter(c => (c.store_id || 'default') === sid),
+        transactions: (full.transactions || []).filter(t => (t.store_id || 'default') === sid),
+        bills: (full.bills || []).filter(b => (b.store_id || 'default') === sid),
+        staff: (full.staff || []).filter(s => (s.store_id || 'default') === sid),
+      },
+      server_time: new Date().toISOString(),
+    });
+  }
+});
 
 app.post('/api/db', async (req, res) => {
   const body = req.body;
@@ -2197,7 +2272,7 @@ app.post('/api/send-reminders', async (req, res) => {
     const bal = getCustomerOutstanding(c.id, db.transactions, db.bills);
     if (bal > 0 && c.phone) {
       const msg =
-        `🙏 *${db.shop.name || 'General Store'}*\n\n` +
+        `🙏 *${(db.shop || {}).name || 'General Store'}*\n\n` +
         `Namaste *${c.name}* ji,\n\n` +
         `Aapka ${fmtRs(bal)} ka baaki hai hamare yahan.\n` +
         `Kripya jald hi chukta karein.\n\nShukriya 🙏`;

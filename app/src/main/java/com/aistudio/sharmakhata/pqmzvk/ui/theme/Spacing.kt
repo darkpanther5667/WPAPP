@@ -3,28 +3,35 @@ package com.aistudio.sharmakhata.pqmzvk.ui.theme
 import androidx.compose.ui.unit.dp
 
 // ============================================================
-// SPACING SCALE (4dp base)
+// STITCH SPACING SYSTEM (4dp base)
 // ============================================================
 object Spacing {
     val xxsmall = 2.dp
-    val xsmall = 4.dp
-    val small = 8.dp
-    val medium = 12.dp
-    val large = 16.dp
+    val unit = 4.dp           // Stitch unit
+    val xsmall = 4.dp        // Stitch unit
+    val small = 8.dp         // Stitch element-gap
+    val medium = 12.dp       // Stitch gutter
+    val large = 16.dp        // Stitch card-padding / container-margin
     val xlarge = 20.dp
     val xxlarge = 24.dp
     val xxxlarge = 32.dp
     val huge = 48.dp
     val gigantic = 64.dp
 
-    /** Horizontal screen padding */
+    /** Horizontal screen padding — Stitch container-margin */
     val screenPadding = 16.dp
 
-    /** Card inner padding */
-    val cardPadding = 14.dp
+    /** Card inner padding — Stitch card-padding */
+    val cardPadding = 16.dp
+
+    /** Spacing between grid items — Stitch gutter */
+    val gutter = 12.dp
+
+    /** Spacing between elements — Stitch element-gap */
+    val elementGap = 8.dp
 
     /** Spacing between list items */
-    val listItemGap = 10.dp
+    val listItemGap = 8.dp
 
     /** Spacing between sections on a screen */
     val sectionGap = 20.dp

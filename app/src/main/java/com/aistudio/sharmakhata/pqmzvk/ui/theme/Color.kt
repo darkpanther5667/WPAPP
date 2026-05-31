@@ -117,27 +117,35 @@ val WhatsAppDark = Color(0xFF128C7E)
 val WhatsAppLight = Color(0xFFDCF8C6)
 
 // ============================================================
-// STITCH DARK SURFACE COLORS (exact from Stitch)
+// STITCH DARK SURFACE COLORS (exact from Stitch tailwind config)
 // ============================================================
-val StitchBg = Color(0xFF0D1117)
-val StitchSurface = Color(0xFF161B22)
-val StitchSurfaceVariant = Color(0xFF21262D)
-val StitchBorder = Color(0xFF30363D)
-val StitchTextPrimary = Color(0xFFDFE2EB)
-val StitchTextSecondary = Color(0xFF8B949E)
-val StitchTextTertiary = Color(0xFF6E7681)
+val StitchBg = Color(0xFF10141A)           // surface-dim / background
+val StitchSurface = Color(0xFF1C2026)      // surface-container
+val StitchSurfaceLow = Color(0xFF181C22)   // surface-container-low
+val StitchSurfaceHigh = Color(0xFF262A31)  // surface-container-high
+val StitchSurfaceHighest = Color(0xFF31353C) // surface-container-highest / surface-variant
+val StitchSurfaceBright = Color(0xFF353940)  // surface-bright
+val StitchSurfaceLowest = Color(0xFF0A0E14) // surface-container-lowest
+val StitchBorder = Color(0xFF3C4A3D)       // outline-variant
+val StitchOutline = Color(0xFF869584)       // outline
+val StitchTextPrimary = Color(0xFFDFE2EB)  // on-surface / on-background
+val StitchTextSecondary = Color(0xFFBBCBB9) // on-surface-variant
+val StitchPrimary = Color(0xFF4FF07F)      // primary (bright green)
+val StitchPrimaryContainer = Color(0xFF25D366) // primary-container (WhatsApp green)
+val StitchOnPrimary = Color(0xFF003915)    // on-primary
+val StitchOnPrimaryContainer = Color(0xFF005523) // on-primary-container
 
 // ============================================================
-// DARK THEME SURFACES — Stitch exact
+// DARK THEME SURFACES — aliases
 // ============================================================
 val BackgroundDark = StitchBg
 val SurfaceDark = StitchSurface
-val SurfaceVariantDark = StitchSurfaceVariant
-val SurfaceHighDark = Color(0xFF2D333B)
+val SurfaceVariantDark = StitchSurfaceHighest
+val SurfaceHighDark = StitchSurfaceHigh
 
 val TextPrimaryDark = StitchTextPrimary
 val TextSecondaryDark = StitchTextSecondary
-val TextTertiaryDark = StitchTextTertiary
+val TextTertiaryDark = StitchTextSecondary // alias
 
 // ============================================================
 // LIGHT THEME SURFACES (keep for light mode support)
@@ -157,7 +165,7 @@ val TextOnPrimaryLight = Color(0xFFFFFFFF)
 // BORDERS & DIVIDERS
 // ============================================================
 val CardBorder = Color(0xFF30363D)
-val DividerColor = StitchSurfaceVariant
+val DividerColor = StitchSurfaceHighest
 val DividerDark = StitchBorder
 val OutlineLight = Color(0xFFD1D5DB)
 val OutlineDark = StitchBorder
@@ -206,3 +214,32 @@ val AvatarColors = listOf(
     listOf(StitchTeal, StitchTealDark),
     listOf(StitchSky, StitchSkyDark),
 )
+
+// ============================================================
+// STITCH SECONDARY — Blue
+// ============================================================
+val StitchSecondary = Color(0xFFA4C9FF)           // secondary (light blue text)
+val StitchOnSecondary = Color(0xFF00315D)          // on-secondary
+val StitchSecondaryContainer = Color(0xFF3B93F3)  // secondary-container (blue)
+val StitchOnSecondaryContainer = Color(0xFF002A52) // on-secondary-container
+
+// ============================================================
+// STITCH TERTIARY — Orange/Coral
+// ============================================================
+val StitchTertiary = Color(0xFFFFC7B6)             // tertiary (light orange text)
+val StitchOnTertiary = Color(0xFF5D1900)           // on-tertiary
+val StitchTertiaryContainer = Color(0xFFFFA080)    // tertiary-container (orange)
+val StitchOnTertiaryContainer = Color(0xFF862800)  // on-tertiary-container
+
+// ============================================================
+// STITCH ERROR
+// ============================================================
+val StitchError = Color(0xFFFFB4AB)
+val StitchOnError = Color(0xFF690005)
+val StitchErrorContainer = Color(0xFF93000A)
+
+// ============================================================
+// BACKWARD COMPATIBILITY ALIASES
+// ============================================================
+val StitchSurfaceVariant = StitchSurfaceHighest
+val StitchTextTertiary = StitchTextSecondary

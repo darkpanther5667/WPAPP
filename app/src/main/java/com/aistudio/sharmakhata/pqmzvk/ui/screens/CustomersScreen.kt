@@ -6,7 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -31,56 +32,57 @@ import com.aistudio.sharmakhata.pqmzvk.data.model.Customer
 import com.aistudio.sharmakhata.pqmzvk.data.model.FullDatabase
 import com.aistudio.sharmakhata.pqmzvk.ui.components.AppAvatar
 import com.aistudio.sharmakhata.pqmzvk.ui.components.EmptyState
+import com.aistudio.sharmakhata.pqmzvk.ui.components.HamburgerAppBar
 import com.aistudio.sharmakhata.pqmzvk.ui.components.ShimmerListItem
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
-import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
+import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.CustomerViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
+import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.LiveSyncManager
+import androidx.compose.ui.res.stringResource
+import com.aistudio.sharmakhata.pqmzvk.R
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomersScreen(
-    viewModel: MainViewModel,
+    viewModel: CustomerViewModel,
+    onMenuClick: () -> Unit = {},
+    shopInitial: String = "S",
     onBack: () -> Unit,
     onCustomerClick: (String) -> Unit,
     onAddCustomer: () -> Unit,
     onNavigateToSearch: () -> Unit = {},
 ) {
     val dbState by viewModel.dbState.collectAsState()
+    val pagedCustomers = viewModel.customersPagingData.collectAsLazyPagingItems()
     val context = LocalContext.current
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedFilter by remember { mutableStateOf("All") }
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Customers", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
+            HamburgerAppBar(
+                title = stringResource(R.string.customers_title),
+                onMenuClick = onMenuClick,
+                shopInitial = shopInitial,
                 actions = {
                     IconButton(onClick = onNavigateToSearch) {
-                        Icon(Icons.Default.Search, contentDescription = "Search", tint = TextSecondaryLight)
+                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search), tint = StitchTextSecondary)
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
+                }
             )
         },
+        containerColor = StitchBg,
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddCustomer,
-                containerColor = StitchTeal,
+                containerColor = StitchPrimaryContainer,
                 contentColor = Color.White,
                 shape = FabShape
             ) {
-                Icon(Icons.Default.PersonAdd, contentDescription = "Add customer")
+                Icon(Icons.Default.PersonAdd, contentDescription = stringResource(R.string.add_customer_action))
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -90,7 +92,7 @@ fun CustomersScreen(
         PullToRefreshBox(
             state = pullToRefreshState,
             isRefreshing = dbState is UiState.Loading,
-            onRefresh = { viewModel.fetchData(context) },
+            onRefresh = { scope.launch { LiveSyncManager.forceRefresh() } },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -111,11 +113,11 @@ fun CustomersScreen(
                 }
                 is UiState.Error -> {
                     EmptyState(
-                        message = "Error loading customers",
+                        message = stringResource(R.string.error_loading_customers),
                         description = (dbState as UiState.Error).message,
                         icon = Icons.Default.Error,
-                        actionLabel = "Retry",
-                        onAction = { viewModel.fetchData(context) }
+                        actionLabel = stringResource(R.string.retry),
+                        onAction = { scope.launch { LiveSyncManager.forceRefresh() } }
                     )
                 }
                 is UiState.Success -> {
@@ -123,20 +125,18 @@ fun CustomersScreen(
                     if (db.customers.isEmpty()) {
                         EmptyState(
                             icon = Icons.Default.Person,
-                            message = "No customers yet",
-                            description = "Add your first customer to get started",
-                            actionLabel = "Add Customer",
+                            message = stringResource(R.string.no_customers_yet),
+                            description = stringResource(R.string.add_first_customer),
+                            actionLabel = stringResource(R.string.add_customer_action),
                             onAction = onAddCustomer
                         )
                     } else {
                         CustomersList(
                             db = db,
+                            pagedCustomers = pagedCustomers,
                             onCustomerClick = onCustomerClick,
                             onAddCustomer = onAddCustomer,
-                            searchQuery = searchQuery,
-                            onSearchChange = { searchQuery = it },
-                            selectedFilter = selectedFilter,
-                            onFilterChange = { selectedFilter = it }
+                            viewModel = viewModel
                         )
                     }
                 }
@@ -148,48 +148,27 @@ fun CustomersScreen(
 @Composable
 fun CustomersList(
     db: FullDatabase,
+    pagedCustomers: LazyPagingItems<Customer>,
     onCustomerClick: (String) -> Unit,
     onAddCustomer: () -> Unit,
-    searchQuery: String,
-    onSearchChange: (String) -> Unit,
-    selectedFilter: String,
-    onFilterChange: (String) -> Unit
+    viewModel: CustomerViewModel
 ) {
-    // Calculate balances for filtering
-    fun getBalance(customer: Customer): Double {
-        val transactions = db.transactions.filter { it.customerId == customer.id }
-        val bills = db.bills.filter { it.customerId == customer.id }
-        val payments = transactions.filter { it.type == "payment" }.sumOf { it.amount }
-        val credits = transactions.filter { it.type == "credit" }.sumOf { it.amount }
-        val billTotal = bills.sumOf { it.total }
-        return credits + billTotal - payments
-    }
-
-    val filteredCustomers = db.customers.filter { customer ->
-        val matchesSearch = customer.name.contains(searchQuery, ignoreCase = true) ||
-            (customer.phone?.contains(searchQuery, ignoreCase = true) == true)
-        val balance = getBalance(customer)
-        val matchesFilter = when (selectedFilter) {
-            "With Outstanding" -> balance > 0
-            "Paid" -> balance <= 0
-            else -> true
-        }
-        matchesSearch && matchesFilter
-    }
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val selectedFilter by viewModel.filter.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Search Bar
         OutlinedTextField(
             value = searchQuery,
-            onValueChange = onSearchChange,
-            placeholder = { Text("Search by name or phone...", color = TextTertiaryLight) },
+            onValueChange = { viewModel.setSearchQuery(it) },
+            placeholder = { Text(stringResource(R.string.search_by_name_or_phone), color = TextTertiaryLight) },
             leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = null, tint = StitchTeal)
+                Icon(Icons.Default.Search, contentDescription = null, tint = StitchPrimaryContainer)
             },
             trailingIcon = if (searchQuery.isNotEmpty()) {
                 {
-                    IconButton(onClick = { onSearchChange("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextSecondaryLight)
+                    IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                        Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.clear), tint = TextSecondaryLight)
                     }
                 }
             } else null,
@@ -198,7 +177,7 @@ fun CustomersList(
                 .padding(horizontal = Spacing.large, vertical = Spacing.small),
             shape = SearchBarShape,
             colors = TextFieldDefaults.colors(
-                focusedIndicatorColor = IndigoPrimary,
+                focusedIndicatorColor = StitchPrimaryContainer,
                 unfocusedIndicatorColor = CardBorder,
                 focusedContainerColor = MaterialTheme.colorScheme.surface,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -218,8 +197,8 @@ fun CustomersList(
             item {
                 FilterChip(
                     selected = selectedFilter == "All",
-                    onClick = { onFilterChange("All") },
-                    label = { Text("All (${db.customers.size})") },
+                    onClick = { viewModel.setFilter("All") },
+                    label = { Text(stringResource(R.string.all_with_count, db.customers.size)) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = StitchTeal,
                         selectedLabelColor = Color.White,
@@ -232,8 +211,8 @@ fun CustomersList(
             item {
                 FilterChip(
                     selected = selectedFilter == "With Outstanding",
-                    onClick = { onFilterChange("With Outstanding") },
-                    label = { Text("With Outstanding") },
+                    onClick = { viewModel.setFilter("With Outstanding") },
+                    label = { Text(stringResource(R.string.with_outstanding)) },
                     leadingIcon = if (selectedFilter == "With Outstanding") {
                         { Icon(Icons.Default.TrendingUp, contentDescription = null, modifier = Modifier.size(16.dp)) }
                     } else null,
@@ -249,8 +228,8 @@ fun CustomersList(
             item {
                 FilterChip(
                     selected = selectedFilter == "Paid",
-                    onClick = { onFilterChange("Paid") },
-                    label = { Text("Paid") },
+                    onClick = { viewModel.setFilter("Paid") },
+                    label = { Text(stringResource(R.string.paid_filter)) },
                     leadingIcon = if (selectedFilter == "Paid") {
                         { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp)) }
                     } else null,
@@ -265,7 +244,7 @@ fun CustomersList(
             }
         }
 
-        if (filteredCustomers.isEmpty()) {
+        if (pagedCustomers.itemCount == 0) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -283,16 +262,16 @@ fun CustomersList(
                         modifier = Modifier.size(IconSize.huge)
                     )
                     Text(
-                        text = if (searchQuery.isNotEmpty()) "No customers matching \"$searchQuery\""
-                        else "No ${selectedFilter.lowercase()} customers",
+                        text = if (searchQuery.isNotEmpty()) stringResource(R.string.no_customers_matching, searchQuery)
+                        else stringResource(R.string.no_filter_customers, selectedFilter.lowercase()),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = TextSecondaryLight,
                         textAlign = TextAlign.Center
                     )
                     if (searchQuery.isNotEmpty()) {
-                        TextButton(onClick = { onSearchChange("") }) {
-                            Text("Clear search", color = IndigoPrimary, fontWeight = FontWeight.Medium)
+                        TextButton(onClick = { viewModel.setSearchQuery("") }) {
+                            Text(stringResource(R.string.clear_search), color = IndigoPrimary, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
@@ -307,13 +286,16 @@ fun CustomersList(
                 ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.listItemGap)
             ) {
-                itemsIndexed(filteredCustomers, key = { _, c -> c.id }) { index, customer ->
-                    CustomerCard(
-                        customer = customer,
-                        db = db,
-                        colorIndex = abs(customer.id.hashCode()) % AvatarColors.size,
-                        onClick = { onCustomerClick(customer.id) }
-                    )
+                items(count = pagedCustomers.itemCount, key = { index -> pagedCustomers[index]?.id ?: index }) { index ->
+                    val customer = pagedCustomers[index]
+                    if (customer != null) {
+                        CustomerCard(
+                            customer = customer,
+                            db = db,
+                            colorIndex = abs(customer.id.hashCode()) % AvatarColors.size,
+                            onClick = { onCustomerClick(customer.id) }
+                        )
+                    }
                 }
             }
         }
@@ -341,9 +323,9 @@ fun CustomerCard(
         else -> AmountNeutral
     }
     val balanceLabel = when {
-        balance > 0 -> "Due"
-        balance < 0 -> "You Get"
-        else -> "Settled"
+        balance > 0 -> stringResource(R.string.due_label)
+        balance < 0 -> stringResource(R.string.you_get_label)
+        else -> stringResource(R.string.settled_label)
     }
 
     Card(
@@ -390,7 +372,7 @@ fun CustomerCard(
                         modifier = Modifier.size(IconSize.xsmall)
                     )
                     Text(
-                        text = customer.phone ?: "No phone",
+                        text = customer.phone ?: stringResource(R.string.no_phone),
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondaryLight,
                         maxLines = 1,
@@ -419,7 +401,7 @@ fun CustomerCard(
 
             Icon(
                 Icons.Default.ChevronRight,
-                contentDescription = "View details",
+                contentDescription = stringResource(R.string.view_details),
                 tint = TextTertiaryLight,
                 modifier = Modifier.size(IconSize.medium)
             )

@@ -22,15 +22,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
+import androidx.compose.ui.res.stringResource
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
+import com.aistudio.sharmakhata.pqmzvk.R
 
 @Composable
 fun LoadingScreen(
@@ -42,24 +43,19 @@ fun LoadingScreen(
     val reportState by viewModel.reportState.collectAsState()
     val syncError by viewModel.syncError.collectAsState()
     var hasTimedOut by remember { mutableStateOf(false) }
-    var showSkeleton by remember { mutableStateOf(true) }
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         viewModel.fetchData(context)
-        // Show skeleton for 2 seconds, then show actual loading
-        kotlinx.coroutines.delay(2000)
-        showSkeleton = false
-        // Add timeout: if no success after 120 seconds, show error (account for Render cold start)
-        kotlinx.coroutines.delay(118000)
-        if (dbState !is UiState.Success || reportState !is UiState.Success) {
+        // If data doesn't load within 30s, show timeout error
+        kotlinx.coroutines.delay(30_000)
+        if (dbState !is UiState.Success) {
             hasTimedOut = true
         }
     }
 
     LaunchedEffect(dbState, reportState) {
         if (dbState is UiState.Success && reportState is UiState.Success) {
-            kotlinx.coroutines.delay(500) // Small delay for smooth transition
             onReady()
         }
     }
@@ -68,15 +64,7 @@ fun LoadingScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            StitchTeal.copy(alpha = 0.05f),
-                            Color.White,
-                            StitchTeal.copy(alpha = 0.02f)
-                        )
-                    )
-                ),
+                .background(StitchBg),
             contentAlignment = Alignment.Center
         ) {
             Column(
@@ -86,9 +74,8 @@ fun LoadingScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                // Logo Animation
                 AnimatedLogo()
-                
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 when {
@@ -98,11 +85,10 @@ fun LoadingScreen(
                                 (dbState as? UiState.Error)?.message,
                                 (reportState as? UiState.Error)?.message,
                                 syncError,
-                                if (hasTimedOut) "Sync timed out. The server may be waking up (cold start). Please try again." else null
+                                if (hasTimedOut) stringResource(R.string.sync_timed_out) else null
                             ).joinToString("\n"),
                             onRetry = {
                                 hasTimedOut = false
-                                showSkeleton = true
                                 viewModel.fetchData(context)
                             },
                             onBackToLogin = {
@@ -111,11 +97,8 @@ fun LoadingScreen(
                             }
                         )
                     }
-                    showSkeleton -> {
-                        LoadingSkeleton()
-                    }
                     else -> {
-                        SyncingAnimation()
+                        LoadingSkeleton()
                     }
                 }
             }
@@ -135,25 +118,29 @@ fun AnimatedLogo() {
         ),
         label = "scale"
     )
-    
+
     Box(
         modifier = Modifier
-            .size(120.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(StitchTeal, StitchTealDark)
-                )
-            )
+            .size(100.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(StitchSurfaceHighest)
             .scale(scale),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            Icons.Default.Storefront,
-            contentDescription = "Grahbook Logo",
-            tint = Color.White,
-            modifier = Modifier.size(60.dp)
-        )
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(StitchPrimaryContainer.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.Storefront,
+                contentDescription = "Grahbook Logo",
+                tint = StitchPrimaryContainer,
+                modifier = Modifier.size(44.dp)
+            )
+        }
     }
 }
 
@@ -163,38 +150,35 @@ fun LoadingSkeleton() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Title Skeleton
         Box(
             modifier = Modifier
                 .width(150.dp)
                 .height(24.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(Slate200)
+                .background(StitchSurfaceHigh)
         )
-        
-        // Subtitle Skeleton
+
         Box(
             modifier = Modifier
                 .width(200.dp)
                 .height(16.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(Slate200)
+                .background(StitchSurfaceHigh)
         )
-        
+
         Spacer(modifier = Modifier.height(32.dp))
-        
-        // Progress indicator
+
         CircularProgressIndicator(
-            color = StitchTeal,
+            color = StitchPrimaryContainer,
             strokeWidth = 3.dp
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Text(
-            text = "Loading your workspace...",
+            text = stringResource(R.string.loading_workspace),
             style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondaryLight
+            color = StitchTextSecondary
         )
     }
 }
@@ -211,25 +195,24 @@ fun SyncingAnimation() {
         ),
         label = "rotation"
     )
-    
+
     CircularProgressIndicator(
-        color = StitchTeal,
+        color = StitchPrimaryContainer,
         strokeWidth = 4.dp,
         modifier = Modifier.size(48.dp)
     )
-    
+
     Spacer(modifier = Modifier.height(24.dp))
-    
+
     Text(
-        text = "Syncing your data…",
+        text = stringResource(R.string.syncing_data),
         style = MaterialTheme.typography.bodyLarge,
-        color = TextSecondaryLight,
+        color = StitchTextSecondary,
         fontWeight = FontWeight.Medium
     )
-    
+
     Spacer(modifier = Modifier.height(8.dp))
-    
-    // Animated dots
+
     Row(
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
@@ -248,7 +231,7 @@ fun SyncingAnimation() {
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(StitchTeal.copy(alpha = alpha))
+                    .background(StitchPrimaryContainer.copy(alpha = alpha))
             )
         }
     }
@@ -265,10 +248,10 @@ fun ErrorState(
             .fillMaxWidth()
             .padding(16.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        colors = CardDefaults.cardColors(containerColor = StitchSurface),
+        border = CardDefaults.outlinedCardBorder().copy(
+            brush = androidx.compose.ui.graphics.SolidColor(StitchBorder)
+        )
     ) {
         Column(
             modifier = Modifier.padding(24.dp),
@@ -281,21 +264,21 @@ fun ErrorState(
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(64.dp)
             )
-            
+
             Text(
-                text = "Sync Failed",
+                text = stringResource(R.string.sync_failed),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = StitchTextPrimary
             )
-            
+
             Text(
                 text = error,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = StitchTextSecondary,
                 textAlign = TextAlign.Center
             )
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -304,22 +287,24 @@ fun ErrorState(
                     onClick = onRetry,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = StitchTeal
+                        containerColor = StitchPrimaryContainer,
+                        contentColor = StitchOnPrimary
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Retry")
+                    Text(stringResource(R.string.retry_button))
                 }
-                
+
                 OutlinedButton(
                     onClick = onBackToLogin,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, StitchTeal)
+                    border = BorderStroke(1.dp, StitchPrimaryContainer),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = StitchPrimaryContainer)
                 ) {
-                    Text("Back to Login")
+                    Text(stringResource(R.string.back_to_login))
                 }
             }
         }

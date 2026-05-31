@@ -368,14 +368,15 @@
     </div>
     <form id="loginForm" onsubmit="return handleLogin(event)">
       <div class="field">
-        <label>Email</label>
-        <input type="email" id="loginEmail" required placeholder="your@store.com" autocomplete="email">
+        <label>Phone Number</label>
+        <input type="tel" id="loginPhone" required pattern="[6-9]{1}[0-9]{9}" placeholder="9876543210" autocomplete="tel-national">
       </div>
       <div class="field">
         <label>Password</label>
         <input type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password">
       </div>
       <p class="error-msg" id="loginError">Invalid credentials. Please try again.</p>
+      <p class="error-msg" id="loginServerError" style="display:none"></p>
       <button type="submit" class="submit-btn" id="loginBtn">Sign In</button>
       <div class="divider">or continue with</div>
       <button type="button" class="social-btn" onclick="socialLogin('google')"><svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-1 .65-2.3 1.03-3.71 1.03-2.86 0-5.32-1.94-6.2-4.57H2.09v2.84C3.87 20.4 7.54 23 12 23z"/><path fill="#FBBC05" d="M5.8 14.03c-.38-1.14-.6-2.35-.6-3.53s.22-2.4.6-3.53V4.13H2.09A11.96 11.96 0 0 0 0 12c0 1.97.48 3.82 1.3 5.45l3.57-2.77z"/><path fill="#EA4335" d="M12 4.73c1.6 0 3.04.56 4.18 1.66l3.13-3.13C17.46 1.1 14.97 0 12 0 7.54 0 3.87 2.6 2.09 6.13l3.57 2.77C6.68 5.61 9.14 4.73 12 4.73z"/></svg> Continue with Google</button>
@@ -427,7 +428,8 @@
         <span class="thumb"><span class="material-icons" id="themeIcon" style="color:#f59e0b">dark_mode</span></span>
       </button>
       <span id="authWrapper"><button id="loginBtnNav" onclick="openLogin()" style="padding:8px 18px;background:transparent;border:2px solid #25d366;color:#25d366;border-radius:12px;font-weight:600;font-size:13px;cursor:pointer;transition:all .3s">Sign In</button></span>
-      <a href="#register" class="ripple-btn" style="padding:10px 22px;background:#25d366;color:#fff;border-radius:12px;font-weight:600;font-size:14px;text-decoration:none;box-shadow:0 4px 16px rgba(37,211,102,.25);display:inline-block">Register Your Store</a>
+      <a href="#register" id="navRegisterBtn" class="ripple-btn" style="padding:10px 22px;background:#25d366;color:#fff;border-radius:12px;font-weight:600;font-size:14px;text-decoration:none;box-shadow:0 4px 16px rgba(37,211,102,.25);display:inline-block">Register Your Store</a>
+      <a href="/dashboard" id="navDashboardBtn" style="display:none;padding:10px 22px;background:#25d366;color:#fff;border-radius:12px;font-weight:600;font-size:14px;text-decoration:none;box-shadow:0 4px 16px rgba(37,211,102,.25)">Dashboard</a>
     </div>
     <div id="navMobile" style="display:flex;align-items:center;gap:8px">
       <button id="themeToggleMob" class="theme-toggle" aria-label="Toggle theme">
@@ -444,7 +446,8 @@
       <a href="#pricing" style="color:var(--text-tertiary);text-decoration:none;font-size:16px;padding:10px 0;border-bottom:1px solid var(--border)">Pricing</a>
       <a href="#faq" style="color:var(--text-tertiary);text-decoration:none;font-size:16px;padding:10px 0;border-bottom:1px solid var(--border)">FAQ</a>
       <a href="#" onclick="closeLoginMob()" id="mobLoginBtn" style="padding:10px;border:2px solid #25d366;color:#25d366;border-radius:12px;text-align:center;font-weight:600;text-decoration:none">Sign In</a>
-      <a href="#register" style="padding:14px;background:#25d366;color:#fff;border-radius:12px;text-align:center;font-weight:600;text-decoration:none">Register Your Store</a>
+      <a href="/dashboard" id="mobDashboardBtn" style="display:none;padding:14px;background:#25d366;color:#fff;border-radius:12px;text-align:center;font-weight:600;text-decoration:none">Dashboard</a>
+      <a href="#register" id="mobRegisterBtn" style="padding:14px;background:#25d366;color:#fff;border-radius:12px;text-align:center;font-weight:600;text-decoration:none">Register Your Store</a>
     </div>
   </div>
 </nav>
@@ -988,12 +991,17 @@ function showForm(p){document.getElementById('planSelect').value=p;document.getE
 document.getElementById('registerForm').addEventListener('submit',async function(e){
   e.preventDefault();const btn=document.getElementById('submitBtn'),orig=btn.innerHTML;
   btn.disabled=true;btn.innerHTML='<span style="display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:#fff;animation:spin .8s linear infinite"></span> Registering...';
-  try{const r=await fetch('/api/register-store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({store_name:document.getElementById('storeName').value,owner_name:document.getElementById('ownerName').value,phone:document.getElementById('phone').value,email:document.getElementById('email').value,business_type:document.getElementById('businessType').value,plan:document.getElementById('planSelect').value})});if(r.ok){const d=await r.json();document.getElementById('registerForm').style.display='none';document.getElementById('successMsg').style.display='block';document.getElementById('storeId').textContent=d.store_id;}else throw new Error();}
-  catch(err){alert('Registration failed. Please try again.');btn.disabled=false;btn.innerHTML=orig;}
+  try{const r=await fetch('/api/register-store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({store_name:document.getElementById('storeName').value,owner_name:document.getElementById('ownerName').value,phone:document.getElementById('phone').value,email:document.getElementById('email').value,business_type:document.getElementById('businessType').value,plan:document.getElementById('planSelect').value,password:document.getElementById('phone').value.slice(-6)})});const d=await r.json();if(r.ok){document.getElementById('registerForm').style.display='none';document.getElementById('successMsg').style.display='block';document.getElementById('storeId').textContent=d.store_id;
+    // Auto-login after registration
+    try{const lr=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:document.getElementById('phone').value,password:document.getElementById('phone').value.slice(-6)})});const ld=await lr.json();if(ld.success&&ld.token){const s=ld.store||{};setSession({name:s.owner_name||document.getElementById('ownerName').value,phone:document.getElementById('phone').value,email:document.getElementById('email').value,store:s.store_name||document.getElementById('storeName').value,store_id:s.id||d.store_id||'',loggedIn:true},ld.token);}}catch(ae){}}else throw new Error();}
+  catch(err){alert('Registration failed. Please ensure all fields are valid.');btn.disabled=false;btn.innerHTML=orig;}
 });
 
-/* ═══ AUTH SYSTEM ═══ */
+/* ═══ AUTH SYSTEM — REAL SERVER API ═══ */
 const AUTH_KEY='gh_user';
+const AUTH_TOKEN_KEY='gh_token';
+const API_BASE = ''; // Same origin
+
 function openLogin(){document.getElementById('loginModal').classList.add('show');}
 function closeLogin(){document.getElementById('loginModal').classList.remove('show');}
 function closeLoginMob(){document.getElementById('mobileMenu').classList.remove('active');setTimeout(()=>{document.getElementById('mobileMenu').style.display='none';document.getElementById('mobileMenu').dataset.shown='false';},500);document.getElementById('menuBtn').querySelector('.material-icons').textContent='menu';openLogin();}
@@ -1003,45 +1011,140 @@ function switchAuthTab(tab){
   document.getElementById('loginForm').style.display=tab==='login'?'block':'none';
   document.getElementById('modalRegisterForm').style.display=tab==='register'?'block':'none';
 }
-function getUsers(){try{return JSON.parse(localStorage.getItem('gh_users')||'[]')}catch{return[]}}
-function saveUsers(u){localStorage.setItem('gh_users',JSON.stringify(u))}
-function getSession(){const s=localStorage.getItem(AUTH_KEY);return s?JSON.parse(s):null}
-function setSession(u){localStorage.setItem(AUTH_KEY,JSON.stringify(u));updateAuthUI();}
-function clearSession(){localStorage.removeItem(AUTH_KEY);updateAuthUI();}
-function handleLogin(e){
-  e.preventDefault();const email=document.getElementById('loginEmail').value,pwd=document.getElementById('loginPassword').value;
-  const users=getUsers(),user=users.find(u=>u.email===email&&u.password===pwd);
-  if(!user){document.getElementById('loginError').style.display='block';return false;}
-  document.getElementById('loginError').style.display='none';
-  setSession({name:user.name,email:user.email,phone:user.phone,store:user.store||'My Store'});
-  closeLogin();return false;
+function getSession(){try{const s=localStorage.getItem(AUTH_KEY);return s?JSON.parse(s):null}catch{return null}}
+function getToken(){return localStorage.getItem(AUTH_TOKEN_KEY)}
+function setSession(user,token){
+  localStorage.setItem(AUTH_KEY,JSON.stringify(user));
+  if(token) localStorage.setItem(AUTH_TOKEN_KEY,token);
+  updateAuthUI();
 }
-function handleRegister(e){
-  e.preventDefault();const name=document.getElementById('regName').value,email=document.getElementById('regEmail').value,phone=document.getElementById('regPhone').value,pwd=document.getElementById('regPassword').value;
-  const users=getUsers();
-  if(users.find(u=>u.email===email)){document.getElementById('regError').style.display='block';document.getElementById('regSuccess').style.display='none';return false;}
-  document.getElementById('regError').style.display='none';
-  users.push({name,email,phone,password:pwd,store:name+"'s Store",createdAt:new Date().toISOString()});
-  saveUsers(users);
-  document.getElementById('regSuccess').style.display='block';
-  setSession({name,email,phone,store:name+"'s Store"});
-  setTimeout(closeLogin,1500);return false;
+function clearSession(){
+  localStorage.removeItem(AUTH_KEY);
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  updateAuthUI();
+}
+async function handleLogin(e){
+  e.preventDefault();
+  const phone=document.getElementById('loginPhone').value;
+  const pwd=document.getElementById('loginPassword').value;
+  const btn=document.getElementById('loginBtn');
+  const errEl=document.getElementById('loginError');
+  const serverErr=document.getElementById('loginServerError');
+  errEl.style.display='none';serverErr.style.display='none';
+  btn.disabled=true;btn.textContent='Signing in...';
+  try{
+    const r=await fetch(API_BASE+'/api/auth/login',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone,password:pwd})
+    });
+    const d=await r.json();
+    if(!d.success||!d.token){
+      serverErr.textContent=d.message||'Login failed. Please try again.';
+      serverErr.style.display='block';
+      btn.disabled=false;btn.textContent='Sign In';
+      return false;
+    }
+    const store=d.store||{};
+    setSession({
+      name:store.owner_name||store.store_name||'Store Owner',
+      phone,
+      email:'',
+      store:store.store_name||'My Store',
+      store_id:store.id||'',
+      loggedIn:true
+    },d.token);
+    closeLogin();return false;
+  }catch(err){
+    serverErr.textContent='Server not reachable. Please try again later.';
+    serverErr.style.display='block';
+    btn.disabled=false;btn.textContent='Sign In';
+    return false;
+  }
+}
+async function handleRegister(e){
+  e.preventDefault();
+  const name=document.getElementById('regName').value;
+  const email=document.getElementById('regEmail').value;
+  const phone=document.getElementById('regPhone').value;
+  const pwd=document.getElementById('regPassword').value;
+  const btn=document.getElementById('regBtn');
+  const errEl=document.getElementById('regError');
+  const sucEl=document.getElementById('regSuccess');
+  errEl.style.display='none';sucEl.style.display='none';
+  btn.disabled=true;btn.innerHTML='<span style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:#fff;animation:spin .8s linear infinite"></span> Creating...';
+  try{
+    const r=await fetch(API_BASE+'/api/register-store',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        store_name:name+"'s Store",
+        owner_name:name,
+        phone,
+        email,
+        business_type:'retail',
+        plan:'basic',
+        password:pwd
+      })
+    });
+    const d=await r.json();
+    if(d.status==='error'){
+      errEl.textContent=d.message||'Registration failed';
+      errEl.style.display='block';
+      btn.disabled=false;btn.innerHTML='Create Account';
+      return false;
+    }
+    // Registration successful — auto login
+    const loginR=await fetch(API_BASE+'/api/auth/login',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone,password:pwd})
+    });
+    const loginD=await loginR.json();
+    if(loginD.success&&loginD.token){
+      const store=loginD.store||{};
+      setSession({
+        name,phone,email,
+        store:store.store_name||name+"'s Store",
+        store_id:store.id||d.store_id||'',
+        loggedIn:true
+      },loginD.token);
+    } else {
+      // Registration worked but auto-login failed — just save basic info
+      setSession({name,phone,email,store:name+"'s Store",store_id:d.store_id||'',loggedIn:true});
+    }
+    sucEl.style.display='block';
+    setTimeout(closeLogin,1500);
+    return false;
+  }catch(err){
+    errEl.textContent='Server not reachable. Please try again.';
+    errEl.style.display='block';
+    btn.disabled=false;btn.innerHTML='Create Account';
+    return false;
+  }
 }
 function socialLogin(provider){
   const names=['Rajesh Sharma','Priya Singh','Amit Verma','Sunita Gupta','Vikram Patel'];
   const name=names[Math.floor(Math.random()*names.length)];
   const email=name.toLowerCase().replace(' ','.')+'@gmail.com';
-  setSession({name,email,phone:'9876543210',store:name+"'s Store",social:provider});
+  setSession({name,email,phone:'9876543210',store:name+"'s Store",social:provider,loggedIn:true});
   closeLogin();
 }
 function updateAuthUI(){
   const user=getSession();const w=document.getElementById('authWrapper');const m=document.getElementById('mobLoginBtn');
-  if(user){
+  const regBtn=document.getElementById('navRegisterBtn');const dashBtn=document.getElementById('navDashboardBtn');
+  const mobRegBtn=document.getElementById('mobRegisterBtn');const mobDashBtn=document.getElementById('mobDashboardBtn');
+  if(user&&user.loggedIn){
     if(w)w.innerHTML=`<span style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:100px;background:rgba(37,211,102,.1);font-size:13px;font-weight:500;color:#25d366"><span class="material-icons" style="font-size:16px">account_circle</span> ${user.name.split(' ')[0]}</span> <button onclick="clearSession()" style="padding:8px 16px;background:transparent;border:1px solid var(--border);color:var(--text-tertiary);border-radius:10px;font-weight:500;font-size:13px;cursor:pointer;transition:all .3s">Logout</button>`;
     if(m)m.innerHTML=`<a href="#" onclick="clearSession();document.getElementById('mobileMenu').classList.remove('active');setTimeout(()=>{document.getElementById('mobileMenu').style.display='none';document.getElementById('mobileMenu').dataset.shown='false';},500);document.getElementById('menuBtn').querySelector('.material-icons').textContent='menu';" style="padding:10px;border:1px solid var(--border);color:var(--text-tertiary);border-radius:12px;text-align:center;font-weight:600;text-decoration:none;font-size:14px">Logout (${user.name.split(' ')[0]})</a>`;
+    if(regBtn)regBtn.style.display='none';
+    if(dashBtn)dashBtn.style.display='inline-block';
+    if(mobRegBtn)mobRegBtn.style.display='none';
+    if(mobDashBtn)mobDashBtn.style.display='block';
   }else{
     if(w)w.innerHTML=`<button onclick="openLogin()" style="padding:8px 18px;background:transparent;border:2px solid #25d366;color:#25d366;border-radius:12px;font-weight:600;font-size:13px;cursor:pointer;transition:all .3s">Sign In</button>`;
     if(m)m.innerHTML=`<a href="#" onclick="closeLoginMob()" style="padding:10px;border:2px solid #25d366;color:#25d366;border-radius:12px;text-align:center;font-weight:600;text-decoration:none">Sign In</a>`;
+    if(regBtn)regBtn.style.display='inline-block';
+    if(dashBtn)dashBtn.style.display='none';
+    if(mobRegBtn)mobRegBtn.style.display='block';
+    if(mobDashBtn)mobDashBtn.style.display='none';
   }
 }
 

@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.sharmakhata.pqmzvk.data.local.ExpenseEntity
 import com.aistudio.sharmakhata.pqmzvk.ui.components.EmptyState
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
+import androidx.compose.ui.res.stringResource
+import com.aistudio.sharmakhata.pqmzvk.R
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -101,6 +103,8 @@ private fun isThisMonth(epochMillis: Long): Boolean {
 fun ExpensesScreen(
     expenses: List<ExpenseEntity>,
     todayTotal: Double,
+    onMenuClick: () -> Unit = {},
+    shopInitial: String = "S",
     onBack: () -> Unit,
     onAddExpense: () -> Unit,
     onDeleteExpense: (Long) -> Unit,
@@ -134,19 +138,13 @@ fun ExpensesScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Expenses", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
+            com.aistudio.sharmakhata.pqmzvk.ui.components.HamburgerAppBar(
+                title = stringResource(R.string.expenses_title),
+                onMenuClick = onMenuClick,
+                shopInitial = shopInitial
             )
         },
+        containerColor = StitchBg,
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddExpense,
@@ -154,7 +152,7 @@ fun ExpensesScreen(
                 contentColor = Color.White,
                 shape = FabShape
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add expense")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_expense_desc))
             }
         }
     ) { padding ->
@@ -170,9 +168,9 @@ fun ExpensesScreen(
             if (expenses.isEmpty() && !isLoading) {
                 EmptyState(
                     icon = Icons.Default.AccountBalance,
-                    message = "No expenses yet",
-                    description = "Track your business expenses by tapping the + button",
-                    actionLabel = "Add Expense",
+                    message = stringResource(R.string.no_expenses_yet),
+                    description = stringResource(R.string.track_expenses),
+                    actionLabel = stringResource(R.string.add_expense_action),
                     onAction = onAddExpense
                 )
             } else {
@@ -215,7 +213,7 @@ fun ExpensesScreen(
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (selectedFilter == "All") "Total Expenses" else "$selectedFilter Expenses",
+                                    text = if (selectedFilter == "All") stringResource(R.string.total_expenses_label) else stringResource(R.string.total_expenses_dynamic, selectedFilter),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = TextSecondaryLight,
                                     maxLines = 1,
@@ -230,7 +228,7 @@ fun ExpensesScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "${filteredExpenses.size} expense${if (filteredExpenses.size != 1) "s" else ""}",
+                                    text = stringResource(R.string.expense_count, filteredExpenses.size),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (filteredExpenses.size > 0) AmberWarning else TextSecondaryLight,
                                     fontWeight = FontWeight.Medium
@@ -246,12 +244,13 @@ fun ExpensesScreen(
                             .padding(horizontal = Spacing.large, vertical = Spacing.small),
                         horizontalArrangement = Arrangement.spacedBy(Spacing.small)
                     ) {
-                        val filters = listOf("All", "Today", "This Week", "This Month")
-                        items(filters) { filter ->
+                        val filters = listOf(R.string.all, R.string.today, R.string.this_week, R.string.this_month)
+                        items(filters) { filterRes ->
+                            val filter = stringResource(filterRes)
                             FilterChip(
                                 selected = selectedFilter == filter,
                                 onClick = { selectedFilter = filter },
-                                label = { Text(filter) },
+                                label = { Text(stringResource(filterRes)) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = IndigoPrimary,
                                     selectedLabelColor = Color.White,
@@ -282,7 +281,7 @@ fun ExpensesScreen(
                                     modifier = Modifier.size(IconSize.huge)
                                 )
                                 Text(
-                                    text = "No expenses for \"$selectedFilter\"",
+                                    text = stringResource(R.string.no_expenses_for_filter, selectedFilter),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.SemiBold,
                                     color = TextSecondaryLight,
@@ -432,7 +431,7 @@ private fun ExpenseCard(
                 ) {
                     Icon(
                         Icons.Default.Delete,
-                        contentDescription = "Delete expense",
+                        contentDescription = stringResource(R.string.delete_expense_desc),
                         tint = ErrorRed.copy(alpha = 0.7f),
                         modifier = Modifier.size(IconSize.small)
                     )

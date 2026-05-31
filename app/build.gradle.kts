@@ -5,6 +5,7 @@ plugins {
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
+  alias(libs.plugins.hilt.android)
 }
 
 android {
@@ -19,6 +20,12 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+  javaCompileOptions {
+    annotationProcessorOptions {
+      arguments["dagger.hilt.disableModulesHaveInstallInCheck"] = "true"
+    }
+  }
 
     val mobileApiKey = run {
       val fromGradleProp = project.findProperty("MOBILE_API_KEY") as String?
@@ -35,6 +42,8 @@ android {
       } else ""
     }
     buildConfigField("String", "MOBILE_API_KEY", "\"${mobileApiKey}\"")
+
+    resourceConfigurations += setOf("en")
   }
 
   signingConfigs {
@@ -61,6 +70,7 @@ android {
       isShrinkResources = false
     }
   }
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
@@ -72,6 +82,11 @@ android {
   buildFeatures {
     compose = true
     buildConfig = true
+  }
+
+  // Room schema export directory for migration validation
+  ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
   }
   
   // Optimize build performance and APK size
@@ -86,12 +101,7 @@ android {
       enableSplit = true
     }
   }
-  
-  defaultConfig {
-    // Keep only necessary resources to reduce APK size
-    resourceConfigurations += setOf("en")
-  }
-  
+
   testOptions { unitTests { isIncludeAndroidResources = true } }
     lint {
         disable.add("NullSafeMutableLiveData")
@@ -144,6 +154,12 @@ dependencies {
   implementation(libs.okhttp)
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
+  implementation(libs.sentry.android)
+  implementation(libs.hilt.android)
+  implementation(libs.hilt.navigation.compose)
+  implementation(libs.androidx.biometric)
+  implementation("androidx.paging:paging-runtime-ktx:3.3.5")
+  implementation("androidx.paging:paging-compose:3.3.5")
   coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
    testImplementation(libs.androidx.compose.ui.test.junit4)
    testImplementation(libs.androidx.core)
@@ -167,4 +183,5 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
+  "ksp"(libs.hilt.compiler)
 }

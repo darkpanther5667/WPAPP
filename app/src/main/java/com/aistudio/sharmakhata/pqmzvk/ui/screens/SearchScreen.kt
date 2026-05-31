@@ -49,7 +49,7 @@ import com.aistudio.sharmakhata.pqmzvk.ui.components.AppAvatar
 import com.aistudio.sharmakhata.pqmzvk.ui.components.EmptyState
 import com.aistudio.sharmakhata.pqmzvk.ui.components.ShimmerLoading
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
-import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
+import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.CustomerViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 import kotlin.math.abs
@@ -57,7 +57,7 @@ import kotlin.math.abs
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
-    viewModel: MainViewModel,
+    viewModel: CustomerViewModel,
     onBack: () -> Unit,
     onCustomerClick: (String) -> Unit,
     onBillClick: (String, String) -> Unit

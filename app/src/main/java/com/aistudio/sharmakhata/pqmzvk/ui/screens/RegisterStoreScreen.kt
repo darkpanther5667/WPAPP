@@ -16,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +27,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
+import androidx.compose.ui.res.stringResource
+import com.aistudio.sharmakhata.pqmzvk.R
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
 import com.aistudio.sharmakhata.pqmzvk.util.SessionManager
@@ -54,7 +55,6 @@ fun RegisterStoreScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var isExistingStore by remember { mutableStateOf(false) }
 
-    // Pre-fill phone from session if available
     LaunchedEffect(Unit) {
         SessionManager.load(context)
         val storedPhone = SessionManager.phone
@@ -70,8 +70,6 @@ fun RegisterStoreScreen(
         when (val state = operationState) {
             is OperationState.Success -> {
                 snackbarHostState.showSnackbar(state.message)
-                // Navigate back to login screen — the storeId is now saved in SessionManager.
-                // LoginScreen's LaunchedEffect will read it and pre-fill the phone.
                 onSuccess()
             }
             is OperationState.Error -> {
@@ -90,16 +88,16 @@ fun RegisterStoreScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Register Store", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.register_store_title), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+                    containerColor = StitchBg,
+                    titleContentColor = StitchTextPrimary,
+                    navigationIconContentColor = StitchTextPrimary
                 )
             )
         },
@@ -109,15 +107,7 @@ fun RegisterStoreScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            StitchTeal,
-                            StitchTealDark,
-                            Color(0xFF134E4A)
-                        )
-                    )
-                )
+                .background(StitchBg)
         ) {
             Column(
                 modifier = Modifier
@@ -127,102 +117,111 @@ fun RegisterStoreScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Logo
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color.White.copy(alpha = 0.15f)),
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(StitchSurfaceHighest),
                     contentAlignment = Alignment.Center
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(60.dp)
+                            .size(50.dp)
                             .clip(CircleShape)
-                            .background(Color.White),
+                            .background(StitchPrimaryContainer.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "G",
-                            fontSize = 28.sp,
+                            stringResource(R.string.app_logo_text),
+                            fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = StitchTeal
+                            color = StitchPrimaryContainer
                         )
                     }
                 }
 
                 Text(
-                    text = if (isExistingStore) "Store Already Registered" else "Setup Your Business",
+                    text = if (isExistingStore) stringResource(R.string.store_already_registered) else stringResource(R.string.setup_your_business),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = StitchTextPrimary
                 )
 
                 Text(
                     text = if (isExistingStore)
-                        "Your store is already registered. You can update your details below."
+                        stringResource(R.string.store_already_registered_desc)
                     else
-                        "Enter your business details to get started with Grahbook",
+                        stringResource(R.string.setup_business_desc),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = StitchTextSecondary,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // Form Card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.95f)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = StitchSurface),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(StitchBorder)
+                    )
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Business Name
                         OutlinedTextField(
                             value = businessName,
                             onValueChange = { businessName = it },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Business Name *") },
-                            placeholder = { Text("e.g. Sharma Electronics") },
-                            leadingIcon = { Icon(Icons.Outlined.Store, contentDescription = null, tint = StitchTeal) },
+                            label = { Text(stringResource(R.string.business_name_label)) },
+                            placeholder = { Text(stringResource(R.string.business_name_placeholder)) },
+                            leadingIcon = { Icon(Icons.Outlined.Store, contentDescription = null, tint = StitchPrimaryContainer) },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             colors = TextFieldDefaults.colors(
-                                focusedIndicatorColor = StitchTeal,
-                                unfocusedIndicatorColor = CardBorder,
-                                focusedContainerColor = BackgroundLight,
-                                unfocusedContainerColor = BackgroundLight
+                                focusedTextColor = StitchTextPrimary,
+                                unfocusedTextColor = StitchTextPrimary,
+                                focusedIndicatorColor = StitchPrimaryContainer,
+                                unfocusedIndicatorColor = StitchBorder,
+                                focusedContainerColor = StitchSurfaceLow,
+                                unfocusedContainerColor = StitchSurfaceLow,
+                                focusedLabelColor = StitchPrimaryContainer,
+                                unfocusedLabelColor = StitchTextSecondary,
+                                cursorColor = StitchPrimaryContainer
                             )
                         )
 
-                        // Owner Name
                         OutlinedTextField(
                             value = ownerName,
                             onValueChange = { ownerName = it },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Owner Name *") },
-                            placeholder = { Text("e.g. Ram Sharma") },
-                            leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null, tint = StitchTeal) },
+                            label = { Text(stringResource(R.string.owner_name_label)) },
+                            placeholder = { Text(stringResource(R.string.owner_name_placeholder)) },
+                            leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null, tint = StitchPrimaryContainer) },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             colors = TextFieldDefaults.colors(
-                                focusedIndicatorColor = StitchTeal,
-                                unfocusedIndicatorColor = CardBorder,
-                                focusedContainerColor = BackgroundLight,
-                                unfocusedContainerColor = BackgroundLight
+                                focusedTextColor = StitchTextPrimary,
+                                unfocusedTextColor = StitchTextPrimary,
+                                focusedIndicatorColor = StitchPrimaryContainer,
+                                unfocusedIndicatorColor = StitchBorder,
+                                focusedContainerColor = StitchSurfaceLow,
+                                unfocusedContainerColor = StitchSurfaceLow,
+                                focusedLabelColor = StitchPrimaryContainer,
+                                unfocusedLabelColor = StitchTextSecondary,
+                                cursorColor = StitchPrimaryContainer
                             )
                         )
 
-                        // Phone
                         OutlinedTextField(
                             value = phone,
                             onValueChange = { newVal ->
@@ -231,49 +230,46 @@ fun RegisterStoreScreen(
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Phone Number *") },
-                            placeholder = { Text("9876543210") },
+                            label = { Text(stringResource(R.string.phone_number_star_label)) },
+                            placeholder = { Text(stringResource(R.string.phone_placeholder)) },
                             leadingIcon = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("+91", fontWeight = FontWeight.Bold, color = StitchTeal, fontSize = 14.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(stringResource(R.string.country_code), fontWeight = FontWeight.Bold, color = StitchPrimaryContainer, fontSize = 14.sp)
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    HorizontalDivider(
-                                        modifier = Modifier
-                                            .width(1.dp)
-                                            .height(20.dp),
-                                        color = CardBorder
-                                    )
+                                    HorizontalDivider(modifier = Modifier.width(1.dp).height(20.dp), color = StitchBorder)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Icon(Icons.Outlined.Phone, contentDescription = null, tint = StitchTeal, modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Outlined.Phone, contentDescription = null, tint = StitchPrimaryContainer, modifier = Modifier.size(18.dp))
                                 }
                             },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             colors = TextFieldDefaults.colors(
-                                focusedIndicatorColor = StitchTeal,
-                                unfocusedIndicatorColor = CardBorder,
-                                focusedContainerColor = BackgroundLight,
-                                unfocusedContainerColor = BackgroundLight
+                                focusedTextColor = StitchTextPrimary,
+                                unfocusedTextColor = StitchTextPrimary,
+                                focusedIndicatorColor = StitchPrimaryContainer,
+                                unfocusedIndicatorColor = StitchBorder,
+                                focusedContainerColor = StitchSurfaceLow,
+                                unfocusedContainerColor = StitchSurfaceLow,
+                                focusedLabelColor = StitchPrimaryContainer,
+                                unfocusedLabelColor = StitchTextSecondary,
+                                cursorColor = StitchPrimaryContainer
                             )
                         )
 
-                        // Password
                         OutlinedTextField(
                             value = password,
                             onValueChange = { password = it },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Password *") },
-                            placeholder = { Text("At least 4 characters") },
-                            leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null, tint = StitchTeal) },
+                            label = { Text(stringResource(R.string.password_star_label)) },
+                            placeholder = { Text(stringResource(R.string.password_min_char)) },
+                            leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null, tint = StitchPrimaryContainer) },
                             trailingIcon = {
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                     Icon(
                                         if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                         contentDescription = null,
-                                        tint = TextSecondaryLight
+                                        tint = StitchTextSecondary
                                     )
                                 }
                             },
@@ -281,77 +277,93 @@ fun RegisterStoreScreen(
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             colors = TextFieldDefaults.colors(
-                                focusedIndicatorColor = StitchTeal,
-                                unfocusedIndicatorColor = CardBorder,
-                                focusedContainerColor = BackgroundLight,
-                                unfocusedContainerColor = BackgroundLight
+                                focusedTextColor = StitchTextPrimary,
+                                unfocusedTextColor = StitchTextPrimary,
+                                focusedIndicatorColor = StitchPrimaryContainer,
+                                unfocusedIndicatorColor = StitchBorder,
+                                focusedContainerColor = StitchSurfaceLow,
+                                unfocusedContainerColor = StitchSurfaceLow,
+                                focusedLabelColor = StitchPrimaryContainer,
+                                unfocusedLabelColor = StitchTextSecondary,
+                                cursorColor = StitchPrimaryContainer
                             )
                         )
 
-                        // Confirm Password
                         OutlinedTextField(
                             value = confirmPassword,
                             onValueChange = { confirmPassword = it },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Confirm Password *") },
-                            placeholder = { Text("Re-enter your password") },
-                            leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null, tint = StitchTeal) },
+                            label = { Text(stringResource(R.string.confirm_password_label)) },
+                            placeholder = { Text(stringResource(R.string.confirm_password_placeholder)) },
+                            leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null, tint = StitchPrimaryContainer) },
                             isError = confirmPassword.isNotEmpty() && password != confirmPassword,
                             supportingText = {
                                 if (confirmPassword.isNotEmpty() && password != confirmPassword) {
-                                    Text("Passwords do not match", color = MaterialTheme.colorScheme.error)
+                                    Text(stringResource(R.string.passwords_do_not_match), color = MaterialTheme.colorScheme.error)
                                 }
                             },
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             colors = TextFieldDefaults.colors(
-                                focusedIndicatorColor = StitchTeal,
-                                unfocusedIndicatorColor = CardBorder,
-                                focusedContainerColor = BackgroundLight,
-                                unfocusedContainerColor = BackgroundLight
+                                focusedTextColor = StitchTextPrimary,
+                                unfocusedTextColor = StitchTextPrimary,
+                                focusedIndicatorColor = StitchPrimaryContainer,
+                                unfocusedIndicatorColor = StitchBorder,
+                                focusedContainerColor = StitchSurfaceLow,
+                                unfocusedContainerColor = StitchSurfaceLow,
+                                focusedLabelColor = StitchPrimaryContainer,
+                                unfocusedLabelColor = StitchTextSecondary,
+                                cursorColor = StitchPrimaryContainer
                             )
                         )
 
-                        // Email (optional)
                         OutlinedTextField(
                             value = email,
                             onValueChange = { email = it },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Email (optional)") },
-                            placeholder = { Text("your@email.com") },
-                            leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = null, tint = StitchTeal) },
+                            label = { Text(stringResource(R.string.email_optional_label)) },
+                            placeholder = { Text(stringResource(R.string.email_placeholder)) },
+                            leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = null, tint = StitchPrimaryContainer) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             colors = TextFieldDefaults.colors(
-                                focusedIndicatorColor = StitchTeal,
-                                unfocusedIndicatorColor = CardBorder,
-                                focusedContainerColor = BackgroundLight,
-                                unfocusedContainerColor = BackgroundLight
+                                focusedTextColor = StitchTextPrimary,
+                                unfocusedTextColor = StitchTextPrimary,
+                                focusedIndicatorColor = StitchPrimaryContainer,
+                                unfocusedIndicatorColor = StitchBorder,
+                                focusedContainerColor = StitchSurfaceLow,
+                                unfocusedContainerColor = StitchSurfaceLow,
+                                focusedLabelColor = StitchPrimaryContainer,
+                                unfocusedLabelColor = StitchTextSecondary,
+                                cursorColor = StitchPrimaryContainer
                             )
                         )
 
-                        // Address
                         OutlinedTextField(
                             value = address,
                             onValueChange = { address = it },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Address (optional)") },
-                            placeholder = { Text("Your business address") },
-                            leadingIcon = { Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = StitchTeal) },
+                            label = { Text(stringResource(R.string.address_optional_label)) },
+                            placeholder = { Text(stringResource(R.string.address_placeholder)) },
+                            leadingIcon = { Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = StitchPrimaryContainer) },
                             minLines = 2,
                             maxLines = 3,
                             shape = RoundedCornerShape(12.dp),
                             colors = TextFieldDefaults.colors(
-                                focusedIndicatorColor = StitchTeal,
-                                unfocusedIndicatorColor = CardBorder,
-                                focusedContainerColor = BackgroundLight,
-                                unfocusedContainerColor = BackgroundLight
+                                focusedTextColor = StitchTextPrimary,
+                                unfocusedTextColor = StitchTextPrimary,
+                                focusedIndicatorColor = StitchPrimaryContainer,
+                                unfocusedIndicatorColor = StitchBorder,
+                                focusedContainerColor = StitchSurfaceLow,
+                                unfocusedContainerColor = StitchSurfaceLow,
+                                focusedLabelColor = StitchPrimaryContainer,
+                                unfocusedLabelColor = StitchTextSecondary,
+                                cursorColor = StitchPrimaryContainer
                             )
                         )
 
-                        // GSTIN
                         OutlinedTextField(
                             value = gstin,
                             onValueChange = { newVal ->
@@ -360,22 +372,26 @@ fun RegisterStoreScreen(
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("GSTIN (optional)") },
-                            placeholder = { Text("22AAAAA0000A1Z5") },
-                            leadingIcon = { Icon(Icons.Outlined.Badge, contentDescription = null, tint = StitchTeal) },
+                            label = { Text(stringResource(R.string.gstin_optional_label)) },
+                            placeholder = { Text(stringResource(R.string.gstin_placeholder)) },
+                            leadingIcon = { Icon(Icons.Outlined.Badge, contentDescription = null, tint = StitchPrimaryContainer) },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             colors = TextFieldDefaults.colors(
-                                focusedIndicatorColor = StitchTeal,
-                                unfocusedIndicatorColor = CardBorder,
-                                focusedContainerColor = BackgroundLight,
-                                unfocusedContainerColor = BackgroundLight
+                                focusedTextColor = StitchTextPrimary,
+                                unfocusedTextColor = StitchTextPrimary,
+                                focusedIndicatorColor = StitchPrimaryContainer,
+                                unfocusedIndicatorColor = StitchBorder,
+                                focusedContainerColor = StitchSurfaceLow,
+                                unfocusedContainerColor = StitchSurfaceLow,
+                                focusedLabelColor = StitchPrimaryContainer,
+                                unfocusedLabelColor = StitchTextSecondary,
+                                cursorColor = StitchPrimaryContainer
                             )
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                        // Register Button
                         Button(
                             onClick = {
                                 isExistingStore = false
@@ -392,27 +408,30 @@ fun RegisterStoreScreen(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(52.dp),
+                                .height(50.dp),
                             enabled = isValid && operationState !is OperationState.Loading,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = StitchTeal)
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = StitchPrimaryContainer,
+                                disabledContainerColor = StitchSurfaceHighest
+                            )
                         ) {
                             if (operationState is OperationState.Loading) {
                                 CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    color = Color.White,
+                                    modifier = Modifier.size(22.dp),
+                                    color = StitchOnPrimary,
                                     strokeWidth = 2.dp
                                 )
                             } else {
-                                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Register & Continue", fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.register_continue), fontWeight = FontWeight.Bold, color = StitchOnPrimary)
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }

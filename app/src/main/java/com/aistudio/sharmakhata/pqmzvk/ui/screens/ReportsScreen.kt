@@ -23,37 +23,35 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
-import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
+import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.ReportsViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 import com.aistudio.sharmakhata.pqmzvk.data.model.DailyReport
+import androidx.compose.ui.res.stringResource
+import com.aistudio.sharmakhata.pqmzvk.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(
-    viewModel: MainViewModel,
+    viewModel: ReportsViewModel,
+    expenses: List<com.aistudio.sharmakhata.pqmzvk.data.local.ExpenseEntity> = emptyList(),
+    onMenuClick: () -> Unit = {},
+    shopInitial: String = "S",
     onBack: () -> Unit
 ) {
     val reportState by viewModel.reportState.collectAsState()
     val dbState by viewModel.dbState.collectAsState()
-    val expenses by viewModel.expenses.collectAsState()
     var selectedPeriod by remember { mutableStateOf("Today") }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Reports", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
+            com.aistudio.sharmakhata.pqmzvk.ui.components.HamburgerAppBar(
+                title = stringResource(R.string.reports_title),
+                onMenuClick = onMenuClick,
+                shopInitial = shopInitial
             )
-        }
+        },
+        containerColor = StitchBg
     ) { padding ->
         Column(
             modifier = Modifier
@@ -69,14 +67,15 @@ fun ReportsScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf("Today", "This Week", "This Month", "All").forEach { period ->
+                listOf(R.string.today, R.string.this_week, R.string.this_month, R.string.all).forEach { periodRes ->
+                    val period = stringResource(periodRes)
                     FilterChip(
                         selected = selectedPeriod == period,
                         onClick = { selectedPeriod = period },
-                        label = { Text(period, style = MaterialTheme.typography.labelSmall) },
+                        label = { Text(stringResource(periodRes), style = MaterialTheme.typography.labelSmall) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = StitchTeal,
-                            selectedLabelColor = Color.White,
+                            selectedContainerColor = StitchPrimaryContainer.copy(alpha = 0.15f),
+                            selectedLabelColor = StitchPrimaryContainer,
                             containerColor = MaterialTheme.colorScheme.surface,
                             labelColor = TextSecondaryLight
                         ),
@@ -99,15 +98,15 @@ fun ReportsScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         ReportStatCard(
-                            label = "Total Sales",
+                            label = stringResource(R.string.total_sales),
                             value = FormatUtils.formatCurrency(report.billsTotal),
                             icon = Icons.Outlined.TrendingUp,
-                            gradient = GradientTeal,
-                            valueColor = StitchTeal,
+                            gradient = GradientWhatsApp,
+                            valueColor = StitchPrimaryContainer,
                             modifier = Modifier.weight(1f)
                         )
                         ReportStatCard(
-                            label = "Expenses",
+                            label = stringResource(R.string.expenses_stat),
                             value = FormatUtils.formatCurrency(totalExpenses),
                             icon = Icons.Outlined.MoneyOff,
                             gradient = GradientOrange,
@@ -125,7 +124,7 @@ fun ReportsScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         ReportStatCard(
-                            label = "Net Profit",
+                            label = stringResource(R.string.net_profit),
                             value = FormatUtils.formatCurrency(netProfit.coerceAtLeast(0.0)),
                             icon = Icons.Outlined.AccountBalance,
                             gradient = if (netProfit >= 0) GradientEmerald else GradientOrange,
@@ -133,11 +132,11 @@ fun ReportsScreen(
                             modifier = Modifier.weight(1f)
                         )
                         ReportStatCard(
-                            label = "Collection",
+                            label = stringResource(R.string.collection_label),
                             value = FormatUtils.formatCurrency(report.paymentTotal),
                             icon = Icons.Outlined.AccountBalanceWallet,
-                            gradient = GradientSky,
-                            valueColor = StitchSky,
+                            gradient = GradientIndigo,
+                            valueColor = AccentBlue,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -146,7 +145,7 @@ fun ReportsScreen(
 
                     // Revenue Breakdown section
                     Text(
-                        text = "REVENUE BREAKDOWN",
+                        text = stringResource(R.string.revenue_breakdown),
                         style = SectionOverlineStyle,
                         color = TextTertiaryLight,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
@@ -164,30 +163,30 @@ fun ReportsScreen(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             BreakdownRow(
-                                label = "Total Bills",
+                                label = stringResource(R.string.total_bills_label),
                                 value = FormatUtils.formatCurrency(report.billsTotal),
-                                count = "${report.billsCount} bills",
-                                valueColor = StitchTeal
+                                count = stringResource(R.string.bills_count, report.billsCount),
+                                valueColor = StitchPrimaryContainer
                             )
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp, color = DividerColor)
                             BreakdownRow(
-                                label = "Total Expenses",
+                                label = stringResource(R.string.total_expenses_label),
                                 value = FormatUtils.formatCurrency(totalExpenses),
-                                count = "${expenses.size} entries",
+                                count = stringResource(R.string.entries_count, expenses.size),
                                 valueColor = ErrorRed
                             )
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp, color = DividerColor)
                             BreakdownRow(
-                                label = "Net Revenue",
+                                label = stringResource(R.string.net_revenue),
                                 value = FormatUtils.formatCurrency(netProfit.coerceAtLeast(0.0)),
-                                count = if (netProfit >= 0) "Profit" else "Loss",
+                                count = if (netProfit >= 0) stringResource(R.string.profit_label) else stringResource(R.string.loss_label),
                                 valueColor = if (netProfit >= 0) SuccessGreen else ErrorRed
                             )
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp, color = DividerColor)
                             BreakdownRow(
-                                label = "Outstanding",
+                                label = stringResource(R.string.outstanding_label),
                                 value = FormatUtils.formatCurrency(report.outstanding.sumOf { it.balance }),
-                                count = "${report.outstanding.size} customers",
+                                count = stringResource(R.string.customers_count, report.outstanding.size),
                                 valueColor = OrangeDanger
                             )
                         }
@@ -198,7 +197,7 @@ fun ReportsScreen(
                     // Outstanding section
                     if (report.outstanding.isNotEmpty()) {
                         Text(
-                            text = "OUTSTANDING",
+                            text = stringResource(R.string.outstanding_section),
                             style = SectionOverlineStyle,
                             color = TextTertiaryLight,
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
@@ -233,7 +232,7 @@ fun ReportsScreen(
                         modifier = Modifier.fillMaxSize().padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = StitchTeal)
+                        CircularProgressIndicator(color = StitchPrimaryContainer)
                     }
                 }
                 is UiState.Error -> {
@@ -244,7 +243,7 @@ fun ReportsScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.Error, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(48.dp))
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("Failed to load reports", style = MaterialTheme.typography.titleSmall)
+                            Text(stringResource(R.string.failed_to_load_reports), style = MaterialTheme.typography.titleSmall)
                         }
                     }
                 }

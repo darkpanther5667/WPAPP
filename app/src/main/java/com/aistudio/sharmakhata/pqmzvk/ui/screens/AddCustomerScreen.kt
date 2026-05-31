@@ -26,13 +26,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
-import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
+import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.CustomerViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
+import androidx.compose.ui.res.stringResource
+import com.aistudio.sharmakhata.pqmzvk.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddCustomerScreen(
-    viewModel: MainViewModel,
+    viewModel: CustomerViewModel,
     onBack: () -> Unit,
 ) {
     val operationState by viewModel.operationState.collectAsState()
@@ -62,10 +64,10 @@ fun AddCustomerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add Customer", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.add_customer_title), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -115,7 +117,7 @@ fun AddCustomerScreen(
                         )
                     }
                     Text(
-                        text = "New Customer",
+                        text = stringResource(R.string.new_customer),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -127,8 +129,8 @@ fun AddCustomerScreen(
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Customer Name") },
-                placeholder = { Text("Enter full name", color = TextTertiaryLight) },
+                label = { Text(stringResource(R.string.customer_name_label)) },
+                placeholder = { Text(stringResource(R.string.enter_full_name), color = TextTertiaryLight) },
                 leadingIcon = {
                     Icon(Icons.Outlined.Person, contentDescription = null, tint = IndigoPrimary)
                 },
@@ -152,8 +154,8 @@ fun AddCustomerScreen(
             OutlinedTextField(
                 value = phone,
                 onValueChange = { phone = it.filter { ch -> ch.isDigit() || ch == '+' } },
-                label = { Text("WhatsApp Number") },
-                placeholder = { Text("e.g. 8052402633", color = TextTertiaryLight) },
+                label = { Text(stringResource(R.string.whatsapp_number_label)) },
+                placeholder = { Text(stringResource(R.string.phone_example), color = TextTertiaryLight) },
                 leadingIcon = {
                     Icon(Icons.Outlined.Phone, contentDescription = null, tint = IndigoPrimary)
                 },
@@ -178,7 +180,7 @@ fun AddCustomerScreen(
 
             // Save button
             Button(
-                onClick = { viewModel.addCustomer(context, name.trim(), phone.trim()) },
+                onClick = { viewModel.addCustomer(name.trim(), phone.trim(), context) },
                 enabled = isValid && operationState !is OperationState.Loading,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -199,7 +201,7 @@ fun AddCustomerScreen(
                     Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(IconSize.small))
                 }
                 Spacer(modifier = Modifier.width(Spacing.small))
-                Text("Save Customer", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.save_customer), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
             }
         }
     }

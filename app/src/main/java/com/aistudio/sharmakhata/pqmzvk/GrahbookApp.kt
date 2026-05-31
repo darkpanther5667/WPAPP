@@ -1,6 +1,6 @@
 package com.aistudio.sharmakhata.pqmzvk
 
-import android.app.Application
+import android.content.Context
 import android.os.Build
 import android.os.StrictMode
 import com.aistudio.sharmakhata.pqmzvk.data.local.AppDatabase
@@ -11,25 +11,28 @@ import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 
-class GrahbookApp : Application() {
-    val database: AppDatabase by lazy { AppDatabase.get(this) }
+object GrahbookApp {
+    private var initialized = false
 
-    override fun onCreate() {
-        super.onCreate()
-        
-        // Enable StrictMode for development to detect potential issues
+    fun init(context: Context) {
+        if (initialized) return
+        initialized = true
+
+        val app = context.applicationContext
+
+        // Enable StrictMode for development
         if (BuildConfig.DEBUG) {
             enableStrictMode()
         }
-        
+
         // Set up global exception handler
         setupGlobalExceptionHandler()
-        
-        SessionManager.load(this)
-        NotificationHelper.createChannels(this)
-        ReminderScheduler.scheduleDailySummary(this)
+
+        SessionManager.load(app)
+        NotificationHelper.createChannels(app)
+        ReminderScheduler.scheduleDailySummary(app)
     }
-    
+
     private fun enableStrictMode() {
         StrictMode.setThreadPolicy(
             StrictMode.ThreadPolicy.Builder()
@@ -47,29 +50,22 @@ class GrahbookApp : Application() {
                 .build()
         )
     }
-    
+
     private fun setupGlobalExceptionHandler() {
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
-        
+
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            // Log the exception
             android.util.Log.e("GrahbookApp", "Uncaught exception in thread ${thread.name}", throwable)
-            
-            // Write to file for debugging
+
             try {
                 val stackTrace = StringWriter().also {
                     PrintWriter(it).use { writer ->
                         throwable.printStackTrace(writer)
                     }
                 }.toString()
-                
-                val logFile = File(getExternalFilesDir(null), "crash_log_${System.currentTimeMillis()}.txt")
-                logFile.writeText("Thread: ${thread.name}\n\nStack Trace:\n$stackTrace")
-            } catch (e: Exception) {
-                android.util.Log.e("GrahbookApp", "Failed to write crash log", e)
-            }
-            
-            // Call the default handler
+                android.util.Log.e("GrahbookApp", "Uncaught: $stackTrace")
+            } catch (_: Exception) { }
+
             defaultHandler?.uncaughtException(thread, throwable)
         }
     }

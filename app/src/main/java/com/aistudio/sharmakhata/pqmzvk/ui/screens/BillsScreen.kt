@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -26,25 +27,29 @@ import com.aistudio.sharmakhata.pqmzvk.data.model.Bill
 import com.aistudio.sharmakhata.pqmzvk.ui.components.EmptyState
 import com.aistudio.sharmakhata.pqmzvk.ui.components.ShimmerLoading
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
-import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
+import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.BillingViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BillsScreen(
-    viewModel: MainViewModel,
+    viewModel: BillingViewModel,
     customerId: String,
     onBack: () -> Unit,
     onOpenPdf: (String) -> Unit,
 ) {
     val dbState by viewModel.dbState.collectAsState()
     val operationState by viewModel.operationState.collectAsState()
-    var selectedFilter by remember { mutableStateOf("All") }
+    val pagedBills = remember(customerId) {
+        viewModel.billsPagingData(customerId)
+    }.collectAsLazyPagingItems()
     var showConfirmDialog by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(operationState) {
         when (operationState) {
@@ -104,7 +109,7 @@ fun BillsScreen(
         PullToRefreshBox(
             state = pullToRefreshState,
             isRefreshing = dbState is UiState.Loading,
-            onRefresh = { viewModel.fetchData(context) },
+            onRefresh = { scope.launch { com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.LiveSyncManager.forceRefresh() } },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -123,20 +128,13 @@ fun BillsScreen(
                         description = (dbState as UiState.Error).message,
                         icon = Icons.Default.Error,
                         actionLabel = "Retry",
-                        onAction = { viewModel.fetchData(context) }
+                        onAction = { scope.launch { com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.LiveSyncManager.forceRefresh() } }
                     )
                 }
                 is UiState.Success -> {
                     val db = (dbState as UiState.Success).data
-                    val allBills = db.bills
-                        .filter { it.customerId == customerId }
-                        .sortedByDescending { it.createdAt }
-
-                    val filteredBills = when (selectedFilter) {
-                        "Paid" -> allBills.filter { it.status == "paid" }
-                        "Unpaid" -> allBills.filter { it.status != "paid" }
-                        else -> allBills
-                    }
+                    val selectedFilter by viewModel.billFilter.collectAsState()
+                    val allBillsForCustomer = db.bills.filter { it.customerId == customerId }
 
                     Column(
                         modifier = Modifier
@@ -153,7 +151,7 @@ fun BillsScreen(
                             item {
                                 FilterChip(
                                     selected = selectedFilter == "All",
-                                    onClick = { selectedFilter = "All" },
+                                    onClick = { viewModel.setBillFilter("All") },
                                     label = { Text("All") },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = IndigoPrimary,
@@ -165,7 +163,7 @@ fun BillsScreen(
                             item {
                                 FilterChip(
                                     selected = selectedFilter == "Paid",
-                                    onClick = { selectedFilter = "Paid" },
+                                    onClick = { viewModel.setBillFilter("Paid") },
                                     label = { Text("Paid") },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = SuccessGreen,
@@ -177,7 +175,7 @@ fun BillsScreen(
                             item {
                                 FilterChip(
                                     selected = selectedFilter == "Unpaid",
-                                    onClick = { selectedFilter = "Unpaid" },
+                                    onClick = { viewModel.setBillFilter("Unpaid") },
                                     label = { Text("Unpaid") },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = ErrorRed,
@@ -189,7 +187,7 @@ fun BillsScreen(
                             item {
                                 FilterChip(
                                     selected = selectedFilter == "Overdue",
-                                    onClick = { selectedFilter = "Overdue" },
+                                    onClick = { viewModel.setBillFilter("Overdue") },
                                     label = { Text("Overdue") },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = AmberWarning,
@@ -200,7 +198,7 @@ fun BillsScreen(
                             }
                         }
 
-                        if (filteredBills.isEmpty()) {
+                        if (pagedBills.itemCount == 0) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -218,7 +216,7 @@ fun BillsScreen(
                                         modifier = Modifier.size(72.dp)
                                     )
                                     Text(
-                                        text = if (allBills.isEmpty()) "No bills found for this customer"
+                                        text = if (allBillsForCustomer.isEmpty()) "No bills found for this customer"
                                         else "No ${selectedFilter.lowercase()} bills",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
@@ -232,15 +230,18 @@ fun BillsScreen(
                                 contentPadding = PaddingValues(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
-                                items(filteredBills) { bill ->
-                                    val customerName = db.customers.find { it.id == bill.customerId }?.name ?: "Unknown"
-                                    InvoiceCard(
-                                        bill = bill,
-                                        customerName = customerName,
-                                        onSendWhatsApp = { viewModel.sendInvoiceOnWhatsApp(context, bill.id) },
-                                        onMarkPaid = { showConfirmDialog = bill.id },
-                                        onOpenPdf = { onOpenPdf(bill.id) }
-                                    )
+                                items(count = pagedBills.itemCount, key = { index -> pagedBills[index]?.id ?: index }) { index ->
+                                    val bill = pagedBills[index]
+                                    if (bill != null) {
+                                        val customerName = db.customers.find { it.id == bill.customerId }?.name ?: "Unknown"
+                                        InvoiceCard(
+                                            bill = bill,
+                                            customerName = customerName,
+                                            onSendWhatsApp = { viewModel.sendInvoiceOnWhatsApp(context, bill.id) },
+                                            onMarkPaid = { showConfirmDialog = bill.id },
+                                            onOpenPdf = { onOpenPdf(bill.id) }
+                                        )
+                                    }
                                 }
                             }
                         }

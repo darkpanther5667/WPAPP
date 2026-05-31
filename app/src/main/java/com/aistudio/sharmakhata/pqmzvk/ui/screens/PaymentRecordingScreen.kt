@@ -16,22 +16,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aistudio.sharmakhata.pqmzvk.R
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.components.AppAvatar
-import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
+import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.PaymentViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PaymentRecordingScreen(
-    viewModel: MainViewModel,
+    viewModel: PaymentViewModel,
     customerId: String,
     customerName: String,
     onBack: () -> Unit
@@ -44,6 +46,7 @@ fun PaymentRecordingScreen(
     var amount by remember { mutableStateOf("") }
     var isCredit by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf("") }
+    var selectedPaymentMode by remember { mutableStateOf("cash") }
     var showConfirmDialog by remember { mutableStateOf(false) }
 
     // Calculate pending amount for this customer
@@ -94,14 +97,14 @@ fun PaymentRecordingScreen(
                         tint = if (isCredit) ErrorRed else SuccessGreen
                     )
                     Text(
-                        "Confirm ${if (isCredit) "Credit" else "Payment"}",
+                        if (isCredit) stringResource(R.string.confirm_credit) else stringResource(R.string.confirm_payment),
                         fontWeight = FontWeight.Bold
                     )
                 }
             },
             text = {
                 Column {
-                    Text("Recording ${if (isCredit) "credit" else "payment"} of:")
+                    Text(stringResource(R.string.recording_of, if (isCredit) stringResource(R.string.credit_lower) else stringResource(R.string.payment_lower)))
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = FormatUtils.formatCurrency(amount.toDoubleOrNull() ?: 0.0),
@@ -111,8 +114,10 @@ fun PaymentRecordingScreen(
                     )
                     if (note.isNotBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Note: $note", color = TextSecondaryLight, fontSize = 14.sp)
+                        Text("${stringResource(R.string.note_label)}: $note", color = TextSecondaryLight, fontSize = 14.sp)
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("${stringResource(R.string.mode_label)}: ${selectedPaymentMode.replaceFirstChar { it.uppercase() }}", color = TextSecondaryLight, fontSize = 14.sp)
                 }
             },
             confirmButton = {
@@ -122,19 +127,21 @@ fun PaymentRecordingScreen(
                         viewModel.addPayment(
                             context = context,
                             customerId = customerId,
-                            amount = if (isCredit) -(amount.toDoubleOrNull() ?: 0.0) else (amount.toDoubleOrNull() ?: 0.0),
-                            note = note.ifBlank { null }
+                            amount = amount.toDoubleOrNull() ?: 0.0,
+                            note = note.ifBlank { null },
+                            paymentMode = selectedPaymentMode,
+                            type = if (isCredit) "credit" else "payment"
                         )
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isCredit) ErrorRed else SuccessGreen
                     )
                 ) {
-                    Text("Confirm")
+                    Text(stringResource(R.string.confirm_button))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showConfirmDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showConfirmDialog = false }) { Text(stringResource(R.string.cancel)) }
             },
             shape = RoundedCornerShape(16.dp)
         )
@@ -143,10 +150,10 @@ fun PaymentRecordingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (isCredit) "Record Credit" else "Record Payment", fontWeight = FontWeight.SemiBold) },
+                title = { Text(if (isCredit) stringResource(R.string.record_credit) else stringResource(R.string.record_payment), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -198,14 +205,14 @@ fun PaymentRecordingScreen(
                             )
                             if (pendingAmount > 0) {
                                 Text(
-                                    text = "Pending: ${FormatUtils.formatCurrency(pendingAmount)}",
+                                    text = "${stringResource(R.string.pending_label)}: ${FormatUtils.formatCurrency(pendingAmount)}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = ErrorRed,
                                     fontWeight = FontWeight.Medium
                                 )
                             } else {
                                 Text(
-                                    text = "No pending amount",
+                                    text = stringResource(R.string.no_pending_amount),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = SuccessGreen,
                                     fontWeight = FontWeight.Medium
@@ -250,12 +257,12 @@ fun PaymentRecordingScreen(
                                 modifier = Modifier.size(28.dp)
                             )
                             Text(
-                                "Payment",
+                                stringResource(R.string.payment_label),
                                 fontWeight = if (!isCredit) FontWeight.Bold else FontWeight.Medium,
                                 color = if (!isCredit) SuccessGreen else TextSecondaryLight
                             )
                             Text(
-                                "Received",
+                                stringResource(R.string.payment_received_label),
                                 fontSize = 11.sp,
                                 color = if (!isCredit) SuccessGreen.copy(alpha = 0.7f) else TextSecondaryLight
                             )
@@ -292,15 +299,60 @@ fun PaymentRecordingScreen(
                                 modifier = Modifier.size(28.dp)
                             )
                             Text(
-                                "Credit",
+                                stringResource(R.string.credit_label),
                                 fontWeight = if (isCredit) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isCredit) ErrorRed else TextSecondaryLight
                             )
                             Text(
-                                "Given",
+                                stringResource(R.string.credit_given_label),
                                 fontSize = 11.sp,
                                 color = if (isCredit) ErrorRed.copy(alpha = 0.7f) else TextSecondaryLight
                             )
+                        }
+                    }
+                }
+
+                // Payment Mode Selector
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = CardShape,
+                    colors = CardDefaults.cardColors(containerColor = StitchSurface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.AccountBalance, contentDescription = null, tint = if (!isCredit) StitchPrimaryContainer else ErrorRed, modifier = Modifier.size(18.dp))
+                            Text(stringResource(R.string.payment_mode), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = StitchTextPrimary)
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(
+                                "cash" to Icons.Default.AccountBalance,
+                                "cheque" to Icons.Default.Receipt,
+                                "upi" to Icons.Default.Phone,
+                                "qr" to Icons.Default.QrCode
+                            ).forEach { (mode, icon) ->
+                                val isSelectedMode = selectedPaymentMode == mode
+                                val modeLabel = when (mode) {
+                                    "cash" -> stringResource(R.string.cash_mode)
+                                    "cheque" -> stringResource(R.string.cheque_mode)
+                                    "upi" -> stringResource(R.string.upi_mode)
+                                    "qr" -> stringResource(R.string.qr_mode)
+                                    else -> mode.replaceFirstChar { it.uppercase() }
+                                }
+                                FilterChip(
+                                    selected = isSelectedMode,
+                                    onClick = { selectedPaymentMode = mode },
+                                    label = { Text(modeLabel, style = MaterialTheme.typography.labelSmall) },
+                                    leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = if (!isCredit) StitchPrimaryContainer.copy(alpha = 0.15f) else ErrorRed.copy(alpha = 0.15f),
+                                        selectedLabelColor = if (!isCredit) StitchPrimaryContainer else ErrorRed,
+                                        containerColor = StitchSurface,
+                                        labelColor = StitchTextSecondary
+                                    ),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -320,7 +372,7 @@ fun PaymentRecordingScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            text = "Enter Amount",
+                            text = stringResource(R.string.enter_amount),
                             style = MaterialTheme.typography.titleSmall,
                             color = TextSecondaryLight,
                             fontWeight = FontWeight.Medium
@@ -334,7 +386,7 @@ fun PaymentRecordingScreen(
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("₹ 0.00", textAlign = TextAlign.Center) },
+                            placeholder = { Text(stringResource(R.string.placeholder_rupees), textAlign = TextAlign.Center) },
                             textStyle = MaterialTheme.typography.displaySmall.copy(
                                 textAlign = TextAlign.Center,
                                 fontWeight = FontWeight.Bold,
@@ -378,7 +430,7 @@ fun PaymentRecordingScreen(
                     value = note,
                     onValueChange = { note = it },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Add a note (optional)...") },
+                    placeholder = { Text(stringResource(R.string.add_note_optional)) },
                     leadingIcon = {
                         Icon(Icons.Outlined.Notes, contentDescription = null, tint = TextSecondaryLight)
                     },
@@ -420,7 +472,7 @@ fun PaymentRecordingScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Record ${if (isCredit) "Credit" else "Payment"}",
+                            if (isCredit) stringResource(R.string.record_credit_button) else stringResource(R.string.record_payment_button),
                             fontWeight = FontWeight.Bold
                         )
                     }

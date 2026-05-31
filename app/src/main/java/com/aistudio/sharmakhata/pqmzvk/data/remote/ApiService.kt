@@ -2,10 +2,13 @@ package com.aistudio.sharmakhata.pqmzvk.data.remote
 
 import com.aistudio.sharmakhata.pqmzvk.data.model.Customer
 import com.aistudio.sharmakhata.pqmzvk.data.model.DailyReport
+import com.aistudio.sharmakhata.pqmzvk.data.model.DeltaChanges
 import com.aistudio.sharmakhata.pqmzvk.data.model.FullDatabase
+import com.squareup.moshi.Json
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Query
 
 interface ApiService {
     @POST("api/auth/request-code")
@@ -20,10 +23,15 @@ interface ApiService {
     @POST("api/register-store")
     suspend fun registerStore(@Body request: RegisterStoreRequest): retrofit2.Response<RegisterStoreResponse>
     @GET("api/db")
-    suspend fun getFullDatabase(): FullDatabase
+    suspend fun getFullDatabase(): retrofit2.Response<FullDatabase>
+
+    /** Delta sync — only fetch records changed since the given ISO 8601 timestamp.
+     *  Falls back to full database if server doesn't support delta endpoint. */
+    @GET("api/db/changes")
+    suspend fun getDeltaChanges(@Query("since") since: String): retrofit2.Response<DeltaChanges>
 
     @GET("api/report")
-    suspend fun getDailyReport(): DailyReport
+    suspend fun getDailyReport(): retrofit2.Response<DailyReport>
 
     @POST("api/db")
     suspend fun updateDatabase(@Body db: FullDatabase): retrofit2.Response<Unit>
@@ -67,13 +75,22 @@ data class AddCustomerResponse(
 data class AddPaymentRequest(
     val customerId: String,
     val amount: Double,
-    val note: String?
+    val note: String?,
+    @Json(name = "payment_mode") val paymentMode: String = "cash",
+    val type: String = "payment"
 )
 
 data class CreateBillRequest(
     val customerId: String,
     val amount: Double,
-    val items: List<BillItemRequest>?
+    val items: List<BillItemRequest>?,
+    @Json(name = "gst_type") val gstType: String = "cgst_sgst",
+    @Json(name = "gst_rate") val gstRate: Int = 0,
+    @Json(name = "taxable_amount") val taxableAmount: Double = 0.0,
+    @Json(name = "total_cgst") val totalCgst: Double = 0.0,
+    @Json(name = "total_sgst") val totalSgst: Double = 0.0,
+    @Json(name = "total_igst") val totalIgst: Double = 0.0,
+    @Json(name = "grand_total") val grandTotal: Double = 0.0
 )
 
 data class CreateBillResponse(
@@ -88,7 +105,9 @@ data class CreateBillResponse(
 data class BillItemRequest(
     val name: String,
     val price: Double,
-    val qty: Int
+    val qty: Int,
+    @Json(name = "hsn_code") val hsnCode: String = "",
+    @Json(name = "gst_rate") val gstRate: Int = 0
 )
 
 data class SendInvoiceRequest(

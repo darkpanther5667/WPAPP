@@ -1,8 +1,10 @@
 package com.aistudio.sharmakhata.pqmzvk.ui.viewmodel
 
+import android.content.Context
 import com.aistudio.sharmakhata.pqmzvk.data.model.DailyReport
 import com.aistudio.sharmakhata.pqmzvk.data.model.FullDatabase
 import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiClient
+import com.aistudio.sharmakhata.pqmzvk.data.sync.DeltaSyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -17,11 +19,10 @@ import java.time.Instant
 object LiveSyncManager {
     private val scope = CoroutineScope(Dispatchers.IO)
     private var syncJob: Job? = null
+    private var contextRef: Context? = null
     private var consecutiveFailures = 0
     private val maxConsecutiveFailures = 3
 
-    // Default interval 5 seconds (configurable via settings later)
-    // Increased to 30 seconds to reduce load on server during cold starts
     var intervalMillis: Long = 30_000L
 
     private val _dailyReport = MutableStateFlow<DailyReport?>(null)
@@ -36,49 +37,62 @@ object LiveSyncManager {
     private val _syncError = MutableStateFlow<String?>(null)
     val syncError: StateFlow<String?> = _syncError.asStateFlow()
 
+    fun init(context: Context) {
+        contextRef = context
+    }
+
     fun start() {
-        if (syncJob != null) return // already running
-        println("LiveSyncManager: Starting sync with interval ${intervalMillis}ms")
-        _syncError.value = null // Clear any previous errors
+        if (syncJob != null) return
+        val ctx = contextRef ?: run {
+            android.util.Log.w("LiveSyncManager", "Cannot start — not initialized with context")
+            return
+        }
+        android.util.Log.d("LiveSyncManager", "Starting delta sync with interval ${intervalMillis}ms")
+        _syncError.value = null
         consecutiveFailures = 0
         syncJob = scope.launch {
-            println("LiveSyncManager: Sync loop started")
+            android.util.Log.d("LiveSyncManager", "Delta sync loop started")
             while (isActive) {
                 try {
-                    println("LiveSyncManager: Starting API fetch (attempt ${consecutiveFailures + 1})")
-                    val report = ApiClient.apiService.getDailyReport()
-                    println("LiveSyncManager: Daily report fetched successfully")
-                    val db = ApiClient.apiService.getFullDatabase()
-                    println("LiveSyncManager: Full database fetched successfully")
-                                        _dailyReport.value = report
-                    _fullDatabase.value = db
-                    _lastSynced.value = Instant.now()
-                    _syncError.value = null // Clear error on successful sync
-                    consecutiveFailures = 0 // Reset failure counter on success
-                    println("LiveSyncManager: Sync completed successfully")
+                    // Use DeltaSyncManager for the database
+                    val db = DeltaSyncManager.fetch(ctx, _fullDatabase.value)
+                    if (db != null) {
+                        _fullDatabase.value = db
+                        _lastSynced.value = Instant.now()
+                        _syncError.value = null
+                        consecutiveFailures = 0
+                        DeltaSyncManager.resetFailures()
+                        android.util.Log.d("LiveSyncManager", "DB sync successful")
+                    } else {
+                        consecutiveFailures++
+                        val errorMsg = "Sync failed ($consecutiveFailures/$maxConsecutiveFailures)"
+                        _syncError.value = errorMsg
+                        android.util.Log.w("LiveSyncManager", errorMsg)
+
+                        val backoffMs = DeltaSyncManager.getBackoffMs().coerceAtLeast(intervalMillis)
+                        android.util.Log.d("LiveSyncManager", "Backoff ${backoffMs}ms")
+                        delay(backoffMs)
+                        continue
+                    }
+
+                    // Daily report is a lightweight aggregation — always fetch fresh
+                    try {
+                        val reportResponse = ApiClient.apiService.getDailyReport()
+                        if (reportResponse.isSuccessful) {
+                            _dailyReport.value = reportResponse.body()
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.d("LiveSyncManager", "Report fetch failed: ${e.message}")
+                    }
+
                 } catch (e: Exception) {
                     consecutiveFailures++
-                    // Log error and notify UI
-                    val errorMessage = when (e) {
-                        is java.net.SocketTimeoutException -> "Connection timed out. Server may be waking up (consecutive failures: $consecutiveFailures/$maxConsecutiveFailures)"
-                        is java.net.UnknownHostException -> "No internet connection."
-                        else -> "Sync failed: ${e.message} (consecutive failures: $consecutiveFailures/$maxConsecutiveFailures)"
-                    }
-                    _syncError.value = errorMessage
-                    println("LiveSyncManager error: ${e.message}")
-                    println("LiveSyncManager error details: ${e.stackTraceToString()}")
-
-                    // Implement exponential backoff for consecutive failures
-                    val backoffTime = if (consecutiveFailures > 1) {
-                        (intervalMillis * consecutiveFailures).coerceAtMost(300_000) // Max 5 minutes
-                    } else {
-                        intervalMillis
-                    }
-                    println("LiveSyncManager: Backing off for ${backoffTime}ms due to error")
-                    delay(backoffTime)
-                    continue // Skip the normal delay and continue immediately with backoff
+                    _syncError.value = "Sync failed — will retry"
+                    android.util.Log.e("LiveSyncManager", "Sync loop error: ${e.message}")
+                    val backoffMs = (intervalMillis * consecutiveFailures).coerceAtMost(300_000L)
+                    delay(backoffMs)
+                    continue
                 }
-                println("LiveSyncManager: Waiting ${intervalMillis}ms before next sync")
                 delay(intervalMillis)
             }
         }
@@ -89,5 +103,26 @@ object LiveSyncManager {
         syncJob = null
         _syncError.value = null
         consecutiveFailures = 0
+        DeltaSyncManager.resetFailures()
+    }
+
+    suspend fun forceRefresh() {
+        val ctx = contextRef ?: return
+        try {
+            val db = DeltaSyncManager.fetch(ctx, _fullDatabase.value)
+            if (db != null) {
+                _fullDatabase.value = db
+                _lastSynced.value = Instant.now()
+                _syncError.value = null
+                consecutiveFailures = 0
+                DeltaSyncManager.resetFailures()
+            }
+            val reportResponse = ApiClient.apiService.getDailyReport()
+            if (reportResponse.isSuccessful) {
+                _dailyReport.value = reportResponse.body()
+            }
+        } catch (e: Exception) {
+            android.util.Log.d("LiveSyncManager", "forceRefresh error: ${e.message}")
+        }
     }
 }

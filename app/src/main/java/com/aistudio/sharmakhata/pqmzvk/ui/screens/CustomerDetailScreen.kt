@@ -33,7 +33,8 @@ import com.aistudio.sharmakhata.pqmzvk.ui.components.AppAvatar
 import com.aistudio.sharmakhata.pqmzvk.ui.components.AppDivider
 import com.aistudio.sharmakhata.pqmzvk.ui.components.InfoRow
 import com.aistudio.sharmakhata.pqmzvk.ui.components.StatusBadge
-import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
+import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.BillingViewModel
+import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.CustomerViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
@@ -42,7 +43,8 @@ import kotlin.math.abs
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomerDetailScreen(
-    viewModel: MainViewModel,
+    customerVm: CustomerViewModel,
+    billingVm: BillingViewModel,
     customerId: String,
     onBack: () -> Unit,
     onAddPayment: () -> Unit,
@@ -50,8 +52,8 @@ fun CustomerDetailScreen(
     onViewBills: () -> Unit,
     onViewLedger: () -> Unit,
 ) {
-    val dbState by viewModel.dbState.collectAsState()
-    val operationState by viewModel.operationState.collectAsState()
+    val dbState by customerVm.dbState.collectAsState()
+    val operationState by billingVm.operationState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -63,14 +65,14 @@ fun CustomerDetailScreen(
                     message = (operationState as OperationState.Success).message,
                     withDismissAction = true
                 )
-                viewModel.resetOperationState()
+                billingVm.resetOperationState()
             }
             is OperationState.Error -> {
                 snackbarHostState.showSnackbar(
                     message = (operationState as OperationState.Error).message,
                     withDismissAction = true
                 )
-                viewModel.resetOperationState()
+                billingVm.resetOperationState()
             }
             else -> {}
         }
@@ -138,8 +140,8 @@ fun CustomerDetailScreen(
                             db = db,
                             onAddPayment = onAddPayment,
                             onCreateBill = onCreateBill,
-                            onSendReminder = { viewModel.sendReminderOnWhatsApp(context, customer.id) },
-                            onSendStatement = { viewModel.sendStatementOnWhatsApp(context, customer.id) },
+                            onSendReminder = { billingVm.sendReminderOnWhatsApp(context, customer.id) },
+                            onSendStatement = { billingVm.sendStatementOnWhatsApp(context, customer.id) },
                             onWhatsAppDirect = {
                                 val payments = db.transactions.filter { it.customerId == customer.id && it.type == "payment" }.sumOf { it.amount }
                                 val credits = db.transactions.filter { it.customerId == customer.id && it.type == "credit" }.sumOf { it.amount }

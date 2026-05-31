@@ -17,22 +17,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aistudio.sharmakhata.pqmzvk.R
 import com.aistudio.sharmakhata.pqmzvk.data.remote.BillItemRequest
 import com.aistudio.sharmakhata.pqmzvk.ui.screens.BillItemEntry
 import com.aistudio.sharmakhata.pqmzvk.data.remote.StoredItem
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
+import androidx.compose.animation.AnimatedVisibility
+import com.aistudio.sharmakhata.pqmzvk.util.GstCalculator
+import com.aistudio.sharmakhata.pqmzvk.util.GstType
+import com.aistudio.sharmakhata.pqmzvk.util.GstBreakdown
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickBillScreen(
+    onMenuClick: () -> Unit = {},
+    shopInitial: String = "S",
     onBack: () -> Unit,
     onCreateBill: (customerName: String?, customerPhone: String?, total: Double, items: List<BillItemRequest>) -> Unit,
     operationState: OperationState,
@@ -48,6 +56,12 @@ fun QuickBillScreen(
     var customerPhone by remember { mutableStateOf("") }
     var showSuccessDialog by remember { mutableStateOf(false) }
     var showStoredItems by remember { mutableStateOf(true) }
+
+    // GST state
+    var gstTypeState by remember { mutableStateOf(GstType.CGST_SGST) }
+    var gstRateState by remember { mutableStateOf(18) }
+    var enableGst by remember { mutableStateOf(false) }
+    var showPreview by remember { mutableStateOf(false) }
 
     // Watch operation state for snackbar and success dialog
     LaunchedEffect(operationState) {
@@ -76,11 +90,11 @@ fun QuickBillScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SuccessGreen)
-                    Text("Bill Created!", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.bill_created_title), fontWeight = FontWeight.Bold)
                 }
             },
             text = {
-                Text("Invoice has been created successfully. You can send it via WhatsApp.")
+                Text(stringResource(R.string.bill_created_message))
             },
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -98,11 +112,11 @@ fun QuickBillScreen(
                         ) {
                             Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("WhatsApp")
+                            Text(stringResource(R.string.whatsapp_label))
                         }
                     }
                     TextButton(onClick = { showSuccessDialog = false; onResetOperation(); onBack() }) {
-                        Text("Done")
+                        Text(stringResource(R.string.done))
                     }
                 }
             },
@@ -116,6 +130,12 @@ fun QuickBillScreen(
             val qty = item.qty.toIntOrNull() ?: 1
             price * qty
         }
+    }
+
+    fun calculateGst(): GstBreakdown {
+        val subtotal = calculateTotal()
+        return if (enableGst) GstCalculator.calculate(subtotal, gstRateState, gstTypeState)
+        else GstBreakdown(taxableAmount = subtotal, grandTotal = subtotal)
     }
 
     // Add a stored item to the bill — fills first empty row or appends a new one
@@ -145,10 +165,10 @@ fun QuickBillScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Quick Bill", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.quick_bill_title), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -207,13 +227,13 @@ fun QuickBillScreen(
                             }
                             Column {
                                 Text(
-                                    text = "Walk-in Customer",
+                                    text = stringResource(R.string.walk_in_customer),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Optional details for the invoice",
+                                    text = stringResource(R.string.optional_details),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = TextSecondaryLight
                                 )
@@ -224,7 +244,7 @@ fun QuickBillScreen(
                             value = customerName,
                             onValueChange = { customerName = it },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("Customer Name (optional)") },
+                            placeholder = { Text(stringResource(R.string.customer_name_optional)) },
                             singleLine = true,
                             leadingIcon = {
                                 Icon(
@@ -252,7 +272,7 @@ fun QuickBillScreen(
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("Phone Number (optional)") },
+                            placeholder = { Text(stringResource(R.string.phone_number_optional)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             leadingIcon = {
@@ -297,7 +317,7 @@ fun QuickBillScreen(
                                     )
                                     Spacer(modifier = Modifier.width(Spacing.small))
                                     Text(
-                                        text = "Quick Add Items",
+                                        text = stringResource(R.string.quick_add_items),
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
@@ -309,7 +329,7 @@ fun QuickBillScreen(
                                 ) {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = "Hide",
+                                        contentDescription = stringResource(R.string.hide),
                                         tint = Slate400,
                                         modifier = Modifier.size(16.dp)
                                     )
@@ -348,6 +368,64 @@ fun QuickBillScreen(
                     }
                 }
 
+                // GST Configuration Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = CardShape,
+                    colors = CardDefaults.cardColors(containerColor = StitchSurface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = Elevation.low)
+                ) {
+                    Column(modifier = Modifier.padding(Spacing.cardPadding)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.Receipt, contentDescription = null, tint = IndigoPrimary, modifier = Modifier.size(20.dp))
+                                Text(stringResource(R.string.gst_configuration), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            }
+                            Switch(
+                                checked = enableGst,
+                                onCheckedChange = { enableGst = it },
+                                colors = SwitchDefaults.colors(checkedTrackColor = IndigoPrimary)
+                            )
+                        }
+                        AnimatedVisibility(visible = enableGst) {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 12.dp)) {
+                                Text(stringResource(R.string.gst_type), style = MaterialTheme.typography.labelMedium, color = TextSecondaryLight)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilterChip(
+                                        selected = gstTypeState == GstType.CGST_SGST,
+                                        onClick = { gstTypeState = GstType.CGST_SGST },
+                                        label = { Text(stringResource(R.string.cgst_sgst_label)) },
+                                        leadingIcon = { if (gstTypeState == GstType.CGST_SGST) Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = IndigoPrimary.copy(alpha = 0.15f), selectedLabelColor = IndigoPrimary)
+                                    )
+                                    FilterChip(
+                                        selected = gstTypeState == GstType.IGST,
+                                        onClick = { gstTypeState = GstType.IGST },
+                                        label = { Text(stringResource(R.string.igst_label)) },
+                                        leadingIcon = { if (gstTypeState == GstType.IGST) Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = IndigoPrimary.copy(alpha = 0.15f), selectedLabelColor = IndigoPrimary)
+                                    )
+                                }
+                                Text(stringResource(R.string.gst_rate), style = MaterialTheme.typography.labelMedium, color = TextSecondaryLight)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    GstCalculator.gstRates.forEach { rate ->
+                                        FilterChip(
+                                            selected = gstRateState == rate,
+                                            onClick = { gstRateState = rate },
+                                            label = { Text("$rate%") },
+                                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = IndigoPrimary.copy(alpha = 0.15f), selectedLabelColor = IndigoPrimary)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Invoice Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -355,7 +433,7 @@ fun QuickBillScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Invoice Items",
+                        text = stringResource(R.string.invoice_items),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
@@ -369,7 +447,7 @@ fun QuickBillScreen(
                     ) {
                         Icon(Icons.Default.AddCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add Item", color = IndigoPrimary)
+                        Text(stringResource(R.string.add_item_button), color = IndigoPrimary)
                     }
                 }
 
@@ -390,14 +468,14 @@ fun QuickBillScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "Item",
+                                    stringResource(R.string.item_column),
                                     modifier = Modifier.weight(1.5f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = TextSecondaryLight
                                 )
                                 Text(
-                                    "Qty",
+                                    stringResource(R.string.qty_column),
                                     modifier = Modifier.weight(0.6f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -405,7 +483,7 @@ fun QuickBillScreen(
                                     textAlign = TextAlign.Center
                                 )
                                 Text(
-                                    "Price",
+                                    stringResource(R.string.price_column),
                                     modifier = Modifier.weight(1f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -413,7 +491,7 @@ fun QuickBillScreen(
                                     textAlign = TextAlign.End
                                 )
                                 Text(
-                                    "Amount",
+                                    stringResource(R.string.amount_column),
                                     modifier = Modifier.weight(1f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -445,7 +523,7 @@ fun QuickBillScreen(
                                         modifier = Modifier
                                             .weight(1.5f)
                                             .height(48.dp),
-                                        placeholder = { Text("Item name", fontSize = 12.sp) },
+                                        placeholder = { Text(stringResource(R.string.item_name_placeholder_small), fontSize = 12.sp) },
                                         textStyle = MaterialTheme.typography.bodySmall,
                                         singleLine = true,
                                         shape = RoundedCornerShape(8.dp),
@@ -470,7 +548,7 @@ fun QuickBillScreen(
                                         modifier = Modifier
                                             .weight(0.6f)
                                             .height(48.dp),
-                                        placeholder = { Text("1", fontSize = 12.sp, textAlign = TextAlign.Center) },
+                                        placeholder = { Text(stringResource(R.string.qty_placeholder), fontSize = 12.sp, textAlign = TextAlign.Center) },
                                         textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.Center),
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -496,7 +574,7 @@ fun QuickBillScreen(
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(48.dp),
-                                        placeholder = { Text("₹0", fontSize = 12.sp, textAlign = TextAlign.End) },
+                                        placeholder = { Text(stringResource(R.string.price_placeholder_zero), fontSize = 12.sp, textAlign = TextAlign.End) },
                                         textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.End),
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -532,7 +610,7 @@ fun QuickBillScreen(
                                         ) {
                                             Icon(
                                                 Icons.Default.RemoveCircleOutline,
-                                                contentDescription = "Remove",
+                                                contentDescription = stringResource(R.string.remove),
                                                 tint = ErrorRed,
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -545,53 +623,56 @@ fun QuickBillScreen(
                         }
                     }
 
-                    // Totals Section
-                    val totalAmount = calculateTotal()
+                    // Totals Section with GST
+                    val subtotal = calculateTotal()
+                    val gstBreakdown = calculateGst()
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = IndigoPrimary.copy(alpha = 0.05f)
-                        )
+                        shape = CardShape,
+                        colors = CardDefaults.cardColors(containerColor = IndigoPrimary.copy(alpha = 0.05f))
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("Subtotal", style = MaterialTheme.typography.bodyMedium, color = TextSecondaryLight)
-                                Text(FormatUtils.formatCurrency(totalAmount), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Column(modifier = Modifier.padding(Spacing.cardPadding)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(stringResource(R.string.subtotal), style = MaterialTheme.typography.bodyMedium, color = TextSecondaryLight)
+                                Text(FormatUtils.formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("GST (Optional)", style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
-                                Text("—", style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                            if (enableGst) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(stringResource(R.string.taxable_amount), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                                    Text(FormatUtils.formatCurrency(gstBreakdown.taxableAmount), style = MaterialTheme.typography.bodySmall)
+                                }
+                                if (gstTypeState == GstType.CGST_SGST) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(stringResource(R.string.cgst_at_rate, gstRateState / 2), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                                        Text(FormatUtils.formatCurrency(gstBreakdown.cgst), style = MaterialTheme.typography.bodySmall, color = AccentBlue)
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(stringResource(R.string.sgst_at_rate, gstRateState / 2), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                                        Text(FormatUtils.formatCurrency(gstBreakdown.sgst), style = MaterialTheme.typography.bodySmall, color = AccentBlue)
+                                    }
+                                } else {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(stringResource(R.string.igst_at_rate, gstRateState), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                                        Text(FormatUtils.formatCurrency(gstBreakdown.igst), style = MaterialTheme.typography.bodySmall, color = AccentBlue)
+                                    }
+                                }
+                            } else {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(stringResource(R.string.gst_optional), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                                    Text("---", style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                                }
                             }
-
                             Spacer(modifier = Modifier.height(8.dp))
                             HorizontalDivider(color = CardBorder)
                             Spacer(modifier = Modifier.height(8.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    "Grand Total",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    FormatUtils.formatCurrency(totalAmount),
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = IndigoPrimary
-                                )
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text(stringResource(R.string.grand_total), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                Text(FormatUtils.formatCurrency(gstBreakdown.grandTotal), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = IndigoPrimary)
                             }
                         }
                     }
@@ -599,21 +680,9 @@ fun QuickBillScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Generate Bill Button
+                // Preview Bill Button
                 Button(
-                    onClick = {
-                        val billItems = items
-                            .filter { it.name.isNotBlank() && it.price.isNotBlank() }
-                            .map { item ->
-                                val price = item.price.toDoubleOrNull() ?: 0.0
-                                val qty = item.qty.toIntOrNull() ?: 1
-                                BillItemRequest(item.name, price, qty)
-                            }
-                        if (billItems.isNotEmpty()) {
-                            val total = calculateTotal()
-                            onCreateBill(customerName.ifBlank { null }, customerPhone.ifBlank { null }, total, billItems)
-                        }
-                    },
+                    onClick = { showPreview = true },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(ComponentSize.buttonHeight),
@@ -630,12 +699,77 @@ fun QuickBillScreen(
                     } else {
                         Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Generate Bill", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.preview_bill), fontWeight = FontWeight.Bold)
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
+    }
+
+    // Invoice Preview Dialog
+    if (showPreview) {
+        val previewSubtotal = calculateTotal()
+        val previewGst = calculateGst()
+        AlertDialog(
+            onDismissRequest = { showPreview = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Receipt, contentDescription = null, tint = IndigoPrimary)
+                    Text(stringResource(R.string.invoice_preview), fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(8.dp)) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(if (customerName.isNotBlank()) customerName else stringResource(R.string.walk_in_customer_fallback), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            Text(stringResource(R.string.invoice_type_label, if (enableGst) (if (gstTypeState == GstType.CGST_SGST) stringResource(R.string.cgst_sgst_label) else stringResource(R.string.igst_label)) else stringResource(R.string.non_gst)), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                        }
+                    }
+                    items.filter { it.name.isNotBlank() }.forEach { item ->
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(item.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                Text("${item.qty} x ${FormatUtils.formatCurrency(item.price.toDoubleOrNull() ?: 0.0)}", style = MaterialTheme.typography.labelSmall, color = TextSecondaryLight)
+                            }
+                            Text(FormatUtils.formatCurrency((item.price.toDoubleOrNull() ?: 0.0) * (item.qty.toIntOrNull() ?: 1)), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    HorizontalDivider(color = CardBorder)
+                    if (enableGst) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(stringResource(R.string.subtotal), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                            Text(FormatUtils.formatCurrency(previewSubtotal), style = MaterialTheme.typography.bodySmall)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(stringResource(R.string.gst_rate_label, gstRateState), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                            Text(FormatUtils.formatCurrency(previewGst.totalGst), style = MaterialTheme.typography.bodySmall, color = AccentBlue)
+                        }
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(stringResource(R.string.grand_total), fontWeight = FontWeight.Bold)
+                        Text(FormatUtils.formatCurrency(previewGst.grandTotal), fontWeight = FontWeight.Bold, color = IndigoPrimary)
+                    }
+                }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { showPreview = false }) { Text(stringResource(R.string.edit)) }
+                    Button(onClick = {
+                        showPreview = false
+                        val billItems = items.filter { it.name.isNotBlank() && it.price.isNotBlank() }
+                            .map { BillItemRequest(it.name, it.price.toDoubleOrNull() ?: 0.0, it.qty.toIntOrNull() ?: 1) }
+                        if (billItems.isNotEmpty()) {
+                            onCreateBill(customerName.ifBlank { null }, customerPhone.ifBlank { null }, previewGst.grandTotal, billItems)
+                        }
+                    }, colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary)) {
+                        Text(stringResource(R.string.create_invoice_button), fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 }

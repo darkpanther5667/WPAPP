@@ -23,14 +23,16 @@ import androidx.compose.ui.unit.dp
 import com.aistudio.sharmakhata.pqmzvk.data.model.Bill
 import com.aistudio.sharmakhata.pqmzvk.data.model.Transaction
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
-import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
+import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.CustomerViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
+import androidx.compose.ui.res.stringResource
+import com.aistudio.sharmakhata.pqmzvk.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LedgerScreen(
-    viewModel: MainViewModel,
+    viewModel: CustomerViewModel,
     customerId: String,
     onBack: () -> Unit
 ) {
@@ -39,10 +41,10 @@ fun LedgerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ledger", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.ledger_title), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

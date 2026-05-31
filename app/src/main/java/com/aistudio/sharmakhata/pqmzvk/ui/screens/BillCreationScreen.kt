@@ -18,17 +18,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aistudio.sharmakhata.pqmzvk.R
 import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiClient
 import com.aistudio.sharmakhata.pqmzvk.data.remote.BillItemRequest
 import com.aistudio.sharmakhata.pqmzvk.data.remote.StoredItem
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
-import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
+import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.BillingViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 
@@ -41,7 +43,7 @@ data class BillItemEntry(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BillCreationScreen(
-    viewModel: MainViewModel,
+    viewModel: BillingViewModel,
     customerId: String,
     customerName: String,
     onBack: () -> Unit
@@ -94,11 +96,11 @@ fun BillCreationScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SuccessGreen)
-                    Text("Bill Created!", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.bill_created_title), fontWeight = FontWeight.Bold)
                 }
             },
             text = {
-                Text("Invoice has been created successfully. You can send it via WhatsApp.")
+                Text(stringResource(R.string.bill_created_message))
             },
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -116,11 +118,11 @@ fun BillCreationScreen(
                         ) {
                             Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("WhatsApp")
+                            Text(stringResource(R.string.whatsapp_label))
                         }
                     }
                     TextButton(onClick = { showSuccessDialog = false; viewModel.resetOperationState(); onBack() }) {
-                        Text("Done")
+                        Text(stringResource(R.string.done))
                     }
                 }
             },
@@ -163,10 +165,10 @@ fun BillCreationScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Create Invoice", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.create_invoice_title), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -223,7 +225,7 @@ fun BillCreationScreen(
                         }
                         Column {
                             Text(
-                                text = "Billing for",
+                                text = stringResource(R.string.billing_for),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TextSecondaryLight
                             )
@@ -260,7 +262,7 @@ fun BillCreationScreen(
                                     )
                                     Spacer(modifier = Modifier.width(Spacing.small))
                                     Text(
-                                        text = "Quick Add Items",
+                                        text = stringResource(R.string.quick_add_items),
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
@@ -272,7 +274,7 @@ fun BillCreationScreen(
                                 ) {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = "Hide",
+                                        contentDescription = stringResource(R.string.hide),
                                         tint = Slate400,
                                         modifier = Modifier.size(16.dp)
                                     )
@@ -291,7 +293,7 @@ fun BillCreationScreen(
                                         onClick = { addStoredItem(stored) },
                                         label = {
                                             Text(
-                                                text = "${stored.name} \u20B9${stored.lastPrice.toInt()}",
+                                                text = "${stored.name} ₹${stored.lastPrice.toInt()}",
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis,
                                                 style = MaterialTheme.typography.labelSmall
@@ -318,7 +320,7 @@ fun BillCreationScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Invoice Items",
+                        text = stringResource(R.string.invoice_items),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
@@ -332,7 +334,7 @@ fun BillCreationScreen(
                     ) {
                         Icon(Icons.Default.AddCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add Item", color = IndigoPrimary)
+                        Text(stringResource(R.string.add_item_button), color = IndigoPrimary)
                     }
                 }
 
@@ -353,14 +355,14 @@ fun BillCreationScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "Item",
+                                    stringResource(R.string.item_column),
                                     modifier = Modifier.weight(1.5f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = TextSecondaryLight
                                 )
                                 Text(
-                                    "Qty",
+                                    stringResource(R.string.qty_column),
                                     modifier = Modifier.weight(0.6f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -368,7 +370,7 @@ fun BillCreationScreen(
                                     textAlign = TextAlign.Center
                                 )
                                 Text(
-                                    "Price",
+                                    stringResource(R.string.price_column),
                                     modifier = Modifier.weight(1f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -376,7 +378,7 @@ fun BillCreationScreen(
                                     textAlign = TextAlign.End
                                 )
                                 Text(
-                                    "Amount",
+                                    stringResource(R.string.amount_column),
                                     modifier = Modifier.weight(1f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -408,7 +410,7 @@ fun BillCreationScreen(
                                         modifier = Modifier
                                             .weight(1.5f)
                                             .height(48.dp),
-                                        placeholder = { Text("Item name", fontSize = 12.sp) },
+                                        placeholder = { Text(stringResource(R.string.item_name_placeholder_small), fontSize = 12.sp) },
                                         textStyle = MaterialTheme.typography.bodySmall,
                                         singleLine = true,
                                         shape = RoundedCornerShape(8.dp),
@@ -433,7 +435,7 @@ fun BillCreationScreen(
                                         modifier = Modifier
                                             .weight(0.6f)
                                             .height(48.dp),
-                                        placeholder = { Text("1", fontSize = 12.sp, textAlign = TextAlign.Center) },
+                                        placeholder = { Text(stringResource(R.string.qty_placeholder), fontSize = 12.sp, textAlign = TextAlign.Center) },
                                         textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.Center),
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -459,7 +461,7 @@ fun BillCreationScreen(
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(48.dp),
-                                        placeholder = { Text("\u20B90", fontSize = 12.sp, textAlign = TextAlign.End) },
+                                        placeholder = { Text(stringResource(R.string.price_placeholder_zero), fontSize = 12.sp, textAlign = TextAlign.End) },
                                         textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.End),
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -495,7 +497,7 @@ fun BillCreationScreen(
                                         ) {
                                             Icon(
                                                 Icons.Default.RemoveCircleOutline,
-                                                contentDescription = "Remove",
+                                                contentDescription = stringResource(R.string.remove),
                                                 tint = ErrorRed,
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -522,7 +524,7 @@ fun BillCreationScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Subtotal", style = MaterialTheme.typography.bodyMedium, color = TextSecondaryLight)
+                                Text(stringResource(R.string.subtotal), style = MaterialTheme.typography.bodyMedium, color = TextSecondaryLight)
                                 Text(FormatUtils.formatCurrency(totalAmount), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             }
                             Spacer(modifier = Modifier.height(4.dp))
@@ -530,7 +532,7 @@ fun BillCreationScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("GST (Optional)", style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                                Text(stringResource(R.string.gst_optional), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
                                 Text("—", style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
                             }
 
@@ -544,7 +546,7 @@ fun BillCreationScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "Grand Total",
+                                    stringResource(R.string.grand_total),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground
@@ -593,7 +595,7 @@ fun BillCreationScreen(
                     } else {
                         Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Generate Invoice", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.create_invoice_button), fontWeight = FontWeight.Bold)
                     }
                 }
 

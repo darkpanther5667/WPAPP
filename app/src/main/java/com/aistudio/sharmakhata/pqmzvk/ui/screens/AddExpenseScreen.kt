@@ -21,6 +21,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
+import androidx.compose.ui.res.stringResource
+import com.aistudio.sharmakhata.pqmzvk.R
 
 private val categoryOptions = listOf(
     "Rent" to Icons.Default.Home,
@@ -52,10 +54,10 @@ fun AddExpenseScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add Expense", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.add_expense_title), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -81,14 +83,14 @@ fun AddExpenseScreen(
                     title = it
                     if (it.isNotBlank()) titleError = false
                 },
-                label = { Text("Title *") },
-                placeholder = { Text("e.g. Office rent, Staff salary...") },
+                label = { Text(stringResource(R.string.expense_title_star)) },
+                placeholder = { Text(stringResource(R.string.expense_title_placeholder)) },
                 leadingIcon = {
                     Icon(Icons.Default.Description, contentDescription = null, tint = IndigoPrimary)
                 },
                 isError = titleError,
                 supportingText = if (titleError) {
-                    { Text("Title is required", color = ErrorRed) }
+                    { Text(stringResource(R.string.expense_title_required), color = ErrorRed) }
                 } else null,
                 modifier = Modifier.fillMaxWidth(),
                 shape = TextFieldShape,
@@ -112,8 +114,8 @@ fun AddExpenseScreen(
                         if (it.toDoubleOrNull() != null) amountError = false
                     }
                 },
-                label = { Text("Amount *") },
-                placeholder = { Text("0.00") },
+                label = { Text(stringResource(R.string.expense_amount_star)) },
+                placeholder = { Text(stringResource(R.string.expense_amount_placeholder)) },
                 leadingIcon = {
                     Text(
                         "₹",
@@ -126,7 +128,7 @@ fun AddExpenseScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 isError = amountError,
                 supportingText = if (amountError) {
-                    { Text("Valid amount is required", color = ErrorRed) }
+                    { Text(stringResource(R.string.expense_amount_required), color = ErrorRed) }
                 } else null,
                 modifier = Modifier.fillMaxWidth(),
                 shape = TextFieldShape,
@@ -143,7 +145,7 @@ fun AddExpenseScreen(
 
             // Category label
             Text(
-                text = "Category",
+                text = stringResource(R.string.expense_category_label),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -184,8 +186,8 @@ fun AddExpenseScreen(
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
-                label = { Text("Note (optional)") },
-                placeholder = { Text("Add any additional details...") },
+                label = { Text(stringResource(R.string.expense_note_optional)) },
+                placeholder = { Text(stringResource(R.string.expense_note_placeholder)) },
                 leadingIcon = {
                     Icon(Icons.Default.Notes, contentDescription = null, tint = IndigoPrimary)
                 },
@@ -234,7 +236,7 @@ fun AddExpenseScreen(
             ) {
                 Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(IconSize.small))
                 Spacer(modifier = Modifier.width(Spacing.small))
-                Text("Save Expense", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.save_expense), style = MaterialTheme.typography.labelLarge)
             }
 
             Spacer(modifier = Modifier.height(Spacing.xxlarge))

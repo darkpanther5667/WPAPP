@@ -71,49 +71,49 @@ private val LightColorScheme = lightColorScheme(
 // DARK COLOR SCHEME (WhatsApp Green primary — Stitch design)
 // ============================================================
 private val DarkColorScheme = darkColorScheme(
-    // Primary — WhatsApp Green
-    primary = WhatsAppPrimary,
-    onPrimary = Color(0xFF00331A),
-    primaryContainer = PrimaryContainer,
-    onPrimaryContainer = OnPrimaryContainer,
+    // Primary — WhatsApp Green (#25D366 = Stitch primary-container)
+    primary = StitchPrimaryContainer,
+    onPrimary = StitchOnPrimary,
+    primaryContainer = StitchSurfaceHigh,
+    onPrimaryContainer = StitchOnPrimaryContainer,
 
-    // Secondary — Blue accent
-    secondary = AccentBlue,
-    onSecondary = Color(0xFF001A40),
-    secondaryContainer = AccentBlueContainer,
-    onSecondaryContainer = AccentBlueOnContainer,
+    // Secondary — Blue (#A4C9FF)
+    secondary = StitchSecondary,
+    onSecondary = StitchOnSecondary,
+    secondaryContainer = StitchSecondaryContainer,
+    onSecondaryContainer = StitchOnSecondaryContainer,
 
-    // Tertiary — Amber for pending/warning
-    tertiary = AmberWarning,
-    onTertiary = Color(0xFF331A00),
-    tertiaryContainer = AmberDark,
-    onTertiaryContainer = AmberLight,
+    // Tertiary — Coral (#FFC7B6)
+    tertiary = StitchTertiary,
+    onTertiary = StitchOnTertiary,
+    tertiaryContainer = StitchTertiaryContainer,
+    onTertiaryContainer = StitchOnTertiaryContainer,
 
     // Error
-    error = ErrorRed,
-    onError = Color(0xFF330000),
-    errorContainer = ErrorRedDark,
-    onErrorContainer = ErrorRedLight,
+    error = StitchError,
+    onError = StitchOnError,
+    errorContainer = StitchErrorContainer,
+    onErrorContainer = Color(0xFFFFDAD6),
 
-    // Background — Stitch dark
+    // Background — Stitch surface-dim
     background = StitchBg,
     onBackground = StitchTextPrimary,
 
     // Surface
     surface = StitchSurface,
     onSurface = StitchTextPrimary,
-    surfaceVariant = StitchSurfaceVariant,
+    surfaceVariant = StitchSurfaceHighest,
     onSurfaceVariant = StitchTextSecondary,
-    surfaceTint = WhatsAppPrimary,
+    surfaceTint = StitchPrimaryContainer,
 
     // Outline
-    outline = StitchBorder,
+    outline = StitchOutline,
     outlineVariant = StitchBorder,
 
     // Inverse
-    inverseSurface = Color(0xFFE8E8E8),
-    inverseOnSurface = Color(0xFF1C1C1E),
-    inversePrimary = WhatsAppPrimaryDark,
+    inverseSurface = StitchTextPrimary,
+    inverseOnSurface = StitchSurfaceLowest,
+    inversePrimary = Color(0xFF006D2F),
 
     // Scrim
     scrim = Color.Black.copy(alpha = 0.6f)
@@ -121,7 +121,7 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun GrahbookTheme(
-    darkTheme: Boolean = true,
+    darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {

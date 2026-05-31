@@ -19,6 +19,7 @@ object SessionManager {
     private const val KEY_TOKEN = "token"
     private const val KEY_STORE_ID = "store_id"
     private const val KEY_PHONE = "phone"
+    private const val KEY_LAST_SYNCED = "last_synced_at"
 
     @Volatile
     var token: String? = null
@@ -30,6 +31,10 @@ object SessionManager {
 
     @Volatile
     var phone: String? = null
+        private set
+
+    @Volatile
+    var lastSyncedAt: String? = null
         private set
 
     private var prefs: SharedPreferences? = null
@@ -58,6 +63,7 @@ object SessionManager {
         token = prefs?.getString(KEY_TOKEN, null)
         storeId = prefs?.getString(KEY_STORE_ID, null)
         phone = prefs?.getString(KEY_PHONE, null)
+        lastSyncedAt = prefs?.getString(KEY_LAST_SYNCED, null)
     }
 
     /**
@@ -90,6 +96,12 @@ object SessionManager {
         phone = phoneValue
     }
 
+    fun saveLastSyncedAt(context: Context, value: String?) {
+        if (prefs == null) load(context)
+        edit { putString(KEY_LAST_SYNCED, value) }
+        lastSyncedAt = value
+    }
+
     /**
      * Clear all session data (logout).
      */
@@ -98,6 +110,7 @@ object SessionManager {
         token = null
         storeId = null
         phone = null
+        lastSyncedAt = null
     }
 
     /**
