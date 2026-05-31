@@ -24,8 +24,7 @@
     "tailwind-merge": "^2.5.0",
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-dialog": "^1.1.0",
-    "@radix-ui/react-sheet": "^1.1.0",
-    "@radix-ui/react-toast": "^1.2.0"
+      "@radix-ui/react-toast": "^1.2.0"
   },
   "devDependencies": {
     "typescript": "^5.5.0",
