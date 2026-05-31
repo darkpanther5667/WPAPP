@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: grahbook-web
+    runtime: node
+    plan: free
+    rootDir: client-web
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://wpapp-xz9l.onrender.com
