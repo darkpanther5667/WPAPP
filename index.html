@@ -256,6 +256,68 @@
     @media(max-width:1024px){.hero .grid{grid-template-columns:1fr}.phone-wrapper{display:none}}
     @media(max-width:768px){nav{padding:0 16px}.section{padding:60px 16px}.form-card{padding:28px 20px}.visitor-badge{display:none!important}}
     @media(max-width:480px){#cookieConsent{right:16px;left:16px;max-width:unset}#mouseGlow{display:none!important}}
+
+    /* ─── LOGIN MODAL ─── */
+    #loginModal{position:fixed;inset:0;z-index:99995;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);opacity:0;visibility:hidden;transition:all .5s cubic-bezier(.34,1.56,.64,1)}
+    #loginModal.show{opacity:1;visibility:visible}
+    #loginModal .mcard{background:var(--bg-card);border:1px solid var(--border);border-radius:28px;padding:40px 36px;max-width:420px;width:92%;transform:scale(.85) translateY(20px);transition:transform .5s cubic-bezier(.34,1.56,.64,1);position:relative;max-height:90vh;overflow-y:auto}
+    #loginModal.show .mcard{transform:scale(1) translateY(0)}
+    #loginModal .tabs{display:flex;background:var(--bg-alt);border-radius:14px;padding:4px;margin-bottom:24px}
+    #loginModal .tabs button{flex:1;padding:10px;border:none;background:transparent;border-radius:11px;font-weight:600;font-size:14px;color:var(--text-tertiary);cursor:pointer;transition:all .3s}
+    #loginModal .tabs button.active{background:var(--bg-card);color:var(--text-secondary);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    #loginModal .field{margin-bottom:16px}
+    #loginModal .field label{display:block;font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:6px}
+    #loginModal .field input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--bg-alt);color:var(--text-primary);font-size:14px;outline:none;transition:all .3s}
+    #loginModal .field input:focus{border-color:#25d366;box-shadow:0 0 0 3px rgba(37,211,102,.1)}
+    #loginModal .submit-btn{width:100%;padding:14px;background:#25d366;color:#fff;border:none;border-radius:14px;font-weight:700;font-size:15px;cursor:pointer;transition:all .3s;box-shadow:0 4px 16px rgba(37,211,102,.25)}
+    #loginModal .submit-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(37,211,102,.35)}
+    #loginModal .submit-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+    #loginModal .close-btn{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;border:none;background:var(--bg-alt);color:var(--text-tertiary);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .3s;z-index:2}
+    #loginModal .close-btn:hover{background:rgba(37,211,102,.1);color:#25d366}
+    #loginModal .error-msg{color:#ef4444;font-size:13px;margin-top:8px;display:none}
+    #loginModal .success-msg{color:#25d366;font-size:13px;margin-top:8px;display:none}
+    #loginModal .divider{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--text-tertiary);font-size:13px}
+    #loginModal .divider::before,#loginModal .divider::after{content:'';flex:1;height:1px;background:var(--border)}
+    #loginModal .social-btn{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--bg-alt);color:var(--text-secondary);font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .3s}
+    #loginModal .social-btn:hover{background:var(--bg-card);border-color:#25d366}
+    #loginModal .seller-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-tertiary);margin-top:12px;padding:6px 12px;background:rgba(37,211,102,.06);border-radius:100px}
+
+    /* ─── DASHBOARD PREVIEW ─── */
+    .dash-card{border-radius:20px;background:var(--bg-card);border:1px solid var(--border);padding:24px;transition:all .4s cubic-bezier(.16,1,.3,1);position:relative;overflow:hidden}
+    .dash-card:hover{transform:translateY(-6px);box-shadow:var(--hover-shadow)}
+    .dash-card .val{font-size:clamp(1.4rem,2.5vw,2rem);font-weight:800;color:var(--text-secondary);transition:color .3s}
+    .dash-card .lbl{font-size:13px;color:var(--text-tertiary);margin-top:2px;transition:color .3s}
+    .dash-card .icon-wrap{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+    .dash-chart{height:180px;border-radius:12px;background:var(--bg-alt);display:flex;align-items:flex-end;gap:6px;padding:16px 12px;transition:background .3s}
+    .dash-chart .bar{flex:1;border-radius:6px 6px 0 0;background:linear-gradient(180deg,#25d366,rgba(37,211,102,.3));transition:height .3s;min-height:4px;position:relative}
+    .dash-chart .bar:hover{opacity:.8}
+
+    /* ─── IMPROVED FOOTER ─── */
+    footer{background:#0f172a;padding:64px 24px 0;transition:background .3s}
+    [data-theme=dark] footer{background:#020617}
+    footer .f-grid{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:2fr 1fr 1fr 1.2fr;gap:40px}
+    footer .f-col{min-width:0}
+    footer .f-brand{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+    footer .f-desc{font-size:14px;line-height:1.7;color:rgba(255,255,255,.45);max-width:320px}
+    footer .f-head{font-weight:600;color:#fff;margin-bottom:16px;font-size:13px;text-transform:uppercase;letter-spacing:.05em}
+    footer .f-links{display:flex;flex-direction:column;gap:10px}
+    footer .f-links a{color:rgba(255,255,255,.45);text-decoration:none;font-size:14px;transition:all .3s;display:flex;align-items:center;gap:6px}
+    footer .f-links a:hover{color:#25d366;transform:translateX(4px)}
+    footer .f-input-wrap{display:flex;gap:8px;margin-top:12px}
+    footer .f-input-wrap input{flex:1;padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:#fff;font-size:14px;outline:none;transition:all .3s;min-width:0}
+    footer .f-input-wrap input:focus{border-color:#25d366}
+    footer .f-input-wrap input::placeholder{color:rgba(255,255,255,.3)}
+    footer .f-input-wrap button{padding:10px 16px;background:#25d366;color:#fff;border:none;border-radius:12px;font-weight:600;font-size:13px;cursor:pointer;transition:all .3s;white-space:nowrap}
+    footer .f-input-wrap button:hover{background:#128c7e}
+    footer .f-social{display:flex;gap:8px;margin-top:16px}
+    footer .f-social a{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.4);text-decoration:none;transition:all .3s;font-size:18px}
+    footer .f-social a:hover{background:rgba(37,211,102,.15);color:#25d366;transform:translateY(-3px)}
+    footer .f-bottom{max-width:1280px;margin:0 auto;padding:28px 0;margin-top:48px;border-top:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+    footer .f-bottom p{font-size:13px;color:rgba(255,255,255,.35)}
+    footer .f-bottom .f-badges{display:flex;gap:12px}
+    footer .f-bottom .f-badges span{padding:4px 12px;border-radius:100px;background:rgba(255,255,255,.05);font-size:11px;color:rgba(255,255,255,.35)}
+    @media(max-width:900px){footer .f-grid{grid-template-columns:1fr 1fr;gap:32px}}
+    @media(max-width:600px){footer .f-grid{grid-template-columns:1fr;gap:28px}footer .f-bottom{flex-direction:column;text-align:center}}
   </style>
 </head>
 <body>
@@ -292,6 +354,60 @@
   </div>
 </div>
 
+<div id="loginModal">
+  <div class="mcard">
+    <button class="close-btn" onclick="closeLogin()"><span class="material-icons" style="font-size:20px">close</span></button>
+    <div style="text-align:center;margin-bottom:20px">
+      <span class="material-icons" style="font-size:36px;color:#25d366">storefront</span>
+      <h3 style="font-size:22px;font-weight:700;color:var(--text-secondary);margin-top:8px;transition:color .3s">Welcome to Grahbook</h3>
+      <p style="font-size:14px;color:var(--text-tertiary);margin-top:4px;transition:color .3s" id="loginSubtext">Manage your store on WhatsApp</p>
+    </div>
+    <div class="tabs">
+      <button class="active" id="loginTab" onclick="switchAuthTab('login')">Sign In</button>
+      <button id="registerTab" onclick="switchAuthTab('register')">Register</button>
+    </div>
+    <form id="loginForm" onsubmit="return handleLogin(event)">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="loginEmail" required placeholder="your@store.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <p class="error-msg" id="loginError">Invalid credentials. Please try again.</p>
+      <button type="submit" class="submit-btn" id="loginBtn">Sign In</button>
+      <div class="divider">or continue with</div>
+      <button type="button" class="social-btn" onclick="socialLogin('google')"><svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-1 .65-2.3 1.03-3.71 1.03-2.86 0-5.32-1.94-6.2-4.57H2.09v2.84C3.87 20.4 7.54 23 12 23z"/><path fill="#FBBC05" d="M5.8 14.03c-.38-1.14-.6-2.35-.6-3.53s.22-2.4.6-3.53V4.13H2.09A11.96 11.96 0 0 0 0 12c0 1.97.48 3.82 1.3 5.45l3.57-2.77z"/><path fill="#EA4335" d="M12 4.73c1.6 0 3.04.56 4.18 1.66l3.13-3.13C17.46 1.1 14.97 0 12 0 7.54 0 3.87 2.6 2.09 6.13l3.57 2.77C6.68 5.61 9.14 4.73 12 4.73z"/></svg> Continue with Google</button>
+      <div style="text-align:center;margin-top:12px">
+        <span class="seller-tag"><span class="material-icons" style="font-size:14px">verified</span> Verified by Google Pay</span>
+      </div>
+    </form>
+    <form id="modalRegisterForm" style="display:none" onsubmit="return handleRegister(event)">
+      <div class="field">
+        <label>Full Name</label>
+        <input type="text" id="regName" required placeholder="Rajesh Sharma" autocomplete="name">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="regEmail" required placeholder="your@store.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Phone</label>
+        <input type="tel" id="regPhone" required pattern="[6-9]{1}[0-9]{9}" placeholder="9876543210" autocomplete="tel-national">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="regPassword" required minlength="6" placeholder="••••••••" autocomplete="new-password">
+      </div>
+      <p class="success-msg" id="regSuccess">Account created! You are now signed in.</p>
+      <p class="error-msg" id="regError">This email is already registered.</p>
+      <button type="submit" class="submit-btn" id="regBtn">Create Account</button>
+      <p style="text-align:center;font-size:12px;color:var(--text-tertiary);margin-top:8px">By registering, you agree to our Terms & Privacy Policy</p>
+    </form>
+  </div>
+</div>
+
 <div id="scroll-progress"></div>
 
 <div class="page-wrap" id="pageWrap">
@@ -310,6 +426,7 @@
       <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
         <span class="thumb"><span class="material-icons" id="themeIcon" style="color:#f59e0b">dark_mode</span></span>
       </button>
+      <span id="authWrapper"><button id="loginBtnNav" onclick="openLogin()" style="padding:8px 18px;background:transparent;border:2px solid #25d366;color:#25d366;border-radius:12px;font-weight:600;font-size:13px;cursor:pointer;transition:all .3s">Sign In</button></span>
       <a href="#register" class="ripple-btn" style="padding:10px 22px;background:#25d366;color:#fff;border-radius:12px;font-weight:600;font-size:14px;text-decoration:none;box-shadow:0 4px 16px rgba(37,211,102,.25);display:inline-block">Register Your Store</a>
     </div>
     <div id="navMobile" style="display:flex;align-items:center;gap:8px">
@@ -326,6 +443,7 @@
       <a href="#features" style="color:var(--text-tertiary);text-decoration:none;font-size:16px;padding:10px 0;border-bottom:1px solid var(--border)">Features</a>
       <a href="#pricing" style="color:var(--text-tertiary);text-decoration:none;font-size:16px;padding:10px 0;border-bottom:1px solid var(--border)">Pricing</a>
       <a href="#faq" style="color:var(--text-tertiary);text-decoration:none;font-size:16px;padding:10px 0;border-bottom:1px solid var(--border)">FAQ</a>
+      <a href="#" onclick="closeLoginMob()" id="mobLoginBtn" style="padding:10px;border:2px solid #25d366;color:#25d366;border-radius:12px;text-align:center;font-weight:600;text-decoration:none">Sign In</a>
       <a href="#register" style="padding:14px;background:#25d366;color:#fff;border-radius:12px;text-align:center;font-weight:600;text-decoration:none">Register Your Store</a>
     </div>
   </div>
@@ -527,6 +645,83 @@
   </div>
 </section>
 
+<section style="padding:100px 24px;background:var(--bg-section);transition:background .3s" id="dashboard">
+  <div style="max-width:1280px;margin:0 auto">
+    <div class="reveal" style="text-align:center"><span class="section-tag">Your Store at a Glance</span></div>
+    <div class="reveal" style="text-align:center;transition-delay:.1s"><h2 class="section-title">The Merchant Dashboard</h2></div>
+    <div class="reveal" style="text-align:center;transition-delay:.2s"><p class="section-sub">Real-time metrics, orders, and insights — all in one place.</p></div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin:32px 0 24px">
+      <div class="dash-card reveal" style="transition-delay:.1s">
+        <div class="icon-wrap" style="background:rgba(37,211,102,.1)"><span class="material-icons" style="font-size:22px;color:#25d366">payments</span></div>
+        <div class="val">₹<span id="dashRevenue">0</span></div>
+        <div class="lbl">Today's Collection</div>
+      </div>
+      <div class="dash-card reveal" style="transition-delay:.15s">
+        <div class="icon-wrap" style="background:rgba(251,191,36,.1)"><span class="material-icons" style="font-size:22px;color:#fbbf24">inventory_2</span></div>
+        <div class="val" id="dashOrders">0</div>
+        <div class="lbl">Orders Today</div>
+      </div>
+      <div class="dash-card reveal" style="transition-delay:.2s">
+        <div class="icon-wrap" style="background:rgba(99,102,241,.1)"><span class="material-icons" style="font-size:22px;color:#6366f1">people</span></div>
+        <div class="val" id="dashCustomers">0</div>
+        <div class="lbl">Total Customers</div>
+      </div>
+      <div class="dash-card reveal" style="transition-delay:.25s">
+        <div class="icon-wrap" style="background:rgba(239,68,68,.1)"><span class="material-icons" style="font-size:22px;color:#ef4444">pending_actions</span></div>
+        <div class="val" id="dashPending">0</div>
+        <div class="lbl">Pending Orders</div>
+      </div>
+    </div>
+
+    <div class="reveal-s" style="transition-delay:.3s;display:grid;grid-template-columns:2fr 1fr;gap:20px">
+      <div class="dash-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h3 style="font-size:15px;font-weight:700;color:var(--text-secondary);transition:color .3s">Weekly Sales</h3>
+          <span style="font-size:12px;padding:4px 10px;border-radius:100px;background:rgba(37,211,102,.1);color:#25d366;font-weight:600">+12.5%</span>
+        </div>
+        <div class="dash-chart">
+          <div class="bar" style="height:40%"></div>
+          <div class="bar" style="height:65%"></div>
+          <div class="bar" style="height:30%"></div>
+          <div class="bar" style="height:80%"></div>
+          <div class="bar" style="height:55%"></div>
+          <div class="bar" style="height:95%"></div>
+          <div class="bar" style="height:70%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text-tertiary);transition:color .3s">
+          <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+        </div>
+      </div>
+      <div class="dash-card">
+        <h3 style="font-size:15px;font-weight:700;color:var(--text-secondary);margin-bottom:16px;transition:color .3s">Recent Orders</h3>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-alt);border-radius:10px;transition:background .3s">
+            <div style="width:8px;height:8px;border-radius:50%;background:#25d366;flex-shrink:0"></div>
+            <div style="flex:1;min-width:0"><p style="font-size:13px;font-weight:600;color:var(--text-secondary);transition:color .3s">Priya Sharma</p><p style="font-size:11px;color:var(--text-tertiary);transition:color .3s">Silk Saree × 2</p></div>
+            <span style="font-size:13px;font-weight:700;color:#25d366">₹9,000</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-alt);border-radius:10px;transition:background .3s">
+            <div style="width:8px;height:8px;border-radius:50%;background:#fbbf24;flex-shrink:0"></div>
+            <div style="flex:1;min-width:0"><p style="font-size:13px;font-weight:600;color:var(--text-secondary);transition:color .3s">Rahul Verma</p><p style="font-size:11px;color:var(--text-tertiary);transition:color .3s">Kurta Set × 1</p></div>
+            <span style="font-size:13px;font-weight:700;color:#fbbf24">₹2,200</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-alt);border-radius:10px;transition:background .3s">
+            <div style="width:8px;height:8px;border-radius:50%;background:#25d366;flex-shrink:0"></div>
+            <div style="flex:1;min-width:0"><p style="font-size:13px;font-weight:600;color:var(--text-secondary);transition:color .3s">Anjali Gupta</p><p style="font-size:11px;color:var(--text-tertiary);transition:color .3s">Groceries × 5</p></div>
+            <span style="font-size:13px;font-weight:700;color:#25d366">₹1,850</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-alt);border-radius:10px;transition:background .3s">
+            <div style="width:8px;height:8px;border-radius:50%;background:#6366f1;flex-shrink:0"></div>
+            <div style="flex:1;min-width:0"><p style="font-size:13px;font-weight:600;color:var(--text-secondary);transition:color .3s">Vikram Singh</p><p style="font-size:11px;color:var(--text-tertiary);transition:color .3s">Electronics × 3</p></div>
+            <span style="font-size:13px;font-weight:700;color:#6366f1">₹18,500</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="pricing" class="section" style="background:var(--bg-section);transition:background .3s">
   <div style="max-width:1280px;margin:0 auto;text-align:center">
     <div class="reveal"><span class="section-tag">Pricing</span></div>
@@ -627,13 +822,64 @@
 </section>
 
 <footer>
-  <div style="max-width:1280px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:48px;margin-bottom:48px">
-    <div><div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><span class="material-icons" style="font-size:28px;color:#25d366">storefront</span><span style="font-weight:700;font-size:18px;color:#fff">Grahbook</span></div><p style="font-size:14px;line-height:1.7;color:rgba(255,255,255,.5)">&copy; 2025 Grahbook India. High-velocity commerce for the modern Indian merchant. Proudly built in Bharat.</p></div>
-    <div><h4 style="font-weight:600;color:#fff;margin-bottom:16px;font-size:13px;text-transform:uppercase;letter-spacing:.05em">Platform</h4><div style="display:flex;flex-direction:column;gap:10px"><a href="#" style="color:rgba(255,255,255,.5);text-decoration:none;font-size:14px;transition:color .3s">Privacy Policy</a><a href="#" style="color:rgba(255,255,255,.5);text-decoration:none;font-size:14px;transition:color .3s">Terms</a><a href="#" style="color:rgba(255,255,255,.5);text-decoration:none;font-size:14px;transition:color .3s">API Docs</a></div></div>
-    <div><h4 style="font-weight:600;color:#fff;margin-bottom:16px;font-size:13px;text-transform:uppercase;letter-spacing:.05em">Support</h4><div style="display:flex;flex-direction:column;gap:10px"><a href="#" style="color:rgba(255,255,255,.5);text-decoration:none;font-size:14px;transition:color .3s">WhatsApp</a><a href="#" style="color:rgba(255,255,255,.5);text-decoration:none;font-size:14px;transition:color .3s">Seller Guide</a><a href="#" style="color:rgba(255,255,255,.5);text-decoration:none;font-size:14px;transition:color .3s">UPI FAQs</a></div></div>
-    <div><h4 style="font-weight:600;color:#fff;margin-bottom:16px;font-size:13px;text-transform:uppercase;letter-spacing:.05em">Connect</h4><div style="display:flex;gap:8px"><a href="#" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);text-decoration:none;transition:all .3s"><span class="material-icons" style="font-size:18px">facebook</span></a><a href="#" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);text-decoration:none;transition:all .3s"><span class="material-icons" style="font-size:18px">photo_camera</span></a><a href="#" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);text-decoration:none;transition:all .3s"><span class="material-icons" style="font-size:18px">alternate_email</span></a></div></div>
+  <div class="f-grid">
+    <div class="f-col">
+      <div class="f-brand">
+        <span class="material-icons" style="font-size:28px;color:#25d366">storefront</span>
+        <span style="font-weight:700;font-size:18px;color:#fff">Grahbook</span>
+      </div>
+      <p class="f-desc">The first AI-powered store bot built for Bharat. Manage billing, UPI payments, and customer chats — all without leaving WhatsApp. Proudly built in India 🇮🇳</p>
+      <div class="f-social">
+        <a href="#" aria-label="WhatsApp"><span class="material-icons">chat</span></a>
+        <a href="#" aria-label="Instagram"><span class="material-icons">photo_camera</span></a>
+        <a href="#" aria-label="YouTube"><span class="material-icons">play_circle</span></a>
+        <a href="#" aria-label="Email"><span class="material-icons">email</span></a>
+      </div>
+    </div>
+    <div class="f-col">
+      <h4 class="f-head">Platform</h4>
+      <div class="f-links">
+        <a href="#features"><span class="material-icons" style="font-size:14px">chevron_right</span> Features</a>
+        <a href="#pricing"><span class="material-icons" style="font-size:14px">chevron_right</span> Pricing</a>
+        <a href="#dashboard"><span class="material-icons" style="font-size:14px">chevron_right</span> Dashboard</a>
+        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> API Docs</a>
+        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> Privacy Policy</a>
+      </div>
+    </div>
+    <div class="f-col">
+      <h4 class="f-head">Support</h4>
+      <div class="f-links">
+        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> Seller Guide</a>
+        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> WhatsApp Setup</a>
+        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> UPI FAQs</a>
+        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> Contact Us</a>
+        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> Grievance</a>
+      </div>
+    </div>
+    <div class="f-col">
+      <h4 class="f-head">Stay Updated</h4>
+      <p style="font-size:13px;color:rgba(255,255,255,.4);line-height:1.6;margin-bottom:4px">Get product updates and seller tips in your inbox.</p>
+      <div class="f-input-wrap">
+        <input type="email" placeholder="your@email.com" id="newsletterInput">
+        <button onclick="submitNewsletter()">Subscribe</button>
+      </div>
+      <div style="margin-top:20px">
+        <h4 class="f-head" style="margin-bottom:10px">Download App</h4>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span style="padding:8px 14px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,.5);cursor:pointer;transition:all .3s"><span class="material-icons" style="font-size:16px">android</span> Android</span>
+          <span style="padding:8px 14px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,.5);cursor:pointer;transition:all .3s"><span class="material-icons" style="font-size:16px">apple</span> iOS</span>
+        </div>
+      </div>
+    </div>
   </div>
-  <div style="max-width:1280px;margin:0 auto;padding-top:32px;border-top:1px solid rgba(255,255,255,.08);text-align:center;font-size:14px;color:rgba(255,255,255,.4)">Made with ❤️ in Bharat 🇮🇳</div>
+  <div class="f-bottom">
+    <p>&copy; 2026 Grahbook India. All rights reserved. Made with ❤️ in Bharat.</p>
+    <div class="f-badges">
+      <span>Make in India</span>
+      <span>UPI Certified</span>
+      <span>DGFT Registered</span>
+    </div>
+  </div>
 </footer>
 
 <button id="backTop" class="back-top" aria-label="Back to top"><span class="material-icons">arrow_upward</span></button>
@@ -746,7 +992,69 @@ document.getElementById('registerForm').addEventListener('submit',async function
   catch(err){alert('Registration failed. Please try again.');btn.disabled=false;btn.innerHTML=orig;}
 });
 
-/* ═══ CLICK EXPLOSION ═══ */
+/* ═══ AUTH SYSTEM ═══ */
+const AUTH_KEY='gh_user';
+function openLogin(){document.getElementById('loginModal').classList.add('show');}
+function closeLogin(){document.getElementById('loginModal').classList.remove('show');}
+function closeLoginMob(){document.getElementById('mobileMenu').classList.remove('active');setTimeout(()=>{document.getElementById('mobileMenu').style.display='none';document.getElementById('mobileMenu').dataset.shown='false';},500);document.getElementById('menuBtn').querySelector('.material-icons').textContent='menu';openLogin();}
+function switchAuthTab(tab){
+  document.getElementById('loginTab').classList.toggle('active',tab==='login');
+  document.getElementById('registerTab').classList.toggle('active',tab==='register');
+  document.getElementById('loginForm').style.display=tab==='login'?'block':'none';
+  document.getElementById('modalRegisterForm').style.display=tab==='register'?'block':'none';
+}
+function getUsers(){try{return JSON.parse(localStorage.getItem('gh_users')||'[]')}catch{return[]}}
+function saveUsers(u){localStorage.setItem('gh_users',JSON.stringify(u))}
+function getSession(){const s=localStorage.getItem(AUTH_KEY);return s?JSON.parse(s):null}
+function setSession(u){localStorage.setItem(AUTH_KEY,JSON.stringify(u));updateAuthUI();}
+function clearSession(){localStorage.removeItem(AUTH_KEY);updateAuthUI();}
+function handleLogin(e){
+  e.preventDefault();const email=document.getElementById('loginEmail').value,pwd=document.getElementById('loginPassword').value;
+  const users=getUsers(),user=users.find(u=>u.email===email&&u.password===pwd);
+  if(!user){document.getElementById('loginError').style.display='block';return false;}
+  document.getElementById('loginError').style.display='none';
+  setSession({name:user.name,email:user.email,phone:user.phone,store:user.store||'My Store'});
+  closeLogin();return false;
+}
+function handleRegister(e){
+  e.preventDefault();const name=document.getElementById('regName').value,email=document.getElementById('regEmail').value,phone=document.getElementById('regPhone').value,pwd=document.getElementById('regPassword').value;
+  const users=getUsers();
+  if(users.find(u=>u.email===email)){document.getElementById('regError').style.display='block';document.getElementById('regSuccess').style.display='none';return false;}
+  document.getElementById('regError').style.display='none';
+  users.push({name,email,phone,password:pwd,store:name+"'s Store",createdAt:new Date().toISOString()});
+  saveUsers(users);
+  document.getElementById('regSuccess').style.display='block';
+  setSession({name,email,phone,store:name+"'s Store"});
+  setTimeout(closeLogin,1500);return false;
+}
+function socialLogin(provider){
+  const names=['Rajesh Sharma','Priya Singh','Amit Verma','Sunita Gupta','Vikram Patel'];
+  const name=names[Math.floor(Math.random()*names.length)];
+  const email=name.toLowerCase().replace(' ','.')+'@gmail.com';
+  setSession({name,email,phone:'9876543210',store:name+"'s Store",social:provider});
+  closeLogin();
+}
+function updateAuthUI(){
+  const user=getSession();const w=document.getElementById('authWrapper');const m=document.getElementById('mobLoginBtn');
+  if(user){
+    if(w)w.innerHTML=`<span style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:100px;background:rgba(37,211,102,.1);font-size:13px;font-weight:500;color:#25d366"><span class="material-icons" style="font-size:16px">account_circle</span> ${user.name.split(' ')[0]}</span> <button onclick="clearSession()" style="padding:8px 16px;background:transparent;border:1px solid var(--border);color:var(--text-tertiary);border-radius:10px;font-weight:500;font-size:13px;cursor:pointer;transition:all .3s">Logout</button>`;
+    if(m)m.innerHTML=`<a href="#" onclick="clearSession();document.getElementById('mobileMenu').classList.remove('active');setTimeout(()=>{document.getElementById('mobileMenu').style.display='none';document.getElementById('mobileMenu').dataset.shown='false';},500);document.getElementById('menuBtn').querySelector('.material-icons').textContent='menu';" style="padding:10px;border:1px solid var(--border);color:var(--text-tertiary);border-radius:12px;text-align:center;font-weight:600;text-decoration:none;font-size:14px">Logout (${user.name.split(' ')[0]})</a>`;
+  }else{
+    if(w)w.innerHTML=`<button onclick="openLogin()" style="padding:8px 18px;background:transparent;border:2px solid #25d366;color:#25d366;border-radius:12px;font-weight:600;font-size:13px;cursor:pointer;transition:all .3s">Sign In</button>`;
+    if(m)m.innerHTML=`<a href="#" onclick="closeLoginMob()" style="padding:10px;border:2px solid #25d366;color:#25d366;border-radius:12px;text-align:center;font-weight:600;text-decoration:none">Sign In</a>`;
+  }
+}
+
+/* ═══ DASHBOARD ANIMATION ═══ */
+(function(){function animateDash(){const rev=document.getElementById('dashRevenue'),ord=document.getElementById('dashOrders'),cus=document.getElementById('dashCustomers'),pen=document.getElementById('dashPending');if(!rev)return;let r=0,o=0,c=0,p=0;const ri=setInterval(()=>{r+=Math.ceil(12500/60);o+=Math.ceil(24/60);c+=Math.ceil(340/60);p+=Math.ceil(8/60);if(r>=12500){r=12500;clearInterval(ri)}rev.textContent=r.toLocaleString('en-IN');ord.textContent=Math.min(o,24);cus.textContent=Math.min(c,340);pen.textContent=Math.min(p,8);},25);}
+const dashObs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){animateDash();dashObs.unobserve(e.target)}})},{threshold:.3});
+const dashSec=document.getElementById('dashboard');if(dashSec)dashObs.observe(dashSec);})();
+
+/* ═══ NEWSLETTER ═══ */
+function submitNewsletter(){const inp=document.getElementById('newsletterInput');if(!inp.value.includes('@')){alert('Please enter a valid email');return}alert('Thanks for subscribing! We will keep you updated.');inp.value='';}
+
+/* ═══ AUTO-LOGIN CHECK ═══ */
+updateAuthUI();
 (function(){if(!window.matchMedia('(pointer:fine)').matches)return;const xc=['#25d366','#4ade80','#128c7e','#a7f3d0','#6ee7b7','#34d399','#fff'];document.addEventListener('click',function(e){for(let i=0;i<18;i++){const p=document.createElement('div');p.className='xpart';const s=3+Math.random()*7;p.style.cssText=`left:${e.clientX}px;top:${e.clientY}px;width:${s}px;height:${s}px;background:${xc[i%xc.length]};box-shadow:0 0 ${s+3}px ${xc[i%xc.length]}`;document.body.appendChild(p);const a=Math.random()*Math.PI*2,sp=60+Math.random()*200,g=.5;let vx=Math.cos(a)*sp,vy=Math.sin(a)*sp-130,op=1;const iv=setInterval(()=>{vy+=g;p.style.left=(parseFloat(p.style.left)+vx*.016)+'px';p.style.top=(parseFloat(p.style.top)+vy*.016)+'px';op-=.018;p.style.opacity=Math.max(op,0);p.style.transform=`scale(${Math.max(op,0)})`;if(op<=0){clearInterval(iv);p.remove();}},16);}});})();
 
 /* ═══ MOUSE GLOW ═══ */
