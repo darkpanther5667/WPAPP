@@ -47,8 +47,7 @@
       --gradient-text:linear-gradient(135deg,#4ade80,#25d366,#128c7e);
     }
 
-    .page-wrap{opacity:0;transition:opacity .7s ease}
-    .page-wrap.visible{opacity:1}
+    .page-wrap{opacity:1}
 
     /* ─── SPARKLES ─── */
     .sparkle{position:fixed;pointer-events:none;z-index:99997;width:4px;height:4px;border-radius:50%;animation:spFade .9s ease-out forwards}
@@ -604,9 +603,6 @@
 </div> <!-- /page-wrap -->
 
 <script>
-/* ═══ PAGE VISIBLE ═══ */
-document.addEventListener('DOMContentLoaded', () => document.getElementById('pageWrap').classList.add('visible'));
-
 /* ═══ GREETING ═══ */
 (function(){ const h=new Date().getHours(); let m; if(h<12)m='Good Morning! ☀️ Now live for Indian merchants'; else if(h<17)m='Good Afternoon! 🌤️ Now live for Indian merchants'; else if(h<21)m='Good Evening! 🌅 Now live for Indian merchants'; else m='Good Night! 🌙 Now live for Indian merchants'; document.getElementById('greetingMsg').textContent=m; })();
 
