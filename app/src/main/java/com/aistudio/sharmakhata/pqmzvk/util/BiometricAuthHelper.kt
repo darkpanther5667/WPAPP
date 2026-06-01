@@ -17,12 +17,15 @@ object BiometricAuthHelper {
     val authState: StateFlow<Boolean> = _authState.asStateFlow()
 
     fun isAvailable(context: Context): Boolean {
+        // Only lock if we are running inside a FragmentActivity — otherwise
+        // BiometricPrompt cannot attach and the user gets permanently stuck.
+        if (context !is androidx.fragment.app.FragmentActivity) return false
         val manager = BiometricManager.from(context)
-        return when (manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)) {
+        return when (manager.canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_STRONG or
+            BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        )) {
             BiometricManager.BIOMETRIC_SUCCESS -> true
-            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> false
-            BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> false
-            BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> false
             else -> false
         }
     }
@@ -59,34 +62,23 @@ object BiometricAuthHelper {
     fun showPrompt(activity: FragmentActivity) {
         try {
             if (isAuthenticated(activity)) return
-
-            val authenticators: Int
-            val title: String
-            val subtitle: String
-
-            when {
-                isAvailable(activity) -> {
-                    authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG
-                    title = "Fingerprint / Face Unlock"
-                    subtitle = "Touch the fingerprint sensor or use face unlock"
-                }
-                isDeviceCredentialAvailable(activity) -> {
-                    authenticators = BiometricManager.Authenticators.DEVICE_CREDENTIAL
-                    title = "Screen Lock"
-                    subtitle = "Enter your device PIN, pattern, or password"
-                }
-                else -> return
-            }
-
+            // Guard: if neither biometric nor device credential is available, skip
+            if (!isAvailable(activity)) return
+            // Use BIOMETRIC_STRONG | DEVICE_CREDENTIAL so the user can also
+            // fall back to PIN/pattern. This also eliminates the need for
+            // setNegativeButtonText which conflicts with BIOMETRIC_STRONG alone.
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                .setTitle(title)
-                .setSubtitle(subtitle)
-                .setNegativeButtonText("Cancel")
+                .setTitle("Verify your identity")
+                .setSubtitle("Use fingerprint, face, or device PIN")
+                .setAllowedAuthenticators(
+                    BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                )
                 .setConfirmationRequired(false)
-                .setAllowedAuthenticators(authenticators)
                 .build()
 
             val executor = getMainExecutor(activity)
+            @Suppress("DEPRECATION")
             val prompt = BiometricPrompt(activity, executor,
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {

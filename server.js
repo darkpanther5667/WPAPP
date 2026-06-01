@@ -1710,10 +1710,10 @@ app.use('/downloads', express.static(path.join(__dirname, 'public', 'downloads')
  */
 app.get('/api/app/version', (req, res) => {
   res.json({
-    versionCode: 1,          // ← BUMP THIS on every new release (must be integer, always increasing)
-    versionName: '1.0',      // ← Human-readable version shown in the update dialog
-    apkUrl: `${process.env.PUBLIC_BASE_URL || 'https://wpapp-xz9l.onrender.com'}/downloads/grahbook-latest.apk`,
-    releaseNotes: 'Initial release.',
+    versionCode: 2,          // ← BUMP THIS on every new release (must be integer, always increasing)
+    versionName: '1.1',      // ← Human-readable version shown in the update dialog
+    apkUrl: 'https://github.com/darkpanther5667/WPAPP/releases/download/v1.1/grahbook-v1.1.apk',
+    releaseNotes: 'Fixed: App no longer gets stuck on the "Verify your identity" screen on launch.',
     mandatory: false          // ← Set true to force all users to update before using the app
   });
 });
