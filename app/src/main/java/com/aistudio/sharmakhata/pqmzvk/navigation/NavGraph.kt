@@ -574,10 +574,22 @@ fun AppNavGraph(
 
                 // ===== INVOICE TEMPLATES =====
                 composable("invoice_templates") {
-                    val purchVm: PurchaseViewModel = hiltViewModel()
+                    val dbState by mainViewModel.dbState.collectAsState()
+                    val currentTemplateStr = when (val s = dbState) {
+                        is UiState.Success -> s.data.shop?.invoiceTemplate ?: "modern"
+                        else -> "modern"
+                    }
+                    val currentEnum = try {
+                        InvoiceTemplate.valueOf(currentTemplateStr.uppercase())
+                    } catch (e: Exception) {
+                        InvoiceTemplate.MODERN
+                    }
                     InvoiceTemplateScreen(
+                        currentTemplate = currentEnum,
                         onBack = { navController.popBackStack() },
-                        onTemplateSelected = { purchVm.setInvoiceTemplate(it) }
+                        onTemplateSelected = { selected ->
+                            mainViewModel.updateInvoiceTemplate(selected.name.lowercase(), context)
+                        }
                     )
                 }
             }

@@ -30,6 +30,20 @@ class BillingRepository @Inject constructor(
         totalIgst: Double = 0.0,
         grandTotal: Double = 0.0
     ): Pair<RepoResult, String?> {
+        // Automatically deduct stock count locally for sold items
+        try {
+            val db = com.aistudio.sharmakhata.pqmzvk.data.local.AppDatabase.get(context)
+            val itemDao = db.itemDao()
+            items?.forEach { billItem ->
+                val matchingItem = itemDao.getAllItemsList().find { it.name.trim().equals(billItem.name.trim(), ignoreCase = true) }
+                if (matchingItem != null) {
+                    itemDao.reduceStock(matchingItem.id, billItem.qty)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BillingRepository", "Stock deduction failed: ${e.message}")
+        }
+
         return try {
             if (!NetworkUtils.isNetworkAvailable(context)) {
                 val payload = moshi.adapter(CreateBillRequest::class.java).toJson(
@@ -71,6 +85,20 @@ class BillingRepository @Inject constructor(
         totalIgst: Double = 0.0,
         grandTotal: Double = 0.0
     ): Pair<RepoResult, String?> {
+        // Automatically deduct stock count locally for sold items
+        try {
+            val db = com.aistudio.sharmakhata.pqmzvk.data.local.AppDatabase.get(context)
+            val itemDao = db.itemDao()
+            items?.forEach { billItem ->
+                val matchingItem = itemDao.getAllItemsList().find { it.name.trim().equals(billItem.name.trim(), ignoreCase = true) }
+                if (matchingItem != null) {
+                    itemDao.reduceStock(matchingItem.id, billItem.qty)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BillingRepository", "Stock deduction failed: ${e.message}")
+        }
+
         return try {
             if (!NetworkUtils.isNetworkAvailable(context)) {
                 val payload = moshi.adapter(CreateBillRequest::class.java).toJson(

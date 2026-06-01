@@ -2631,10 +2631,33 @@ app.get('/api/bill/:id/pdf', async (req, res) => {
       phone: '0000000000'
     };
 
-    // Colors
-    const INDIGO = '#4F46E5';
-    const INDIGO_DARK = '#312E81';
-    const INDIGO_LIGHT = '#EEF2FF';
+    // Colors dynamic based on invoice template style
+    const template = (shop.invoice_template || 'modern').toLowerCase();
+    let PRIMARY_COLOR = '#10B981'; // Modern (Emerald)
+    let PRIMARY_DARK = '#065F46';
+    let PRIMARY_LIGHT = '#ECFDF5';
+    let SECONDARY_TEXT = '#A7F3D0';
+
+    if (template === 'classic') {
+      PRIMARY_COLOR = '#4F46E5'; // Classic (Indigo)
+      PRIMARY_DARK = '#312E81';
+      PRIMARY_LIGHT = '#EEF2FF';
+      SECONDARY_TEXT = '#C7D2FE';
+    } else if (template === 'professional') {
+      PRIMARY_COLOR = '#0F172A'; // Professional (Slate Slate-900)
+      PRIMARY_DARK = '#020617';
+      PRIMARY_LIGHT = '#F1F5F9';
+      SECONDARY_TEXT = '#94A3B8';
+    } else if (template === 'minimal') {
+      PRIMARY_COLOR = '#374151'; // Minimal (Charcoal Grey-700)
+      PRIMARY_DARK = '#111827';
+      PRIMARY_LIGHT = '#F9FAFB';
+      SECONDARY_TEXT = '#9CA3AF';
+    }
+
+    const INDIGO = PRIMARY_COLOR;
+    const INDIGO_DARK = PRIMARY_DARK;
+    const INDIGO_LIGHT = PRIMARY_LIGHT;
     const SLATE_50 = '#F8FAFC';
     const SLATE_100 = '#F1F5F9';
     const SLATE_200 = '#E2E8F0';
@@ -2660,21 +2683,21 @@ app.get('/api/bill/:id/pdf', async (req, res) => {
     doc.rect(0, 0, pageWidth, headerHeight).fill(INDIGO);
     doc.fontSize(22).fillColor('#FFFFFF')
        .text(shop.name || 'GENERAL STORE', margin, 20, { width: contentWidth, align: 'center' });
-    doc.fontSize(9).fillColor('#C7D2FE')
+    doc.fontSize(9).fillColor(SECONDARY_TEXT)
        .text(shop.address || '', margin, 48, { width: contentWidth, align: 'center' });
     
     let subHeaderY = 62;
     if (shop.phone) {
-      doc.fontSize(9).fillColor('#C7D2FE')
+      doc.fontSize(9).fillColor(SECONDARY_TEXT)
          .text(`WhatsApp: +91 ${shop.phone}`, margin, subHeaderY, { width: contentWidth, align: 'center' });
       subHeaderY += 13;
     }
     if (shop.gstin) {
-      doc.fontSize(9).fillColor('#E0E7FF')
+      doc.fontSize(9).fillColor(SECONDARY_TEXT)
          .text(`GSTIN: ${shop.gstin}`, margin, subHeaderY, { width: contentWidth, align: 'center' });
       subHeaderY += 13;
     }
-    doc.fontSize(9).fillColor('#A5B4FC')
+    doc.fontSize(9).fillColor(SECONDARY_TEXT)
        .text('TAX INVOICE', margin, subHeaderY, { width: contentWidth, align: 'center' });
 
     // ── INVOICE META ─────────────────────────
@@ -3035,6 +3058,19 @@ app.get('/view/bill/:id', async (req, res) => {
 
     const isPaid = bill.status === 'paid';
     const grandTotal = bill.grand_total || bill.total;
+    const template = (shop.invoice_template || 'modern').toLowerCase();
+    let bgGradient = 'from-emerald-600 to-emerald-800'; // Modern
+    let textAccent = 'text-emerald-600';
+    if (template === 'classic') {
+      bgGradient = 'from-indigo-600 to-indigo-800'; // Classic
+      textAccent = 'text-indigo-600';
+    } else if (template === 'professional') {
+      bgGradient = 'from-slate-800 to-slate-950'; // Professional
+      textAccent = 'text-slate-900';
+    } else if (template === 'minimal') {
+      bgGradient = 'from-gray-700 to-gray-800'; // Minimal
+      textAccent = 'text-gray-700';
+    }
     const cleanShopName = (shop.name || 'Store').replace(/[^a-zA-Z0-9 ]/g, '').trim();
     const upiUri = `upi://pay?pa=${encodeURIComponent(shop.upi_id)}&pn=${encodeURIComponent(cleanShopName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Bill ' + bill.id.substring(0,8))}`;
 
@@ -3076,7 +3112,7 @@ app.get('/view/bill/:id', async (req, res) => {
           <div class="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden mb-6">
             
             <!-- Store Profile Header -->
-            <div class="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 text-white text-center sm:text-left">
+            <div class="bg-gradient-to-r ${bgGradient} p-6 text-white text-center sm:text-left">
               <h2 class="text-2xl font-extrabold tracking-tight">${shop.name}</h2>
               ${shop.owner ? `<p class="text-indigo-200 text-sm mt-0.5">Prop: ${shop.owner}</p>` : ''}
               <div class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-indigo-100 border-t border-indigo-500/30 pt-3">
@@ -3141,7 +3177,7 @@ app.get('/view/bill/:id', async (req, res) => {
                 
                 <div class="flex justify-between items-end pt-3 border-t border-slate-200/60 text-slate-900">
                   <span class="font-bold">Total Amount Due / कुल देय राशि</span>
-                  <span class="text-2xl font-extrabold text-indigo-600">₹${grandTotal.toFixed(2)}</span>
+                  <span class="text-2xl font-extrabold ${textAccent}">₹${grandTotal.toFixed(2)}</span>
                 </div>
               </div>
             </div>

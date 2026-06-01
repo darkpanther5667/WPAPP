@@ -740,6 +740,7 @@ fun ProfileScreen(
                   address = editAddress.ifBlank { null },
                   upiId = editUpiId.ifBlank { null },
                   gstin = editGstin.ifBlank { null },
+                  invoiceTemplate = shop?.invoiceTemplate,
                   context = context
                 )
                 showEditStoreDialog = false

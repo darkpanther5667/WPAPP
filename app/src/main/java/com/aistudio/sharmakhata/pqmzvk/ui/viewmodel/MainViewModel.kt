@@ -511,6 +511,7 @@ class MainViewModel @Inject constructor(
         address: String?,
         upiId: String?,
         gstin: String?,
+        invoiceTemplate: String?,
         context: android.content.Context
     ) {
         _operationState.value = OperationState.Loading
@@ -522,7 +523,8 @@ class MainViewModel @Inject constructor(
                         owner_name = ownerName,
                         address = address,
                         upi_id = upiId,
-                        gstin = gstin
+                        gstin = gstin,
+                        invoice_template = invoiceTemplate
                     )
                 )
                 if (response.isSuccessful && response.body()?.success == true) {
@@ -538,6 +540,20 @@ class MainViewModel @Inject constructor(
                 _operationState.value = OperationState.Error("Network error. Failed to update profile.")
             }
         }
+    }
+
+    fun updateInvoiceTemplate(templateName: String, context: android.content.Context) {
+        val currentDb = (dbState.value as? UiState.Success)?.data ?: return
+        val currentShop = currentDb.shop ?: return
+        updateStoreProfile(
+            storeName = currentShop.name ?: "",
+            ownerName = currentShop.owner ?: "",
+            address = currentShop.address,
+            upiId = currentShop.upiId,
+            gstin = currentShop.gstin,
+            invoiceTemplate = templateName,
+            context = context
+        )
     }
 
     companion object {
