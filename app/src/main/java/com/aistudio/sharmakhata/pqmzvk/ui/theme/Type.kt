@@ -11,19 +11,16 @@ import com.aistudio.sharmakhata.pqmzvk.R
 
 // === LOCAL FONT FAMILIES ===
 
-val Syne = FontFamily(
-    Font(R.font.syne_regular, FontWeight.Normal),
-    Font(R.font.syne_bold, FontWeight.Bold),
-    Font(R.font.syne_extrabold, FontWeight.ExtraBold),
-    Font(R.font.syne_bold, FontWeight.SemiBold) // map semibold to bold if needed
+val Poppins = FontFamily(
+    Font(R.font.poppins_regular, FontWeight.Normal),
+    Font(R.font.poppins_medium, FontWeight.Medium),
+    Font(R.font.poppins_semibold, FontWeight.SemiBold),
+    Font(R.font.poppins_bold, FontWeight.Bold),
+    Font(R.font.poppins_extrabold, FontWeight.ExtraBold)
 )
 
-val DMSans = FontFamily(
-    Font(R.font.dmsans_regular, FontWeight.Normal),
-    Font(R.font.dmsans_medium, FontWeight.Medium),
-    Font(R.font.dmsans_bold, FontWeight.Bold),
-    Font(R.font.dmsans_medium, FontWeight.SemiBold) // map semibold to medium/bold
-)
+val Syne = Poppins
+val DMSans = Poppins
 
 val JetBrainsMono = FontFamily(
     Font(R.font.jetbrainsmono_regular, FontWeight.Normal),

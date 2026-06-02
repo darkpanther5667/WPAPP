@@ -72,6 +72,7 @@ import java.util.Locale
 import android.content.res.Configuration
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.ui.res.stringResource
 import androidx.compose.material.icons.filled.Check
 import com.aistudio.sharmakhata.pqmzvk.util.SessionManager
 import com.aistudio.sharmakhata.pqmzvk.util.BiometricAuthHelper
@@ -419,7 +420,7 @@ fun ProfileScreen(
     Scaffold(
       topBar = {
         TopAppBar(
-          title = { Text("Settings", fontWeight = FontWeight.Bold) },
+          title = { Text(stringResource(R.string.settings_title), fontWeight = FontWeight.Bold) },
           colors = TopAppBarDefaults.topAppBarColors(
             containerColor = Color.Transparent,
             titleContentColor = Color.White
@@ -479,7 +480,7 @@ fun ProfileScreen(
               .padding(horizontal = 16.dp, vertical = 4.dp)
           ) {
             Text(
-              text = if (token != null) "Active Account" else "Not logged in",
+              text = if (token != null) stringResource(R.string.active_account) else stringResource(R.string.not_logged_in),
               style = MaterialTheme.typography.labelSmall,
               fontWeight = FontWeight.SemiBold,
               color = Color.White
@@ -526,7 +527,7 @@ fun ProfileScreen(
                   verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                   Text(text = customerCount.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = StitchTeal)
-                  Text(text = "Customers", style = MaterialTheme.typography.labelSmall, color = TextSecondaryLight)
+                  Text(text = stringResource(R.string.customers_title), style = MaterialTheme.typography.labelSmall, color = TextSecondaryLight)
                 }
               }
               Card(
@@ -541,7 +542,7 @@ fun ProfileScreen(
                   verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                   Text(text = billCount.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = StitchSky)
-                  Text(text = "Bills", style = MaterialTheme.typography.labelSmall, color = TextSecondaryLight)
+                  Text(text = stringResource(R.string.bills_title), style = MaterialTheme.typography.labelSmall, color = TextSecondaryLight)
                 }
               }
             }
@@ -550,7 +551,7 @@ fun ProfileScreen(
 
             // === SETTINGS SECTIONS ===
             Text(
-              text = "PREFERENCES",
+              text = stringResource(R.string.preferences_title),
               style = SectionOverlineStyle,
               color = TextTertiaryLight,
               modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
@@ -560,8 +561,8 @@ fun ProfileScreen(
             SettingsItem(
               icon = if (isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
               iconTint = StitchTeal,
-              title = "Dark Mode / नाइट मोड",
-              subtitle = if (isDarkTheme) "Currently dark" else "Currently light",
+              title = stringResource(R.string.dark_mode_title),
+              subtitle = if (isDarkTheme) stringResource(R.string.dark_mode_currently_dark) else stringResource(R.string.dark_mode_currently_light),
               trailing = {
                 Switch(
                   checked = isDarkTheme,
@@ -582,7 +583,7 @@ fun ProfileScreen(
             SettingsItem(
               icon = Icons.Default.Edit,
               iconTint = StitchTeal,
-              title = "Edit Store Details / दुकान की जानकारी",
+              title = stringResource(R.string.edit_store_details_title),
               subtitle = "Name, Owner, Address, UPI ID, GSTIN",
               onClick = {
                 editStoreName = storeName
@@ -600,7 +601,7 @@ fun ProfileScreen(
             SettingsItem(
               icon = Icons.Default.Language,
               iconTint = StitchTeal,
-              title = "Language / भाषा",
+              title = stringResource(R.string.language_title),
               subtitle = when (currentLanguage) {
                 "hi" -> "हिंदी (Hindi)"
                 else -> "English (Hinglish)"
@@ -612,7 +613,7 @@ fun ProfileScreen(
 
             // ABOUT
             Text(
-              text = "ABOUT",
+              text = stringResource(R.string.about_section),
               style = SectionOverlineStyle,
               color = TextTertiaryLight,
               modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
@@ -621,7 +622,7 @@ fun ProfileScreen(
             SettingsItem(
               icon = Icons.Default.Info,
               iconTint = StitchSky,
-              title = "Version",
+              title = stringResource(R.string.version_title),
               subtitle = "${BuildConfig.VERSION_NAME} (${BuildConfig.BUILD_TYPE})"
             )
 
@@ -630,7 +631,7 @@ fun ProfileScreen(
             SettingsItem(
               icon = Icons.Default.Sync,
               iconTint = StitchTeal,
-              title = "Sync Status",
+              title = stringResource(R.string.sync_status_title),
               subtitle = if (token != null) "Active" else "Inactive"
             )
 
@@ -652,7 +653,7 @@ fun ProfileScreen(
             ) {
               Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(IconSize.small))
               Spacer(modifier = Modifier.width(8.dp))
-              Text("Logout", fontWeight = FontWeight.Bold, color = ErrorRed)
+              Text(stringResource(R.string.logout_button), fontWeight = FontWeight.Bold, color = ErrorRed)
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -664,7 +665,7 @@ fun ProfileScreen(
     if (showLanguageDialog) {
       AlertDialog(
         onDismissRequest = { showLanguageDialog = false },
-        title = { Text("Choose Language / भाषा चुनें", fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.choose_language_title), fontWeight = FontWeight.Bold) },
         text = {
           Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val languages = listOf(

@@ -220,7 +220,7 @@ fun CustomersList(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "Total Udhaar",
+                text = stringResource(R.string.outstanding_label),
                 style = MaterialTheme.typography.bodySmall,
                 color = Ink300,
                 fontWeight = FontWeight.SemiBold
@@ -243,21 +243,21 @@ fun CustomersList(
                 FilterChipItem(
                     selected = selectedFilter == "All",
                     onClick = { viewModel.setFilter("All") },
-                    text = "Sab (${db.customers.size})"
+                    text = stringResource(R.string.all_with_count, db.customers.size)
                 )
             }
             item {
                 FilterChipItem(
                     selected = selectedFilter == "With Outstanding",
                     onClick = { viewModel.setFilter("With Outstanding") },
-                    text = "With Outstanding"
+                    text = stringResource(R.string.with_outstanding)
                 )
             }
             item {
                 FilterChipItem(
                     selected = selectedFilter == "Paid",
                     onClick = { viewModel.setFilter("Paid") },
-                    text = "Paid"
+                    text = stringResource(R.string.paid_filter)
                 )
             }
         }
@@ -281,7 +281,14 @@ fun CustomersList(
                     )
                     Text(
                         text = if (searchQuery.isNotEmpty()) stringResource(R.string.no_customers_matching, searchQuery)
-                        else stringResource(R.string.no_filter_customers, selectedFilter.lowercase()),
+                        else {
+                            val localizedFilter = when (selectedFilter) {
+                                "With Outstanding" -> stringResource(R.string.with_outstanding).lowercase()
+                                "Paid" -> stringResource(R.string.paid_filter).lowercase()
+                                else -> ""
+                            }
+                            stringResource(R.string.no_filter_customers, localizedFilter)
+                        },
                         style = MaterialTheme.typography.titleLarge,
                         color = Ink200,
                         textAlign = TextAlign.Center

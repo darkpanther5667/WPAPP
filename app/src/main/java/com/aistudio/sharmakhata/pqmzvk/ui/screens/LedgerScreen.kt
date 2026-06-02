@@ -98,7 +98,7 @@ fun LedgerScreen(
                         ) {
                             Icon(Icons.Outlined.PersonOff, contentDescription = null, tint = TextTertiaryLight, modifier = Modifier.size(IconSize.huge))
                             Spacer(modifier = Modifier.height(Spacing.medium))
-                            Text("Customer not found", color = TextSecondaryLight, style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.customer_not_found), color = TextSecondaryLight, style = MaterialTheme.typography.bodyMedium)
                         }
                     } else {
                         LedgerContent(customerName = customer.name, transactions = transactions, bills = bills)
@@ -130,7 +130,7 @@ fun LedgerContent(customerName: String, transactions: List<Transaction>, bills: 
         ) {
             Column(modifier = Modifier.padding(Spacing.large)) {
                 Text(
-                    text = "Ledger for",
+                    text = stringResource(R.string.ledger_for),
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.White.copy(alpha = 0.8f)
                 )
@@ -142,7 +142,7 @@ fun LedgerContent(customerName: String, transactions: List<Transaction>, bills: 
                 )
                 Spacer(modifier = Modifier.height(Spacing.xsmall))
                 Text(
-                    text = "${events.size} entries",
+                    text = stringResource(R.string.entries_count_label, events.size),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.7f)
                 )
@@ -167,7 +167,7 @@ fun LedgerContent(customerName: String, transactions: List<Transaction>, bills: 
                         modifier = Modifier.size(IconSize.huge)
                     )
                     Text(
-                        "No history available",
+                        stringResource(R.string.no_history),
                         color = TextSecondaryLight,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -210,9 +210,9 @@ fun LedgerEventCard(event: LedgerEvent) {
         else -> IndigoContainer
     }
     val label = when {
-        isPayment -> "Payment Received"
-        isCredit -> "Credit Given"
-        else -> "Bill Created"
+        isPayment -> stringResource(R.string.payment_received_label)
+        isCredit -> stringResource(R.string.credit_given_label)
+        else -> stringResource(R.string.bill_created_event)
     }
 
     Card(

@@ -38,6 +38,8 @@ import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.BillingViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
+import androidx.compose.ui.res.stringResource
+import com.aistudio.sharmakhata.pqmzvk.R
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 import kotlinx.coroutines.launch
 
@@ -163,21 +165,21 @@ fun BillsScreen(
                                 FilterChipItem(
                                     selected = selectedFilter == "All",
                                     onClick = { viewModel.setBillFilter("All") },
-                                    text = "Sab"
+                                    text = stringResource(R.string.all_bills)
                                 )
                             }
                             item {
                                 FilterChipItem(
                                     selected = selectedFilter == "Paid",
                                     onClick = { viewModel.setBillFilter("Paid") },
-                                    text = "Paid"
+                                    text = stringResource(R.string.paid_bills)
                                 )
                             }
                             item {
                                 FilterChipItem(
                                     selected = selectedFilter == "Unpaid",
                                     onClick = { viewModel.setBillFilter("Unpaid") },
-                                    text = "Unpaid"
+                                    text = stringResource(R.string.unpaid_bills)
                                 )
                             }
                         }
@@ -199,9 +201,14 @@ fun BillsScreen(
                                         tint = Ink400,
                                         modifier = Modifier.size(72.dp)
                                     )
+                                    val localizedFilter = when (selectedFilter) {
+                                        "Paid" -> stringResource(R.string.paid_bills).lowercase()
+                                        "Unpaid" -> stringResource(R.string.unpaid_bills).lowercase()
+                                        else -> ""
+                                    }
                                     Text(
-                                        text = if (allBillsForCustomer.isEmpty()) "No bills found for this customer"
-                                        else "No ${selectedFilter.lowercase()} bills",
+                                        text = if (allBillsForCustomer.isEmpty()) stringResource(R.string.no_bills_for_customer)
+                                        else stringResource(R.string.no_filter_bills, localizedFilter),
                                         style = MaterialTheme.typography.titleMedium,
                                         color = Ink100,
                                         textAlign = TextAlign.Center
@@ -216,7 +223,7 @@ fun BillsScreen(
                                 items(count = pagedBills.itemCount, key = { index -> pagedBills[index]?.id ?: index }) { index ->
                                     val bill = pagedBills[index]
                                     if (bill != null) {
-                                        val customerName = db.customers.find { it.id == bill.customerId }?.name ?: "Unknown"
+                                        val customerName = db.customers.find { it.id == bill.customerId }?.name ?: stringResource(R.string.unknown)
                                         InvoiceCard(
                                             bill = bill,
                                             customerName = customerName,
@@ -297,7 +304,7 @@ private fun InvoiceCard(
             ) {
                 Column {
                     Text(
-                        text = "Invoice #${bill.id.take(8).uppercase()}",
+                        text = stringResource(R.string.invoice_hash, bill.id.take(8).uppercase()),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -340,7 +347,7 @@ private fun InvoiceCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Total Amount",
+                    text = stringResource(R.string.total_amount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -355,7 +362,7 @@ private fun InvoiceCard(
             if (bill.items.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "${bill.items.size} item(s)",
+                    text = stringResource(R.string.items_count, bill.items.size),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -380,7 +387,7 @@ private fun InvoiceCard(
                 ) {
                     Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("PDF", fontSize = 12.sp, fontFamily = Syne)
+                    Text(stringResource(R.string.pdf_label), fontSize = 12.sp, fontFamily = Syne)
                 }
 
                 // WhatsApp Button
@@ -393,7 +400,7 @@ private fun InvoiceCard(
                 ) {
                     Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("WhatsApp", fontSize = 12.sp, fontFamily = Syne)
+                    Text(stringResource(R.string.whatsapp_label), fontSize = 12.sp, fontFamily = Syne)
                 }
 
                 // Mark Paid Button (only if unpaid)
@@ -406,7 +413,7 @@ private fun InvoiceCard(
                     ) {
                         Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Paid", fontSize = 12.sp, fontFamily = Syne, color = Color.White)
+                        Text(stringResource(R.string.mark_paid_button), fontSize = 12.sp, fontFamily = Syne, color = Color.White)
                     }
                 }
             }

@@ -38,6 +38,8 @@ import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.BillingViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.CustomerViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
+import androidx.compose.ui.res.stringResource
+import com.aistudio.sharmakhata.pqmzvk.R
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 import kotlin.math.abs
 
@@ -132,7 +134,7 @@ fun CustomerDetailScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(Icons.Default.PersonOff, contentDescription = null, modifier = Modifier.size(64.dp), tint = TextSecondaryLight)
                                 Spacer(modifier = Modifier.height(12.dp))
-                                Text("Customer not found", color = TextSecondaryLight)
+                                Text(stringResource(R.string.customer_not_found), color = TextSecondaryLight)
                             }
                         }
                     } else {
@@ -254,21 +256,21 @@ fun CustomerDetailContent(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             StatsCard(
-                label = "Total Bills",
+                label = stringResource(R.string.total_bills_stat),
                 value = bills.size.toString(),
                 icon = Icons.Outlined.Receipt,
                 color = IndigoPrimary,
                 modifier = Modifier.weight(1f)
             )
             StatsCard(
-                label = "Total Paid",
+                label = stringResource(R.string.total_paid_stat),
                 value = FormatUtils.formatCurrency(payments),
                 icon = Icons.Outlined.CheckCircle,
                 color = SuccessGreen,
                 modifier = Modifier.weight(1f)
             )
             StatsCard(
-                label = "Outstanding",
+                label = stringResource(R.string.outstanding_stat),
                 value = bills.filter { it.status != "paid" }.size.toString(),
                 icon = Icons.Outlined.PendingActions,
                 color = AmberWarning,
@@ -292,7 +294,7 @@ fun CustomerDetailContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Outstanding Balance",
+                    text = stringResource(R.string.outstanding_balance),
                     style = MaterialTheme.typography.titleSmall,
                     color = TextSecondaryLight,
                     fontWeight = FontWeight.Medium
@@ -306,7 +308,7 @@ fun CustomerDetailContent(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = if (outstanding > 0) "Amount Due" else "No Outstanding Balance",
+                    text = if (outstanding > 0) stringResource(R.string.amount_due) else stringResource(R.string.no_outstanding_balance),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (outstanding > 0) ErrorRed else SuccessGreen,
                     fontWeight = FontWeight.Medium
@@ -323,31 +325,31 @@ fun CustomerDetailContent(
         ) {
             QuickActionIconButton(
                 icon = Icons.Default.Payments,
-                label = "Add Payment",
+                label = stringResource(R.string.add_payment_action),
                 color = SuccessGreen,
                 onClick = onAddPayment
             )
             QuickActionIconButton(
                 icon = Icons.Default.AddShoppingCart,
-                label = "Create Bill",
+                label = stringResource(R.string.create_bill_action),
                 color = IndigoPrimary,
                 onClick = onCreateBill
             )
             QuickActionIconButton(
                 icon = Icons.Default.Notifications,
-                label = "Reminder",
+                label = stringResource(R.string.reminder_action),
                 color = AmberWarning,
                 onClick = onSendReminder
             )
             QuickActionIconButton(
                 icon = Icons.Default.Description,
-                label = "Statement",
+                label = stringResource(R.string.statement_action),
                 color = Color(0xFF8B5CF6),
                 onClick = onSendStatement
             )
             QuickActionIconButton(
                 icon = Icons.Default.Chat,
-                label = "WhatsApp",
+                label = stringResource(R.string.whatsapp_action),
                 color = Color(0xFF25D366),
                 onClick = onWhatsAppDirect
             )
@@ -375,7 +377,7 @@ fun CustomerDetailContent(
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Text("Bills", style = TabLabelStyle)
+                            Text(stringResource(R.string.bills_tab), style = TabLabelStyle)
                         }
                     },
                     selectedContentColor = IndigoPrimary,
@@ -387,7 +389,7 @@ fun CustomerDetailContent(
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Icon(Icons.Default.Book, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Text("Ledger", style = TabLabelStyle)
+                            Text(stringResource(R.string.ledger_tab), style = TabLabelStyle)
                         }
                     },
                     selectedContentColor = IndigoPrimary,
@@ -399,7 +401,7 @@ fun CustomerDetailContent(
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Text("Details", style = TabLabelStyle)
+                            Text(stringResource(R.string.details_tab), style = TabLabelStyle)
                         }
                     },
                     selectedContentColor = IndigoPrimary,
@@ -451,13 +453,13 @@ fun CustomerDetailContent(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "All Bills (${bills.size})",
+                                    text = stringResource(R.string.all_bills_count, bills.size),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 TextButton(onClick = onViewBills) {
-                                    Text("View All", color = IndigoPrimary, fontWeight = FontWeight.Medium)
+                                    Text(stringResource(R.string.view_all), color = IndigoPrimary, fontWeight = FontWeight.Medium)
                                 }
                             }
                             if (sortedBills.isEmpty()) {
@@ -467,7 +469,7 @@ fun CustomerDetailContent(
                                     verticalArrangement = Arrangement.spacedBy(Spacing.small)
                                 ) {
                                     Icon(Icons.Outlined.Receipt, contentDescription = null, tint = TextTertiaryLight, modifier = Modifier.size(IconSize.xlarge))
-                                    Text("No bills yet", color = TextSecondaryLight, style = MaterialTheme.typography.bodyMedium)
+                                    Text(stringResource(R.string.no_bills_yet), color = TextSecondaryLight, style = MaterialTheme.typography.bodyMedium)
                                 }
                             } else {
                                 sortedBills.take(5).forEachIndexed { index, bill ->
@@ -524,13 +526,13 @@ fun CustomerDetailContent(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Recent Transactions",
+                                    text = stringResource(R.string.recent_transactions),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 TextButton(onClick = onViewLedger) {
-                                    Text("View All", color = IndigoPrimary, fontWeight = FontWeight.Medium)
+                                    Text(stringResource(R.string.view_all), color = IndigoPrimary, fontWeight = FontWeight.Medium)
                                 }
                             }
 
@@ -541,7 +543,7 @@ fun CustomerDetailContent(
                                     verticalArrangement = Arrangement.spacedBy(Spacing.small)
                                 ) {
                                     Icon(Icons.Outlined.History, contentDescription = null, tint = TextTertiaryLight, modifier = Modifier.size(IconSize.xlarge))
-                                    Text("No transactions yet", color = TextSecondaryLight, style = MaterialTheme.typography.bodyMedium)
+                                    Text(stringResource(R.string.no_transactions_yet), color = TextSecondaryLight, style = MaterialTheme.typography.bodyMedium)
                                 }
                             } else {
                                 sortedTransactions.take(5).forEachIndexed { index, tx ->
@@ -565,24 +567,24 @@ fun CustomerDetailContent(
                         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.flat)
                     ) {
                         Column(modifier = Modifier.padding(Spacing.xlarge)) {
-                            InfoRow(label = "Phone", value = customer.phone ?: "Not set")
+                            InfoRow(label = stringResource(R.string.phone_field), value = customer.phone ?: stringResource(R.string.not_set))
                             AppDivider()
-                            InfoRow(label = "Customer ID", value = customer.id.take(12))
+                            InfoRow(label = stringResource(R.string.customer_id_field), value = customer.id.take(12))
                             AppDivider()
-                            InfoRow(label = "Total Bills", value = bills.size.toString())
+                            InfoRow(label = stringResource(R.string.total_bills_field), value = bills.size.toString())
                             AppDivider()
                             val paidBills = bills.count { it.status == "paid" }
-                            InfoRow(label = "Paid Bills", value = paidBills.toString())
+                            InfoRow(label = stringResource(R.string.paid_bills_field), value = paidBills.toString())
                             AppDivider()
                             InfoRow(
-                                label = "Outstanding Amount",
+                                label = stringResource(R.string.outstanding_amount_field),
                                 value = FormatUtils.formatCurrency(outstanding),
                                 valueColor = if (outstanding > 0) ErrorRed else SuccessGreen,
                                 valueStyle = AmountMediumStyle
                             )
                             if (customer.createdAt != null) {
                                 AppDivider()
-                                InfoRow(label = "Customer Since", value = FormatUtils.formatDate(customer.createdAt))
+                                InfoRow(label = stringResource(R.string.customer_since_field), value = FormatUtils.formatDate(customer.createdAt))
                             }
                         }
                     }
@@ -603,7 +605,7 @@ private fun BillRowItem(
 ) {
     val isPaid = bill.status == "paid"
     val statusColor = if (isPaid) SuccessGreen else ErrorRed
-    val statusLabel = if (isPaid) "Paid" else "Unpaid"
+    val statusLabel = if (isPaid) stringResource(R.string.paid) else stringResource(R.string.unpaid)
     val statusBg = if (isPaid) BadgePaidBg else BadgeUnpaidBg
     val statusText = if (isPaid) BadgePaidText else BadgeUnpaidText
 
@@ -761,7 +763,7 @@ fun TransactionTimelineItem(
     val isPayment = transaction.type == "payment"
     val color = if (isPayment) SuccessGreen else ErrorRed
     val sign = if (isPayment) "+" else "-"
-    val label = if (isPayment) "Payment Received" else "Credit Given"
+    val label = if (isPayment) stringResource(R.string.payment_received_label) else stringResource(R.string.credit_given_label)
 
     Row(
         modifier = Modifier

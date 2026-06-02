@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.aistudio.sharmakhata.pqmzvk.R
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import java.text.NumberFormat
 import java.util.Locale
@@ -398,11 +400,11 @@ fun StatusBadge(
     modifier: Modifier = Modifier
 ) {
     val (bgColor, textColor, text) = when (status) {
-        GrahbookStatus.PAID -> Triple(RupeeGreen.copy(alpha = 0.15f), RupeeGreen, "Paid ✓")
-        GrahbookStatus.UNPAID -> Triple(DebtRed.copy(alpha = 0.15f), DebtRed, "Unpaid")
-        GrahbookStatus.PARTIAL -> Triple(PendingAmber.copy(alpha = 0.15f), PendingAmber, "Partial")
-        GrahbookStatus.ACTIVE -> Triple(Brand500.copy(alpha = 0.15f), Brand300, "Active")
-        GrahbookStatus.LOW_STOCK -> Triple(PendingAmber.copy(alpha = 0.15f), PendingAmber, "Low Stock")
+        GrahbookStatus.PAID -> Triple(RupeeGreen.copy(alpha = 0.15f), RupeeGreen, stringResource(R.string.paid) + " ✓")
+        GrahbookStatus.UNPAID -> Triple(DebtRed.copy(alpha = 0.15f), DebtRed, stringResource(R.string.unpaid))
+        GrahbookStatus.PARTIAL -> Triple(PendingAmber.copy(alpha = 0.15f), PendingAmber, stringResource(R.string.partial_label))
+        GrahbookStatus.ACTIVE -> Triple(Brand500.copy(alpha = 0.15f), Brand300, stringResource(R.string.active_label))
+        GrahbookStatus.LOW_STOCK -> Triple(PendingAmber.copy(alpha = 0.15f), PendingAmber, stringResource(R.string.low_stock))
     }
 
     Box(

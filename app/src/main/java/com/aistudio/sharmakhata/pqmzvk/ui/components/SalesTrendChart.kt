@@ -11,6 +11,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.sharmakhata.pqmzvk.data.model.Bill
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
+import com.aistudio.sharmakhata.pqmzvk.R
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -94,7 +96,7 @@ fun SalesTrendChart(
             ) {
                 Column {
                     Text(
-                        text = "SALES TREND / बिक्री का ग्राफ",
+                        text = stringResource(R.string.sales_trend).uppercase(),
                         style = TextStyle(
                             fontFamily = Syne,
                             fontWeight = FontWeight.Bold,

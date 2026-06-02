@@ -67,7 +67,26 @@
     <string name="register_store_title">Register Store</string>
     <string name="add_expense_title">Add Expense</string>
 
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="preferences_title">PREFERENCES</string>
+    <string name="dark_mode_title">Dark Mode</string>
+    <string name="dark_mode_currently_dark">Currently dark</string>
+    <string name="dark_mode_currently_light">Currently light</string>
+    <string name="edit_store_details_title">Edit Store Details</string>
+    <string name="language_title">Language</string>
+    <string name="choose_language_title">Choose Language</string>
+    <string name="logout_button">Logout</string>
+    <string name="about_section">ABOUT</string>
+    <string name="version_title">Version</string>
+    <string name="sync_status_title">Sync Status</string>
+    <string name="active_account">Active Account</string>
+    <string name="active_label">Active</string>
+    <string name="not_logged_in">Not logged in</string>
+
     <!-- Dashboard -->
+    <string name="aaj_ka_hisab">Today\'s Summary</string>
+    <string name="sales_trend">Sales Trend</string>
     <string name="default_shop_name">WhatsApp Billing</string>
     <string name="welcome_back">Welcome back, 👋</string>
     <string name="could_not_load_dashboard">Could not load dashboard</string>

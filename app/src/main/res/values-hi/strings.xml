@@ -66,7 +66,26 @@
     <string name="expense_note_placeholder">कोई अतिरिक्त विवरण जोड़ें...</string>
     <string name="save_expense">खर्च सहेजें</string>
 
+    <!-- Settings -->
+    <string name="settings_title">सेटिंग्स</string>
+    <string name="preferences_title">प्राथमिकताएं</string>
+    <string name="dark_mode_title">डार्क मोड</string>
+    <string name="dark_mode_currently_dark">वर्तमान में डार्क</string>
+    <string name="dark_mode_currently_light">वर्तमान में लाइट</string>
+    <string name="edit_store_details_title">दुकान की जानकारी संपादित करें</string>
+    <string name="language_title">भाषा</string>
+    <string name="choose_language_title">भाषा चुनें</string>
+    <string name="logout_button">लॉगआउट</string>
+    <string name="about_section">के बारे में</string>
+    <string name="version_title">संस्करण</string>
+    <string name="sync_status_title">सिंक की स्थिति</string>
+    <string name="active_account">सक्रिय खाता</string>
+    <string name="active_label">सक्रिय</string>
+    <string name="not_logged_in">लॉग इन नहीं है</string>
+
     <!-- Dashboard -->
+    <string name="aaj_ka_hisab">आज का हिसाब</string>
+    <string name="sales_trend">बिक्री का ग्राफ</string>
     <string name="default_shop_name">व्हाट्सएप बिलिंग</string>
     <string name="welcome_back">स्वागत है, 👋</string>
     <string name="could_not_load_dashboard">डैशबोर्ड लोड नहीं हो सका</string>

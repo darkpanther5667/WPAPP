@@ -335,7 +335,7 @@ private fun DashboardContent(
             Spacer(modifier = Modifier.height(GrahbookSpacing.md))
             Spacer(modifier = Modifier.height(GrahbookSpacing.md))
             Text(
-                text = "AAJ KA HISAB / आज का हिसाब",
+                text = stringResource(R.string.aaj_ka_hisab).uppercase(),
                 style = TextStyle(
                     fontFamily = Syne,
                     fontWeight = FontWeight.Bold,
@@ -352,7 +352,7 @@ private fun DashboardContent(
             ) {
                 item {
                     MetricCard(
-                        label = "Outstanding",
+                        label = stringResource(R.string.outstanding_label),
                         amount = (totalOutstanding * 100).toLong(),
                         trend = if (totalOutstanding > 0) 12.5f else null,
                         accentColor = DebtRed,
@@ -363,7 +363,7 @@ private fun DashboardContent(
                 }
                 item {
                     MetricCard(
-                        label = "Today's Collection",
+                        label = stringResource(R.string.todays_collection),
                         amount = (report.paymentTotal * 100).toLong(),
                         trend = 8.3f,
                         accentColor = RupeeGreen,
@@ -373,7 +373,7 @@ private fun DashboardContent(
                 }
                 item {
                     MetricCard(
-                        label = "Pending Bills",
+                        label = stringResource(R.string.pending_label),
                         amount = (overdueCount * 100).toLong(), // standard map to value
                         trend = null,
                         accentColor = PendingAmber,
@@ -383,7 +383,7 @@ private fun DashboardContent(
                 }
                 item {
                     MetricCard(
-                        label = "Low Stock",
+                        label = stringResource(R.string.low_stock),
                         amount = 0L,
                         trend = null,
                         accentColor = Saffron500,
@@ -407,7 +407,7 @@ private fun DashboardContent(
         // ===== SECTION 2: QUICK ACTIONS =====
         item {
             Text(
-                text = "QUICK ACTIONS / जल्दी करें",
+                text = stringResource(R.string.quick_actions).uppercase(),
                 style = TextStyle(
                     fontFamily = Syne,
                     fontWeight = FontWeight.Bold,
@@ -441,7 +441,7 @@ private fun DashboardContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Recent Activity / हाल की गतिविधि",
+                    text = stringResource(R.string.recent_transactions),
                     style = TextStyle(
                         fontFamily = Syne,
                         fontWeight = FontWeight.Bold,
@@ -450,7 +450,7 @@ private fun DashboardContent(
                     )
                 )
                 Text(
-                    text = "Sab Dekho →",
+                    text = "${stringResource(R.string.see_all)} →",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable { onNavigateToCustomers() }
@@ -463,12 +463,12 @@ private fun DashboardContent(
             val recentTxns = db.transactions.sortedByDescending { it.timestamp }.take(5)
             items(recentTxns) { txn ->
                 val customer = db.customers.find { it.id == txn.customerId }
-                val name = customer?.name ?: "Unknown"
+                val name = customer?.name ?: stringResource(R.string.unknown)
                 val isCredit = txn.type == "credit" || txn.type == "bill"
                 
                 TransactionItem(
                     name = name,
-                    detail = if (isCredit) "Bill Created" else "Payment Received",
+                    detail = if (isCredit) stringResource(R.string.bill_created_event) else stringResource(R.string.payment_received_label),
                     outstanding = (txn.amount * 100).toLong(),
                     isPositive = !isCredit,
                     time = "2h ago",
@@ -490,7 +490,7 @@ private fun DashboardContent(
                         Icon(Icons.Default.ReceiptLong, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
                         Spacer(Modifier.height(GrahbookSpacing.xs))
                         Text(
-                            text = "No transactions yet. Pehla bill banao!",
+                            text = stringResource(R.string.no_transactions_yet),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
