@@ -120,6 +120,7 @@ function requiresMobileApiKey(req) {
   if (req.path === '/api/auth/request-code') return false;
   if (req.path === '/api/auth/verify-code') return false;
   if (req.path === '/api/auth/login') return false;
+  if (req.path === '/api/auth/google') return false;
   if (req.path === '/api/register-store') return false;
   if (req.path.startsWith('/api/store/')) return false;
   // Allow PDF endpoints to be fetched by WhatsApp/clients without an app key.
