@@ -140,6 +140,9 @@ function requiresMobileApiKey(req) {
 function mobileApiKeyMiddleware(req, res, next) {
   if (!requiresMobileApiKey(req)) return next();
 
+  // If the request has a Bearer token (web dashboard session), let sessionAuthMiddleware handle it
+  if (req.get('Authorization')?.startsWith('Bearer ')) return next();
+
   const expectedKey = process.env.MOBILE_API_KEY;
   if (!expectedKey) {
     return res.status(500).json({ success: false, message: 'Server misconfigured: MOBILE_API_KEY missing' });
@@ -147,7 +150,7 @@ function mobileApiKeyMiddleware(req, res, next) {
 
   const providedKey = req.get('X-API-KEY');
   if (!providedKey) {
-    return res.status(401).json({ success: false, message: 'Unauthorized' });
+    return res.status(401).json({ success: false, message: 'Unauthorized (Missing API Key or Session Token)' });
   }
 
   // Timing-safe comparison to prevent timing attacks
