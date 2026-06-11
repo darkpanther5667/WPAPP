@@ -19,10 +19,7 @@ val Poppins = FontFamily(
     Font(R.font.poppins_extrabold, FontWeight.ExtraBold)
 )
 
-val Syne = Poppins
-val DMSans = Poppins
-
-val JetBrainsMono = Poppins
+val JetBrainsMono = FontFamily.Monospace
 
 // === GRAHBOOK PRO TYPOGRAPHY ===
 
@@ -37,7 +34,7 @@ val Typography = Typography(
     ),
     // Screen title — "Aapke Customers"
     displayMedium = TextStyle(
-        fontFamily = Syne,
+        fontFamily = Poppins,
         fontWeight = FontWeight.ExtraBold,
         fontSize = 28.sp,
         letterSpacing = (-0.5).sp,
@@ -45,21 +42,21 @@ val Typography = Typography(
     ),
     // Section header — "Aaj Ka Hisab"
     headlineMedium = TextStyle(
-        fontFamily = Syne,
+        fontFamily = Poppins,
         fontWeight = FontWeight.Bold,
         fontSize = 20.sp,
         letterSpacing = 0.sp
     ),
     // Card title — customer name
     titleLarge = TextStyle(
-        fontFamily = DMSans,
+        fontFamily = Poppins,
         fontWeight = FontWeight.SemiBold,
         fontSize = 17.sp,
         letterSpacing = 0.sp
     ),
     // Body — descriptions, labels
     bodyLarge = TextStyle(
-        fontFamily = DMSans,
+        fontFamily = Poppins,
         fontWeight = FontWeight.Normal,
         fontSize = 15.sp,
         letterSpacing = 0.15.sp,
@@ -67,15 +64,14 @@ val Typography = Typography(
     ),
     // Supporting — timestamps, meta
     bodySmall = TextStyle(
-        fontFamily = DMSans,
+        fontFamily = Poppins,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
-        letterSpacing = 0.4.sp,
-        color = Ink300
+        letterSpacing = 0.4.sp
     ),
     // Button label
     labelLarge = TextStyle(
-        fontFamily = Syne,
+        fontFamily = Poppins,
         fontWeight = FontWeight.Bold,
         fontSize = 15.sp,
         letterSpacing = 0.5.sp
@@ -99,7 +95,7 @@ val AmountMediumStyle = TextStyle(
 )
 
 val SectionOverlineStyle = TextStyle(
-    fontFamily = Syne,
+    fontFamily = Poppins,
     fontWeight = FontWeight.Bold,
     fontSize = 12.sp,
     lineHeight = 16.sp,
@@ -114,7 +110,7 @@ val AmountSmallStyle = TextStyle(
 )
 
 val TabLabelStyle = TextStyle(
-    fontFamily = Syne,
+    fontFamily = Poppins,
     fontWeight = FontWeight.Medium,
     fontSize = 10.sp,
     lineHeight = 14.sp,

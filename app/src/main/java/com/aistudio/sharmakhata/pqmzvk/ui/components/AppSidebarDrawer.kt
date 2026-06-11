@@ -37,12 +37,19 @@ data class DrawerMenuItem(
     val badge: Int = 0
 )
 
+data class DrawerMenuSection(
+    val title: String,
+    val icon: ImageVector,
+    val items: List<DrawerMenuItem>
+)
+
 @Composable
 fun AppSidebarDrawer(
     drawerState: DrawerState,
     currentScreen: String,
     shopName: String,
     shopOwner: String,
+    shopPhone: String = "",
     customerCount: Int,
     billCount: Int,
     onNavigate: (String) -> Unit,
@@ -50,23 +57,45 @@ fun AppSidebarDrawer(
     content: @Composable () -> Unit
 ) {
 
-    val primaryMenuItems = listOf(
-        DrawerMenuItem("dashboard", "Dashboard", Icons.Outlined.Home, Icons.Filled.Home),
-        DrawerMenuItem("customers", "Customers", Icons.Outlined.People, Icons.Filled.People),
-        DrawerMenuItem("bills", "Invoices", Icons.Outlined.Receipt, Icons.Filled.Receipt),
-        DrawerMenuItem("reports", "Reports", Icons.Outlined.Assessment, Icons.Filled.Assessment),
-        DrawerMenuItem("financial_reports", "Accounting", Icons.Outlined.AccountBalance, Icons.Filled.AccountBalance),
-        DrawerMenuItem("items", "Inventory", Icons.Outlined.Inventory2, Icons.Filled.Inventory),
-        DrawerMenuItem("expenses", "Expenses", Icons.Outlined.MoneyOff, Icons.Filled.MoneyOff),
-        DrawerMenuItem("purchases", "Purchases", Icons.Outlined.LocalShipping, Icons.Filled.LocalShipping),
-        DrawerMenuItem("quick_bill", "Quick Bill", Icons.Outlined.Bolt, Icons.Filled.Bolt),
-    )
-
-    val secondaryMenuItems = listOf(
-        DrawerMenuItem("profile", "Settings", Icons.Outlined.Settings, Icons.Filled.Settings),
-        DrawerMenuItem("share", "Share App", Icons.Outlined.Share, Icons.Filled.Share),
-        DrawerMenuItem("gst_returns", "GST Returns", Icons.Outlined.Assessment, Icons.Filled.Assessment),
-        DrawerMenuItem("invoice_templates", "Invoice Templates", Icons.Outlined.Description, Icons.Filled.Description),
+    val menuSections = listOf(
+        DrawerMenuSection(
+            title = "SALES & BILLING",
+            icon = Icons.Outlined.PointOfSale,
+            items = listOf(
+                DrawerMenuItem("dashboard", "Dashboard", Icons.Outlined.Home, Icons.Filled.Home),
+                DrawerMenuItem("customers", "Customers", Icons.Outlined.People, Icons.Filled.People),
+                DrawerMenuItem("bills", "Invoices", Icons.Outlined.Receipt, Icons.Filled.Receipt),
+                DrawerMenuItem("quick_bill", "Quick Bill", Icons.Outlined.Bolt, Icons.Filled.Bolt),
+            )
+        ),
+        DrawerMenuSection(
+            title = "PURCHASES & EXPENSES",
+            icon = Icons.Outlined.ShoppingCart,
+            items = listOf(
+                DrawerMenuItem("purchases", "Purchases", Icons.Outlined.LocalShipping, Icons.Filled.LocalShipping),
+                DrawerMenuItem("expenses", "Expenses", Icons.Outlined.MoneyOff, Icons.Filled.MoneyOff),
+            )
+        ),
+        DrawerMenuSection(
+            title = "STOCK & REPORTS",
+            icon = Icons.Outlined.Assessment,
+            items = listOf(
+                DrawerMenuItem("items", "Inventory", Icons.Outlined.Inventory2, Icons.Filled.Inventory),
+                DrawerMenuItem("reports", "Reports", Icons.Outlined.Assessment, Icons.Filled.Assessment),
+                DrawerMenuItem("financial_reports", "Accounting", Icons.Outlined.AccountBalance, Icons.Filled.AccountBalance),
+                DrawerMenuItem("gst_returns", "GST Returns", Icons.Outlined.Description, Icons.Filled.Description),
+            )
+        ),
+        DrawerMenuSection(
+            title = "SETTINGS & ADMIN",
+            icon = Icons.Outlined.Settings,
+            items = listOf(
+                DrawerMenuItem("profile", "Settings", Icons.Outlined.Settings, Icons.Filled.Settings),
+                DrawerMenuItem("invoice_templates", "Invoice Templates", Icons.Outlined.Description, Icons.Filled.Description),
+                DrawerMenuItem("staff", "Staff Management", Icons.Outlined.SupervisorAccount, Icons.Filled.SupervisorAccount),
+                DrawerMenuItem("share", "Share App", Icons.Outlined.Share, Icons.Filled.Share),
+            )
+        ),
     )
 
     ModalNavigationDrawer(
@@ -88,7 +117,7 @@ fun AppSidebarDrawer(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(220.dp)
+                            .height(200.dp)
                             .background(
                                 Brush.linearGradient(
                                     colors = listOf(
@@ -109,7 +138,7 @@ fun AppSidebarDrawer(
                             // Avatar
                             Box(
                                 modifier = Modifier
-                                    .size(60.dp)
+                                    .size(56.dp)
                                     .clip(CircleShape)
                                     .background(StitchPrimaryContainer),
                                 contentAlignment = Alignment.Center
@@ -118,16 +147,16 @@ fun AppSidebarDrawer(
                                     text = shopName.firstOrNull()?.uppercase().toString(),
                                     fontWeight = FontWeight.Bold,
                                     color = StitchOnPrimaryContainer,
-                                    fontSize = 24.sp
+                                    fontSize = 22.sp
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
 
                             // Shop Name
                             Text(
                                 text = shopName,
-                                style = MaterialTheme.typography.headlineSmall,
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = StitchTextPrimary,
                                 maxLines = 1,
@@ -144,17 +173,15 @@ fun AppSidebarDrawer(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             // Stats row
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                                 HeaderStat("Customers", "$customerCount")
                                 HeaderStat("Bills", "$billCount")
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
 
                     // ===== SCROLLABLE MENU =====
                     Column(
@@ -162,66 +189,73 @@ fun AppSidebarDrawer(
                             .weight(1f)
                             .verticalScroll(rememberScrollState())
                     ) {
-                        // Primary nav items
-                        Text(
-                            text = "MAIN MENU",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = StitchTextSecondary.copy(alpha = 0.6f),
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
-                            modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp)
-                        )
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                        primaryMenuItems.forEach { item ->
-                            DrawerNavItem(
-                                item = item,
-                                isSelected = currentScreen == item.id,
-                                onClick = {
-                                    onNavigate(item.id)
-                                }
-                            )
+                        menuSections.forEachIndexed { index, section ->
+                            // Section header
+                            Row(
+                                modifier = Modifier.padding(start = 20.dp, top = if (index == 0) 8.dp else 12.dp, bottom = 6.dp, end = 20.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    section.icon,
+                                    contentDescription = null,
+                                    tint = StitchTextSecondary.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = section.title,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = StitchTextSecondary.copy(alpha = 0.5f),
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.8.sp
+                                )
+                            }
+
+                            section.items.forEach { item ->
+                                DrawerNavItem(
+                                    item = item,
+                                    isSelected = currentScreen == item.id,
+                                    onClick = {
+                                        onNavigate(item.id)
+                                    }
+                                )
+                            }
+
+                            // Divider between sections (not after the last one)
+                            if (index < menuSections.size - 1) {
+                                HorizontalDivider(
+                                    color = StitchBorder,
+                                    thickness = 0.5.dp,
+                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                                )
+                            }
                         }
 
-                        HorizontalDivider(
-                            color = StitchBorder,
-                            thickness = 0.5.dp,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-                        )
-
-                        // Secondary nav items
-                        Text(
-                            text = "OTHER",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = StitchTextSecondary.copy(alpha = 0.6f),
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
-                            modifier = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 8.dp)
-                        )
-
-                        secondaryMenuItems.forEach { item ->
-                            DrawerNavItem(
-                                item = item,
-                                isSelected = currentScreen == item.id,
-                                onClick = { onNavigate(item.id) }
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    // ===== FOOTER =====
+                    // ===== PROFILE CARD FOOTER =====
                     HorizontalDivider(
                         color = StitchBorder,
                         thickness = 0.5.dp,
-                        modifier = Modifier.padding(horizontal = 20.dp)
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+
+                    ProfileFooterCard(
+                        shopName = shopName,
+                        shopOwner = shopOwner,
+                        shopPhone = shopPhone,
+                        onTap = { onNavigate("profile") }
                     )
 
                     // Logout
                     DrawerNavItem(
                         item = DrawerMenuItem("logout", "Logout", Icons.AutoMirrored.Filled.Logout, Icons.AutoMirrored.Filled.Logout),
                         isSelected = false,
-                        iconTint = Color(0xFFFF6B6B),
-                        labelColor = Color(0xFFFF6B6B),
+                        iconTint = DebtRed,
+                        labelColor = DebtRed,
                         onClick = onLogout
                     )
 
@@ -230,7 +264,7 @@ fun AppSidebarDrawer(
                         text = "v${com.aistudio.sharmakhata.pqmzvk.BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.labelSmall,
                         color = StitchTextSecondary.copy(alpha = 0.4f),
-                        modifier = Modifier.padding(start = 20.dp, top = 4.dp, bottom = 16.dp)
+                        modifier = Modifier.padding(start = 20.dp, top = 2.dp, bottom = 12.dp)
                     )
                 }
             }
@@ -241,6 +275,69 @@ fun AppSidebarDrawer(
             }
         }
     )
+}
+
+@Composable
+private fun ProfileFooterCard(
+    shopName: String,
+    shopOwner: String,
+    shopPhone: String,
+    onTap: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(StitchPrimaryContainer.copy(alpha = 0.08f))
+            .border(0.5.dp, StitchPrimaryContainer.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+            .clickable(onClick = onTap)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Small avatar
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(StitchPrimaryContainer.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Outlined.Person,
+                contentDescription = null,
+                tint = StitchPrimaryContainer,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = shopName,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = StitchTextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (shopPhone.isNotBlank()) {
+                Text(
+                    text = if (shopPhone.length >= 10) "+91 ${shopPhone.takeLast(10)}" else shopPhone,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = StitchTextSecondary.copy(alpha = 0.7f)
+                )
+            }
+        }
+
+        Icon(
+            Icons.Outlined.Settings,
+            contentDescription = "Settings",
+            tint = StitchTextSecondary.copy(alpha = 0.5f),
+            modifier = Modifier.size(16.dp)
+        )
+    }
 }
 
 @Composable
@@ -266,14 +363,14 @@ private fun DrawerNavItem(
                 else Color.Transparent
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 14.dp),
+            .padding(horizontal = 12.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = item.icon,
             contentDescription = item.label,
             tint = iconTint ?: if (isSelected) StitchPrimaryContainer else StitchTextSecondary.copy(alpha = 0.7f),
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(21.dp)
         )
 
         Spacer(modifier = Modifier.width(14.dp))

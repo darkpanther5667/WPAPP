@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -82,7 +83,7 @@ fun FinancialReportsScreen(
     val accountsReceivable = remember(bills) {
         bills.filter { it.status == "unpaid" }.sumOf { it.total }
     }
-    val inventoryValue = 0.0
+    val inventoryValue = 0.0 // TODO: Replace with actual inventory calculation when PurchaseEntity stock data is available
     val totalAssets = remember(cashInHand, accountsReceivable) {
         cashInHand + accountsReceivable + inventoryValue
     }
@@ -110,7 +111,7 @@ fun FinancialReportsScreen(
         cashFromSales - cashPaidForExpenses
     }
     val netCashFlow = netOperatingCashFlow
-    val openingBalance = 0.0
+    val openingBalance = 0.0 // TODO: Replace with actual opening balance fetched from backend/settings when API is available
     val closingBalance = remember(openingBalance, netCashFlow) { openingBalance + netCashFlow }
 
     // ============================================================
@@ -181,7 +182,7 @@ fun FinancialReportsScreen(
                             )
                         },
                         selectedContentColor = StitchPrimaryContainer,
-                        unselectedContentColor = TextSecondaryLight
+                        unselectedContentColor = StitchTextSecondary
                     )
                 }
             }
@@ -259,7 +260,7 @@ private fun PLStatementSection(
             FinancialStatCard(
                 label = "Net Revenue",
                 value = FormatUtils.formatCurrency(netRevenue),
-                icon = Icons.Outlined.TrendingUp,
+                icon = Icons.AutoMirrored.Outlined.TrendingUp,
                 gradient = GradientWhatsApp,
                 valueColor = StitchPrimaryContainer,
                 modifier = Modifier.weight(1f)
@@ -332,7 +333,7 @@ private fun PLStatementSection(
                     label = "Less GST",
                     value = FormatUtils.formatCurrency(totalGst),
                     subtitle = "CGST + SGST + IGST",
-                    valueColor = TextSecondaryLight
+                    valueColor = StitchTextSecondary
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 12.dp),
@@ -468,7 +469,7 @@ private fun PLStatementSection(
                             text = "Profit Margin",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
-                            color = TextSecondaryLight
+                            color = StitchTextSecondary
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         Text(
@@ -603,7 +604,7 @@ private fun BalanceSheetSection(
                     label = "Inventory Value",
                     value = FormatUtils.formatCurrency(inventoryValue),
                     subtitle = "Stock on hand",
-                    valueColor = TextSecondaryLight
+                    valueColor = StitchTextSecondary
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 12.dp),
@@ -749,7 +750,7 @@ private fun BalanceSheetSection(
                     Text(
                         text = "Total Assets",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondaryLight
+                        color = StitchTextSecondary
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     Text(
@@ -767,7 +768,7 @@ private fun BalanceSheetSection(
                     Text(
                         text = "Liabilities + Equity",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondaryLight
+                        color = StitchTextSecondary
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     Text(
@@ -899,7 +900,7 @@ private fun CashFlowSection(
                     label = "Opening Balance",
                     value = FormatUtils.formatCurrency(openingBalance),
                     subtitle = "Beginning period",
-                    valueColor = TextSecondaryLight
+                    valueColor = StitchTextSecondary
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 12.dp),
@@ -975,7 +976,7 @@ private fun FinancialStatCard(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = TextSecondaryLight,
+                color = StitchTextSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1015,7 +1016,7 @@ private fun FinancialBreakdownRow(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = TextSecondaryLight
+                color = StitchTextSecondary
             )
         }
         Text(
@@ -1077,7 +1078,7 @@ private fun ExpenseCategoryRow(
             Text(
                 text = String.format("%.1f%%", percentage),
                 style = MaterialTheme.typography.bodySmall,
-                color = TextSecondaryLight
+                color = StitchTextSecondary
             )
         }
         Text(
@@ -1095,7 +1096,7 @@ private fun SectionHeader(title: String) {
     Text(
         text = title,
         style = SectionOverlineStyle,
-        color = TextSecondaryLight,
+        color = StitchTextSecondary,
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
     )
 }

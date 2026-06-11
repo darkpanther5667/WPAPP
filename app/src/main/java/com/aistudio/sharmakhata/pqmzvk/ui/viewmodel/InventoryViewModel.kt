@@ -36,12 +36,12 @@ class InventoryViewModel @Inject constructor(
         }
     }
 
-    fun saveItem(name: String, price: Double, stock: Int, lowStockAlert: Int, itemId: Long? = null) {
+    fun saveItem(name: String, price: Double, stock: Int, lowStockAlert: Int, hsnCode: String = "", itemId: Long? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             if (itemId != null) {
-                inventoryRepository.update(ItemEntity(id = itemId, name = name, price = price, stock = stock, lowStockAlert = lowStockAlert))
+                inventoryRepository.update(ItemEntity(id = itemId, name = name, price = price, hsnCode = hsnCode, stock = stock, lowStockAlert = lowStockAlert))
             } else {
-                inventoryRepository.insert(ItemEntity(name = name, price = price, stock = stock, lowStockAlert = lowStockAlert))
+                inventoryRepository.insert(ItemEntity(name = name, price = price, hsnCode = hsnCode, stock = stock, lowStockAlert = lowStockAlert))
             }
         }
     }

@@ -270,7 +270,7 @@ private fun CustomerSearchResult(
                 Text(
                     text = customer.phone ?: "",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondaryLight
+                    color = StitchTextSecondary
                 )
             }
         }
@@ -328,7 +328,7 @@ private fun BillSearchResult(
                 Text(
                     text = "Bill #${bill.id.take(8)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondaryLight
+                    color = StitchTextSecondary
                 )
             }
             // Bill total

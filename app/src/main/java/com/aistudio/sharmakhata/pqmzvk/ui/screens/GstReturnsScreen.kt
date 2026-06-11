@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -145,7 +146,7 @@ fun GstReturnsScreen(
                 GstStatCard(
                     label = "Total Taxable",
                     value = FormatUtils.formatCurrency(gstSummary.totalTaxableSales),
-                    icon = Icons.Outlined.TrendingUp,
+                    icon = Icons.AutoMirrored.Outlined.TrendingUp,
                     gradient = GradientIndigo,
                     modifier = Modifier.weight(1f)
                 )

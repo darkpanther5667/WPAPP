@@ -106,7 +106,7 @@ val Slate100 = Ink100
 val Slate200 = Ink200
 val Slate300 = Ink300
 val Slate400 = Ink400
-val Slate500 = Ink200
+val Slate500 = Ink400
 val Slate600 = Ink500
 val Slate700 = Ink600
 val Slate800 = Ink700
@@ -158,17 +158,17 @@ val StitchSurfaceLow: Color
 val StitchSurfaceHigh: Color
     @Composable
     @ReadOnlyComposable
-    get() = MaterialTheme.colorScheme.surfaceVariant
+    get() = MaterialTheme.colorScheme.surfaceContainerHigh
 
 val StitchSurfaceHighest: Color
     @Composable
     @ReadOnlyComposable
-    get() = MaterialTheme.colorScheme.surfaceVariant
+    get() = MaterialTheme.colorScheme.surfaceContainerHighest
 
 val StitchSurfaceBright: Color
     @Composable
     @ReadOnlyComposable
-    get() = MaterialTheme.colorScheme.surfaceVariant
+    get() = MaterialTheme.colorScheme.surfaceBright
 
 val StitchSurfaceLowest: Color
     @Composable

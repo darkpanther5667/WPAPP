@@ -1,15 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Phone, Lock, Eye, EyeOff } from "lucide-react";
-import { cn, formatPhone } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+
+// Google OAuth Client ID from environment
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        id?: {
+          initialize: (config: any) => void;
+          prompt: (callback?: (notification: any) => void) => void;
+          renderButton: (element: HTMLElement, config: any) => void;
+        };
+      };
+    };
+  }
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,7 +34,81 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Handle Google credential response
+  const handleGoogleCredential = useCallback(async (response: any) => {
+    setGoogleLoading(true);
+    setError("");
+    try {
+      const { data } = await apiClient.post("/api/auth/google", {
+        credential: response.credential,
+        clientId: response.clientId || GOOGLE_CLIENT_ID,
+      });
+      if (!data.success) {
+        setError(data.message || "Google login failed.");
+        setGoogleLoading(false);
+        return;
+      }
+      const store = data.store || {};
+      setAuth(data.token, store, {
+        name: store.owner_name || store.store_name || "Google User",
+        phone: store.phone || "",
+        email: store.email || "",
+      });
+      router.replace("/dashboard");
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          "Google login failed. Please try again."
+      );
+      setGoogleLoading(false);
+    }
+  }, [setAuth, router]);
+
+  // Initialize Google Sign-In
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return;
+
+    // Load Google Identity Services script
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleCredential,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+
+        // Render the Google Sign-In button
+        const btnContainer = document.getElementById("google-signin-btn");
+        if (btnContainer) {
+          window.google.accounts.id.renderButton(btnContainer, {
+            type: "standard",
+            theme: "outline",
+            size: "large",
+            text: "continue_with",
+            shape: "rectangular",
+            width: btnContainer.offsetWidth || 300,
+          });
+        }
+      }
+    };
+    document.head.appendChild(script);
+
+    return () => {
+      // Cleanup
+      const existingScript = document.querySelector(
+        'script[src="https://accounts.google.com/gsi/client"]'
+      );
+      if (existingScript) existingScript.remove();
+    };
+  }, [handleGoogleCredential]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +160,23 @@ export default function LoginPage() {
             Sign in to manage your store
           </p>
         </div>
+
+        {/* Google Sign-In Button */}
+        {GOOGLE_CLIENT_ID && (
+          <>
+            <div id="google-signin-btn" className="w-full mb-4" />
+            <div className="relative mb-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white dark:bg-dark-800 px-2 text-muted-foreground">
+                  or sign in with phone
+                </span>
+              </div>
+            </div>
+          </>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Phone */}

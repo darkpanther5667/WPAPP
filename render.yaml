@@ -16,11 +16,13 @@ services:
       - key: PORT
         value: "3000"
       - key: MOBILE_API_KEY
-        value: b7c3f1f6c9b84c4ea2a9f0c0f4c9a7d1
+        sync: false
       - key: ALLOWED_ORIGIN
         sync: false
       - key: PUBLIC_BASE_URL
         sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
       # ⚠️ Set these secrets in Render Dashboard:
-      #   WHATSAPP_TOKEN, PHONE_NUMBER_ID, VERIFY_TOKEN, ADMIN_KEY
-      #   MONGODB_URI, OPENROUTER_API_KEY, ALLOWED_ORIGIN, PUBLIC_BASE_URL
+      #   MOBILE_API_KEY, WHATSAPP_TOKEN, PHONE_NUMBER_ID, VERIFY_TOKEN, ADMIN_KEY, GEMINI_API_KEY
+      #   MONGODB_URI, ALLOWED_ORIGIN, PUBLIC_BASE_URL, WHATSAPP_APP_SECRET

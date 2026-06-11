@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { apiClient } from "@/lib/auth-store";
+import Link from "next/link";
+import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Customer, BillItem } from "@/types";
@@ -146,7 +147,7 @@ export default function CreateInvoicePage() {
             <h2 className="text-sm font-semibold text-foreground">Items</h2>
           </div>
           {items.map((item, idx) => (
-            <div key={idx} className="grid grid-cols-[1fr_60px_80px_36px] gap-2 items-center">
+            <div key={idx} className="grid grid-cols-[1fr_60px_80px_36px] sm:grid-cols-[1fr_60px_80px_36px] gap-2 items-center">
               <Input
                 placeholder="Item name"
                 value={item.name}

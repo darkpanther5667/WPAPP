@@ -13,18 +13,14 @@ import com.aistudio.sharmakhata.pqmzvk.data.model.FullDatabase
 import com.aistudio.sharmakhata.pqmzvk.data.remote.AddCustomerRequest
 import com.aistudio.sharmakhata.pqmzvk.data.remote.AddPaymentRequest
 import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiClient
-import com.aistudio.sharmakhata.pqmzvk.data.remote.BillItemRequest
+import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiService
 import com.aistudio.sharmakhata.pqmzvk.data.remote.CreateBillRequest
 import com.aistudio.sharmakhata.pqmzvk.data.remote.MarkBillPaidRequest
-import com.aistudio.sharmakhata.pqmzvk.data.remote.RequestLoginCodeRequest
-import com.aistudio.sharmakhata.pqmzvk.data.remote.VerifyLoginCodeRequest
-import com.aistudio.sharmakhata.pqmzvk.data.remote.RegisterStoreRequest
-import com.aistudio.sharmakhata.pqmzvk.data.remote.LoginWithPasswordRequest
+import com.aistudio.sharmakhata.pqmzvk.data.repository.AuthRepository
+import com.aistudio.sharmakhata.pqmzvk.data.repository.AuthResult
 import com.aistudio.sharmakhata.pqmzvk.data.sync.DeltaSyncManager
 import com.aistudio.sharmakhata.pqmzvk.util.NetworkUtils
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,14 +29,16 @@ import kotlinx.coroutines.Dispatchers
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    application: Application
+    application: Application,
+    private val apiService: ApiService,
+    private val moshi: Moshi,
+    private val authRepository: AuthRepository
 ) : AndroidViewModel(application) {
 
     private val db = AppDatabase.get(getApplication())
     private val cacheDao = db.cacheDao()
     private val pendingDao = db.pendingDao()
 
-    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     private val dbAdapter = moshi.adapter(FullDatabase::class.java)
     private val reportAdapter = moshi.adapter(DailyReport::class.java)
 
@@ -178,7 +176,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             if (gen != fetchGeneration) return@launch
             try {
-                val response = ApiClient.apiService.getDailyReport()
+                val response = apiService.getDailyReport()
                 if (response.isSuccessful) {
                     val freshReport = response.body()
                     if (freshReport != null && gen == fetchGeneration) {
@@ -274,9 +272,8 @@ class MainViewModel @Inject constructor(
                     "add_customer" -> {
                         val req = moshi.adapter(AddCustomerRequest::class.java).fromJson(op.payload)
                         if (req != null) {
-                            val response = ApiClient.apiService.addCustomer(req)
+                            val response = apiService.addCustomer(req)
                             if (response.code() == 409) {
-                                android.util.Log.w("SyncManager", "Conflict adding customer: ${req.name}")
                                 true
                             } else {
                                 response.isSuccessful && response.body()?.success == true
@@ -286,21 +283,21 @@ class MainViewModel @Inject constructor(
                     "create_bill" -> {
                         val req = moshi.adapter(CreateBillRequest::class.java).fromJson(op.payload)
                         if (req != null) {
-                            val response = ApiClient.apiService.createBill(req)
+                            val response = apiService.createBill(req)
                             response.isSuccessful && response.body()?.success == true
                         } else false
                     }
                     "add_payment" -> {
                         val req = moshi.adapter(AddPaymentRequest::class.java).fromJson(op.payload)
                         if (req != null) {
-                            val response = ApiClient.apiService.addPayment(req)
+                            val response = apiService.addPayment(req)
                             response.isSuccessful
                         } else false
                     }
                     "mark_paid" -> {
                         val req = moshi.adapter(MarkBillPaidRequest::class.java).fromJson(op.payload)
                         if (req != null) {
-                            val response = ApiClient.apiService.markBillPaid(req)
+                            val response = apiService.markBillPaid(req)
                             response.isSuccessful && response.body()?.success == true
                         } else false
                     }
@@ -341,42 +338,16 @@ class MainViewModel @Inject constructor(
         _operationState.value = OperationState.Idle
     }
 
-    // ── Auth ────────────────────────────────────────────────────────────────────
+    // ── Auth (delegated to AuthRepository) ──────────────────────────────────────
 
     fun requestLoginCode(phone: String, storeId: String? = null, retryCount: Int = 0) {
         val sid = storeId.takeIf { !it.isNullOrBlank() } ?: com.aistudio.sharmakhata.pqmzvk.util.SessionManager.storeId ?: ""
         _operationState.value = OperationState.Loading
         viewModelScope.launch {
-            try {
-                val response = ApiClient.apiService.requestLoginCode(RequestLoginCodeRequest(sid, phone))
-                if (response.isSuccessful && response.body()?.success == true) {
-                    _operationState.value = OperationState.Success("Code sent on WhatsApp")
-                } else {
-                    val serverMsg = response.body()?.message ?: "Failed to send OTP"
-                    _operationState.value = OperationState.Error(serverMsg)
-                }
-            } catch (e: Exception) {
-                val errorMessage = when (e) {
-                    is java.net.SocketTimeoutException -> {
-                        if (retryCount < 2) {
-                            kotlinx.coroutines.delay((1000L * (retryCount + 1)))
-                            requestLoginCode(phone, sid, retryCount + 1)
-                            return@launch
-                        } else {
-                            "Connection timed out. Please check your internet connection and try again."
-                        }
-                    }
-                    is java.net.UnknownHostException -> {
-                        "No internet connection. Please check your network and try again."
-                    }
-                    is java.net.ConnectException -> {
-                        "Unable to connect to server. Please try again."
-                    }
-                    else -> {
-                        "Failed to send OTP. Please try again."
-                    }
-                }
-                _operationState.value = OperationState.Error(errorMessage)
+            val result = authRepository.requestLoginCode(sid, phone)
+            when (result) {
+                is AuthResult.Success -> _operationState.value = OperationState.Success(result.message ?: "Code sent")
+                is AuthResult.Error -> _operationState.value = OperationState.Error(result.message)
             }
         }
     }
@@ -385,31 +356,23 @@ class MainViewModel @Inject constructor(
         val sid = storeId.takeIf { !it.isNullOrBlank() } ?: com.aistudio.sharmakhata.pqmzvk.util.SessionManager.storeId ?: ""
         _operationState.value = OperationState.Loading
         viewModelScope.launch {
-            try {
-                val response = ApiClient.apiService.verifyLoginCode(VerifyLoginCodeRequest(sid, phone, code))
-                val body = response.body()
-                val token = body?.token
-                if (response.isSuccessful && !token.isNullOrBlank()) {
-                    _authToken.value = token
-                    com.aistudio.sharmakhata.pqmzvk.util.SessionManager.setToken(context, token)
-
-                    val storeMap = body?.store as? Map<*, *>
-                    val storeIdFromServer = storeMap?.get("id") as? String
-                    if (!storeIdFromServer.isNullOrBlank()) {
-                        com.aistudio.sharmakhata.pqmzvk.util.SessionManager.saveStoreInfo(context, storeIdFromServer, phone)
+            val result = authRepository.verifyLoginCode(sid, phone, code)
+            when (result) {
+                is AuthResult.Success -> {
+                    result.token?.let { token ->
+                        _authToken.value = token
+                        com.aistudio.sharmakhata.pqmzvk.util.SessionManager.setToken(context, token)
+                    }
+                    result.storeId?.let { id ->
+                        com.aistudio.sharmakhata.pqmzvk.util.SessionManager.saveStoreInfo(context, id, phone)
                         com.aistudio.sharmakhata.pqmzvk.util.SessionManager.reload(context)
                     }
-
                     LiveSyncManager.stop()
                     LiveSyncManager.init(context)
                     LiveSyncManager.start()
                     _operationState.value = OperationState.Success("Logged in")
-                } else {
-                    val serverMsg = body?.message ?: "Invalid or expired OTP"
-                    _operationState.value = OperationState.Error(serverMsg)
                 }
-            } catch (e: Exception) {
-                _operationState.value = OperationState.Error("Network error. Please check your connection.")
+                is AuthResult.Error -> _operationState.value = OperationState.Error(result.message)
             }
         }
     }
@@ -417,30 +380,23 @@ class MainViewModel @Inject constructor(
     fun loginWithPassword(phone: String, password: String, context: android.content.Context) {
         _operationState.value = OperationState.Loading
         viewModelScope.launch {
-            try {
-                val response = ApiClient.apiService.loginWithPassword(LoginWithPasswordRequest(phone, password))
-                val body = response.body()
-                if (response.isSuccessful && body?.success == true && !body.token.isNullOrBlank()) {
-                    _authToken.value = body.token
-                    com.aistudio.sharmakhata.pqmzvk.util.SessionManager.setToken(context, body.token)
-
-                    val storeMap = body.store as? Map<*, *>
-                    val storeIdFromServer = storeMap?.get("id") as? String
-                    if (!storeIdFromServer.isNullOrBlank()) {
-                        com.aistudio.sharmakhata.pqmzvk.util.SessionManager.saveStoreInfo(context, storeIdFromServer, phone)
+            val result = authRepository.loginWithPassword(phone, password)
+            when (result) {
+                is AuthResult.Success -> {
+                    result.token?.let { token ->
+                        _authToken.value = token
+                        com.aistudio.sharmakhata.pqmzvk.util.SessionManager.setToken(context, token)
+                    }
+                    result.storeId?.let { id ->
+                        com.aistudio.sharmakhata.pqmzvk.util.SessionManager.saveStoreInfo(context, id, phone)
                         com.aistudio.sharmakhata.pqmzvk.util.SessionManager.reload(context)
                     }
-
                     LiveSyncManager.stop()
                     LiveSyncManager.init(context)
                     LiveSyncManager.start()
                     _operationState.value = OperationState.Success("Logged in")
-                } else {
-                    val serverMsg = body?.message ?: "Login failed. Check your phone and password."
-                    _operationState.value = OperationState.Error(serverMsg)
                 }
-            } catch (e: Exception) {
-                _operationState.value = OperationState.Error("Network error. Please check your connection.")
+                is AuthResult.Error -> _operationState.value = OperationState.Error(result.message)
             }
         }
     }
@@ -469,38 +425,19 @@ class MainViewModel @Inject constructor(
     ) {
         _operationState.value = OperationState.Loading
         viewModelScope.launch {
-            try {
-                val response = ApiClient.apiService.registerStore(
-                    RegisterStoreRequest(
-                        store_name = storeName,
-                        owner_name = ownerName,
-                        phone = phone,
-                        email = email,
-                        address = address,
-                        gstin = gstin,
-                        password = password,
-                    )
-                )
-                val body = response.body()
-                val storeId = body?.store_id
-                val status = body?.status
-
-                if (!storeId.isNullOrBlank()) {
-                    _registeredStoreId.value = storeId
-                    if (context != null) {
-                        com.aistudio.sharmakhata.pqmzvk.util.SessionManager.saveStoreInfo(context, storeId, phone)
-                        com.aistudio.sharmakhata.pqmzvk.util.SessionManager.reload(context)
+            val result = authRepository.registerStore(storeName, ownerName, phone, email, address, gstin, password)
+            when (result) {
+                is AuthResult.Success -> {
+                    result.storeId?.let { id ->
+                        _registeredStoreId.value = id
+                        if (context != null) {
+                            com.aistudio.sharmakhata.pqmzvk.util.SessionManager.saveStoreInfo(context, id, phone)
+                            com.aistudio.sharmakhata.pqmzvk.util.SessionManager.reload(context)
+                        }
                     }
-                    val msg = when (status) {
-                        "exists" -> "Store already exists — you can login now"
-                        else -> body?.message ?: "Store registered"
-                    }
-                    _operationState.value = OperationState.Success(msg)
-                } else {
-                    _operationState.value = OperationState.Error(body?.message ?: "Failed to register store")
+                    _operationState.value = OperationState.Success(result.message ?: "Store registered")
                 }
-            } catch (e: Exception) {
-                _operationState.value = OperationState.Error("Failed to register store. Please try again.")
+                is AuthResult.Error -> _operationState.value = OperationState.Error(result.message)
             }
         }
     }
@@ -516,28 +453,14 @@ class MainViewModel @Inject constructor(
     ) {
         _operationState.value = OperationState.Loading
         viewModelScope.launch {
-            try {
-                val response = ApiClient.apiService.updateStoreProfile(
-                    com.aistudio.sharmakhata.pqmzvk.data.remote.UpdateStoreProfileRequest(
-                        store_name = storeName,
-                        owner_name = ownerName,
-                        address = address,
-                        upi_id = upiId,
-                        gstin = gstin,
-                        invoice_template = invoiceTemplate
-                    )
-                )
-                if (response.isSuccessful && response.body()?.success == true) {
-                    _operationState.value = OperationState.Success("Store profile updated successfully")
-                    // Force refresh to pull updated store info
+            val result = authRepository.updateStoreProfile(storeName, ownerName, address, upiId, gstin, invoiceTemplate)
+            when (result) {
+                is AuthResult.Success -> {
+                    _operationState.value = OperationState.Success(result.message ?: "Updated")
                     LiveSyncManager.forceRefresh()
                     fetchData(context)
-                } else {
-                    val serverMsg = response.body()?.message ?: "Failed to update profile"
-                    _operationState.value = OperationState.Error(serverMsg)
                 }
-            } catch (e: Exception) {
-                _operationState.value = OperationState.Error("Network error. Failed to update profile.")
+                is AuthResult.Error -> _operationState.value = OperationState.Error(result.message)
             }
         }
     }

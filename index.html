@@ -11,6 +11,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏪</text></svg>">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -424,6 +425,8 @@
       <a href="#features" class="nav-link">Features</a>
       <a href="#pricing" class="nav-link">Pricing</a>
       <a href="#faq" class="nav-link">FAQ</a>
+      <a href="about.html" class="nav-link">About</a>
+      <a href="contact.html" class="nav-link">Contact</a>
       <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
         <span class="thumb"><span class="material-icons" id="themeIcon" style="color:#f59e0b">dark_mode</span></span>
       </button>
@@ -445,6 +448,8 @@
       <a href="#features" style="color:var(--text-tertiary);text-decoration:none;font-size:16px;padding:10px 0;border-bottom:1px solid var(--border)">Features</a>
       <a href="#pricing" style="color:var(--text-tertiary);text-decoration:none;font-size:16px;padding:10px 0;border-bottom:1px solid var(--border)">Pricing</a>
       <a href="#faq" style="color:var(--text-tertiary);text-decoration:none;font-size:16px;padding:10px 0;border-bottom:1px solid var(--border)">FAQ</a>
+      <a href="about.html" style="color:var(--text-tertiary);text-decoration:none;font-size:16px;padding:10px 0;border-bottom:1px solid var(--border)">About</a>
+      <a href="contact.html" style="color:var(--text-tertiary);text-decoration:none;font-size:16px;padding:10px 0;border-bottom:1px solid var(--border)">Contact</a>
       <a href="#" onclick="closeLoginMob()" id="mobLoginBtn" style="padding:10px;border:2px solid #25d366;color:#25d366;border-radius:12px;text-align:center;font-weight:600;text-decoration:none">Sign In</a>
       <a href="/dashboard" id="mobDashboardBtn" style="display:none;padding:14px;background:#25d366;color:#fff;border-radius:12px;text-align:center;font-weight:600;text-decoration:none">Dashboard</a>
       <a href="#register" id="mobRegisterBtn" style="padding:14px;background:#25d366;color:#fff;border-radius:12px;text-align:center;font-weight:600;text-decoration:none">Register Your Store</a>
@@ -845,18 +850,22 @@
         <a href="#features"><span class="material-icons" style="font-size:14px">chevron_right</span> Features</a>
         <a href="#pricing"><span class="material-icons" style="font-size:14px">chevron_right</span> Pricing</a>
         <a href="#dashboard"><span class="material-icons" style="font-size:14px">chevron_right</span> Dashboard</a>
-        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> API Docs</a>
-        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> Privacy Policy</a>
       </div>
     </div>
     <div class="f-col">
-      <h4 class="f-head">Support</h4>
+      <h4 class="f-head">Legal</h4>
       <div class="f-links">
-        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> Seller Guide</a>
-        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> WhatsApp Setup</a>
-        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> UPI FAQs</a>
-        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> Contact Us</a>
-        <a href="#"><span class="material-icons" style="font-size:14px">chevron_right</span> Grievance</a>
+        <a href="privacy-policy.html"><span class="material-icons" style="font-size:14px">chevron_right</span> Privacy Policy</a>
+        <a href="return-refund-policy.html"><span class="material-icons" style="font-size:14px">chevron_right</span> Return & Refund</a>
+        <a href="cancellation-policy.html"><span class="material-icons" style="font-size:14px">chevron_right</span> Cancellation</a>
+        <a href="shipping-policy.html"><span class="material-icons" style="font-size:14px">chevron_right</span> Shipping Policy</a>
+      </div>
+    </div>
+    <div class="f-col">
+      <h4 class="f-head">Company</h4>
+      <div class="f-links">
+        <a href="about.html"><span class="material-icons" style="font-size:14px">chevron_right</span> About Us</a>
+        <a href="contact.html"><span class="material-icons" style="font-size:14px">chevron_right</span> Contact Us</a>
       </div>
     </div>
     <div class="f-col">
@@ -876,7 +885,7 @@
     </div>
   </div>
   <div class="f-bottom">
-    <p>&copy; 2026 Grahbook India. All rights reserved. Made with ❤️ in Bharat.</p>
+    <p>&copy; 2026 Grahbook India. All rights reserved. Operated by Neha Agrawal.</p>
     <div class="f-badges">
       <span>Make in India</span>
       <span>UPI Certified</span>
@@ -1121,11 +1130,57 @@ async function handleRegister(e){
   }
 }
 function socialLogin(provider){
-  const names=['Rajesh Sharma','Priya Singh','Amit Verma','Sunita Gupta','Vikram Patel'];
-  const name=names[Math.floor(Math.random()*names.length)];
-  const email=name.toLowerCase().replace(' ','.')+'@gmail.com';
-  setSession({name,email,phone:'9876543210',store:name+"'s Store",social:provider,loggedIn:true});
-  closeLogin();
+  if(provider==='google'){
+    if(!window.google||!window.google.accounts||!window.google.accounts.id){
+      alert('Google Sign-In is loading. Please try again in a moment.');
+      return;
+    }
+    window.google.accounts.id.prompt(function(notification){
+      if(notification.isNotDisplayed()){
+        console.warn('Google One Tap not displayed:', notification.getNotDisplayedReason());
+      }
+    });
+    return;
+  }
+  // Fallback for other providers (not implemented)
+  alert('Only Google sign-in is supported for now.');
+}
+
+// Google OAuth configuration
+const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com'; // Replace with your actual Client ID
+
+function initGoogleOAuth(){
+  if(!window.google||!window.google.accounts||!window.google.accounts.id) return;
+  window.google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleGoogleCredentialResponse,
+    auto_select: false,
+    cancel_on_tap_outside: true
+  });
+}
+
+function handleGoogleCredentialResponse(response){
+  fetch('/api/auth/google',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({credential:response.credential,clientId:response.clientId||GOOGLE_CLIENT_ID})
+  })
+  .then(r=>r.json())
+  .then(data=>{
+    if(!data.success){alert(data.message||'Google login failed.');return;}
+    var store=data.store||{};
+    setSession({name:store.owner_name||store.store_name||'Google User',email:store.email||'',phone:store.phone||'',store:store.store_name||'My Store',social:'google',loggedIn:true,token:data.token});
+    closeLogin();
+    window.location.href='/dashboard';
+  })
+  .catch(function(err){alert('Google login failed: '+err.message);});
+}
+
+// Initialize Google OAuth when script loads
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(initGoogleOAuth,500);});
+}else{
+  setTimeout(initGoogleOAuth,500);
 }
 function updateAuthUI(){
   const user=getSession();const w=document.getElementById('authWrapper');const m=document.getElementById('mobLoginBtn');

@@ -32,6 +32,8 @@ import com.aistudio.sharmakhata.pqmzvk.data.local.PurchaseEntity
 import com.aistudio.sharmakhata.pqmzvk.data.local.PurchaseItemEntry
 import com.aistudio.sharmakhata.pqmzvk.ui.components.HamburgerAppBar
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
+import com.aistudio.sharmakhata.pqmzvk.util.DecimalVisualTransformation
+import com.aistudio.sharmakhata.pqmzvk.util.FormValidators
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 import java.text.SimpleDateFormat
 import java.util.*
@@ -273,7 +275,9 @@ fun AddPurchaseScreen(
     var paidAmount by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var items by remember { mutableStateOf(listOf(PurchaseItemEntry())) }
-    val isValid = supplierName.isNotBlank() && items.any { it.name.isNotBlank() && it.price.isNotBlank() }
+    val isValid = FormValidators.isValidName(supplierName) && items.any {
+        it.name.isNotBlank() && FormValidators.isValidPrice(it.price) && (it.qty.toIntOrNull() ?: 0) > 0
+    }
 
     fun calculateTotal(): Double {
         return items.sumOf {
@@ -452,6 +456,7 @@ fun AddPurchaseScreen(
                                 textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.End),
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                visualTransformation = DecimalVisualTransformation(),
                                 shape = RoundedCornerShape(8.dp),
                                 colors = TextFieldDefaults.colors(
                                     focusedIndicatorColor = StitchPrimaryContainer,
@@ -512,6 +517,7 @@ fun AddPurchaseScreen(
                         shape = TextFieldShape,
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        visualTransformation = DecimalVisualTransformation(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = StitchPrimaryContainer,
                             unfocusedBorderColor = StitchBorder,

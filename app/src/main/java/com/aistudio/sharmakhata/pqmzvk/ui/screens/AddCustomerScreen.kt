@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.CustomerViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
+import com.aistudio.sharmakhata.pqmzvk.util.PhoneVisualTransformation
 import androidx.compose.ui.res.stringResource
 import com.aistudio.sharmakhata.pqmzvk.R
 
@@ -144,7 +145,7 @@ fun AddCustomerScreen(
                     focusedTextColor = TextPrimaryLight,
                     unfocusedTextColor = TextPrimaryLight,
                     focusedLabelColor = IndigoPrimary,
-                    unfocusedLabelColor = TextSecondaryLight,
+                    unfocusedLabelColor = StitchTextSecondary,
                     cursorColor = IndigoPrimary
                 ),
                 singleLine = true
@@ -153,24 +154,38 @@ fun AddCustomerScreen(
             // Phone field
             OutlinedTextField(
                 value = phone,
-                onValueChange = { phone = it.filter { ch -> ch.isDigit() || ch == '+' } },
+                onValueChange = { newVal ->
+                    val digits = newVal.filter { it.isDigit() }.take(10)
+                    phone = digits
+                },
                 label = { Text(stringResource(R.string.whatsapp_number_label)) },
-                placeholder = { Text(stringResource(R.string.phone_example), color = TextTertiaryLight) },
+                placeholder = { Text("98765 43210", color = TextTertiaryLight) },
                 leadingIcon = {
-                    Icon(Icons.Outlined.Phone, contentDescription = null, tint = IndigoPrimary)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("+91", fontWeight = FontWeight.Bold, color = IndigoPrimary)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Box(modifier = Modifier.width(1.dp).height(20.dp).color(CardBorder))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Outlined.Phone, contentDescription = null, tint = IndigoPrimary)
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                visualTransformation = PhoneVisualTransformation(),
+                isError = phone.isNotEmpty() && phone.length < 10,
+                supportingText = if (phone.isNotEmpty() && phone.length < 10) {
+                    { Text("Enter 10 digit number", color = DebtRed) }
+                } else null,
                 shape = TextFieldShape,
                 colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = IndigoPrimary,
+                    focusedIndicatorColor = if (phone.length == 10) IndigoPrimary else DebtRed,
                     unfocusedIndicatorColor = CardBorder,
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                     focusedTextColor = TextPrimaryLight,
                     unfocusedTextColor = TextPrimaryLight,
                     focusedLabelColor = IndigoPrimary,
-                    unfocusedLabelColor = TextSecondaryLight,
+                    unfocusedLabelColor = StitchTextSecondary,
                     cursorColor = IndigoPrimary
                 ),
                 singleLine = true

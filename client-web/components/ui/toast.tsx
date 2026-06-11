@@ -103,6 +103,14 @@ ToastDescription.displayName = ToastPrimitives.Description.displayName;
 
 type ToastVariant = VariantProps<typeof toastVariants>["variant"];
 
+const Toaster = () => {
+  return (
+    <ToastProvider>
+      <ToastPrimitives.Viewport className="fixed bottom-0 right-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]" />
+    </ToastProvider>
+  );
+};
+
 export {
   ToastProvider,
   Toast,
@@ -110,6 +118,7 @@ export {
   ToastClose,
   ToastTitle,
   ToastDescription,
+  Toaster,
   toastVariants,
   type ToastVariant,
 };

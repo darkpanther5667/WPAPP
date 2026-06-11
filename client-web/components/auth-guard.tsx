@@ -19,3 +19,9 @@ export function useAuthGuard() {
     }
   }, [isAuthenticated, pathname, router]);
 }
+
+/** Client component wrapper for use in Server Component layouts */
+export function AuthGuard() {
+  useAuthGuard();
+  return null;
+}

@@ -64,7 +64,7 @@ fun LedgerScreen(
                 is UiState.Loading -> {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center),
-                        color = IndigoPrimary
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
                 is UiState.Error -> {
@@ -75,10 +75,10 @@ fun LedgerScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(Spacing.medium)
                     ) {
-                        Icon(Icons.Default.Error, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(IconSize.xlarge))
+                        Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(IconSize.xlarge))
                         Text(
-                            text = "Error: ${(dbState as UiState.Error).message}",
-                            color = ErrorRed,
+                            text = stringResource(R.string.error_search_prefix, (dbState as UiState.Error).message),
+                            color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -96,9 +96,9 @@ fun LedgerScreen(
                                 .padding(Spacing.xxxlarge),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(Icons.Outlined.PersonOff, contentDescription = null, tint = TextTertiaryLight, modifier = Modifier.size(IconSize.huge))
+                            Icon(Icons.Outlined.PersonOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(IconSize.huge))
                             Spacer(modifier = Modifier.height(Spacing.medium))
-                            Text(stringResource(R.string.customer_not_found), color = TextSecondaryLight, style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.customer_not_found), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                         }
                     } else {
                         LedgerContent(customerName = customer.name, transactions = transactions, bills = bills)
@@ -126,7 +126,7 @@ fun LedgerContent(customerName: String, transactions: List<Transaction>, bills: 
         // Header banner
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = IndigoPrimary
+            color = MaterialTheme.colorScheme.primary
         ) {
             Column(modifier = Modifier.padding(Spacing.large)) {
                 Text(
@@ -163,12 +163,12 @@ fun LedgerContent(customerName: String, transactions: List<Transaction>, bills: 
                     Icon(
                         Icons.Outlined.History,
                         contentDescription = null,
-                        tint = TextTertiaryLight,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.size(IconSize.huge)
                     )
                     Text(
                         stringResource(R.string.no_history),
-                        color = TextSecondaryLight,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -194,9 +194,9 @@ fun LedgerEventCard(event: LedgerEvent) {
     val isBill = event.type == "bill"
 
     val amountColor = when {
-        isPayment -> SuccessGreen
-        isCredit -> ErrorRed
-        else -> IndigoPrimary
+        isPayment -> RupeeGreen
+        isCredit -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
     }
     val sign = if (isPayment) "+" else "-"
     val icon = when {
@@ -205,9 +205,9 @@ fun LedgerEventCard(event: LedgerEvent) {
         else -> Icons.Outlined.Receipt
     }
     val iconBg = when {
-        isPayment -> SuccessGreen.copy(alpha = 0.1f)
-        isCredit -> ErrorRed.copy(alpha = 0.1f)
-        else -> IndigoContainer
+        isPayment -> RupeeGreen.copy(alpha = 0.1f)
+        isCredit -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+        else -> MaterialTheme.colorScheme.primaryContainer
     }
     val label = when {
         isPayment -> stringResource(R.string.payment_received_label)
@@ -252,13 +252,13 @@ fun LedgerEventCard(event: LedgerEvent) {
                 Text(
                     text = FormatUtils.formatDateTime(event.dateIso),
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondaryLight
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (event.description.isNotEmpty()) {
                     Text(
                         text = event.description,
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextTertiaryLight,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )

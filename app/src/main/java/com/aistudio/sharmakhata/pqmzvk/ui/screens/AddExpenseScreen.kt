@@ -21,20 +21,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
+import com.aistudio.sharmakhata.pqmzvk.util.Constants
+import com.aistudio.sharmakhata.pqmzvk.util.DecimalVisualTransformation
+import com.aistudio.sharmakhata.pqmzvk.util.FormValidators
 import androidx.compose.ui.res.stringResource
 import com.aistudio.sharmakhata.pqmzvk.R
-
-private val categoryOptions = listOf(
-    "Rent" to Icons.Default.Home,
-    "Utilities" to Icons.Default.Bolt,
-    "Salary" to Icons.Default.Groups,
-    "Inventory" to Icons.Default.Inventory2,
-    "Transport" to Icons.Default.LocalShipping,
-    "Marketing" to Icons.Default.Campaign,
-    "Food" to Icons.Default.Restaurant,
-    "Office Supplies" to Icons.Default.Build,
-    "Other" to Icons.Default.MoreHoriz
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,7 +40,7 @@ fun AddExpenseScreen(
     var titleError by remember { mutableStateOf(false) }
     var amountError by remember { mutableStateOf(false) }
 
-    val isFormValid = title.isNotBlank() && amountText.toDoubleOrNull() != null && (amountText.toDoubleOrNull() ?: 0.0) > 0
+    val isFormValid = FormValidators.isValidName(title) && FormValidators.isValidAmount(amountText)
 
     Scaffold(
         topBar = {
@@ -109,10 +100,12 @@ fun AddExpenseScreen(
             OutlinedTextField(
                 value = amountText,
                 onValueChange = {
-                    if (it.isEmpty() || it.all { c -> c.isDigit() || c == '.' }) {
-                        amountText = it
-                        if (it.toDoubleOrNull() != null) amountError = false
+                    amountText = it.filter { c -> c.isDigit() || c == '.' }.let { filtered ->
+                        // Allow only one dot
+                        var dotCount = 0
+                        filtered.filter { c -> if (c == '.') { dotCount++; dotCount <= 1 } else true }
                     }
+                    if (FormValidators.isValidAmount(amountText)) amountError = false
                 },
                 label = { Text(stringResource(R.string.expense_amount_star)) },
                 placeholder = { Text(stringResource(R.string.expense_amount_placeholder)) },
@@ -126,6 +119,7 @@ fun AddExpenseScreen(
                     )
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                visualTransformation = DecimalVisualTransformation(),
                 isError = amountError,
                 supportingText = if (amountError) {
                     { Text(stringResource(R.string.expense_amount_required), color = ErrorRed) }
@@ -159,7 +153,7 @@ fun AddExpenseScreen(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.small)
             ) {
-                categoryOptions.forEach { (category, icon) ->
+                Constants.EXPENSE_CATEGORIES.forEach { (category, icon) ->
                     FilterChip(
                         selected = selectedCategory == category,
                         onClick = { selectedCategory = category },
@@ -175,7 +169,7 @@ fun AddExpenseScreen(
                             selectedContainerColor = IndigoPrimary,
                             selectedLabelColor = Color.White,
                             containerColor = MaterialTheme.colorScheme.surface,
-                            labelColor = TextSecondaryLight
+                            labelColor = StitchTextSecondary
                         ),
                         shape = RoundedCornerShape(10.dp)
                     )

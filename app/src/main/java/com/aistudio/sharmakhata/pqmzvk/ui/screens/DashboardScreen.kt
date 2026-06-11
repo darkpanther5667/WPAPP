@@ -6,6 +6,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -13,6 +15,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -48,10 +52,13 @@ import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 import androidx.compose.ui.res.stringResource
 import com.aistudio.sharmakhata.pqmzvk.R
 import com.aistudio.sharmakhata.pqmzvk.ui.components.AmountText
+import com.aistudio.sharmakhata.pqmzvk.ui.components.EmilEaseOut
 import com.aistudio.sharmakhata.pqmzvk.ui.components.GrahbookAmountType
 import com.aistudio.sharmakhata.pqmzvk.ui.components.CustomerAvatar
 import com.aistudio.sharmakhata.pqmzvk.ui.components.MetricCard
+import com.aistudio.sharmakhata.pqmzvk.ui.components.PressSpring
 import com.aistudio.sharmakhata.pqmzvk.ui.components.SalesTrendChart
+import com.aistudio.sharmakhata.pqmzvk.ui.components.DashboardShimmer
 import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,9 +111,7 @@ fun DashboardScreen(
             ) {
                 when (reportState) {
                     is UiState.Loading -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = Saffron500)
-                        }
+                        DashboardShimmer()
                     }
                     is UiState.Error -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -116,8 +121,8 @@ fun DashboardScreen(
                                 modifier = Modifier.padding(32.dp)
                             ) {
                                 Icon(Icons.Outlined.CloudOff, contentDescription = null, tint = DebtRed, modifier = Modifier.size(48.dp))
-                                Text(stringResource(R.string.could_not_load_dashboard), style = MaterialTheme.typography.bodyLarge, color = Ink000)
-                                Text((reportState as UiState.Error).message, style = MaterialTheme.typography.bodySmall, color = Ink200, textAlign = TextAlign.Center)
+                                Text(stringResource(R.string.could_not_load_dashboard), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onBackground)
+                                Text((reportState as UiState.Error).message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                                 Button(
                                     onClick = { scope.launch { LiveSyncManager.forceRefresh() } },
                                     colors = ButtonDefaults.buttonColors(containerColor = Brand500, contentColor = Color.White),
@@ -168,7 +173,7 @@ private fun SyncStatusStrip(isSyncing: Boolean) {
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(
-            text = if (isSyncing) "Syncing..." else "Last synced: 2 min ago",
+            text = if (isSyncing) stringResource(R.string.syncing_now) else stringResource(R.string.last_synced_recently),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
         )
@@ -209,7 +214,7 @@ private fun DashboardTopBar(
                     text = shopInitial,
                     color = MaterialTheme.colorScheme.onPrimary,
                     style = TextStyle(
-                        fontFamily = Syne,
+                        fontFamily = Poppins,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp
                     )
@@ -220,7 +225,7 @@ private fun DashboardTopBar(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Namaste 👋",
+                    text = stringResource(R.string.namaste_greeting),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -309,14 +314,14 @@ private fun DashboardContent(
         else -> null
     }
 
-    val animY = remember { Animatable(45f) }
+    val animY = remember { Animatable(32f) }
     val alpha = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         launch {
-            animY.animateTo(0f, animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing))
+            animY.animateTo(0f, animationSpec = tween(durationMillis = 250, easing = EmilEaseOut))
         }
         launch {
-            alpha.animateTo(1f, animationSpec = tween(durationMillis = 450))
+            alpha.animateTo(1f, animationSpec = tween(durationMillis = 250, easing = EmilEaseOut))
         }
     }
 
@@ -328,33 +333,43 @@ private fun DashboardContent(
                 this.translationY = animY.value
             },
         contentPadding = PaddingValues(bottom = 90.dp), // space for bottom nav
-        verticalArrangement = Arrangement.spacedBy(GrahbookSpacing.lg)
+        verticalArrangement = Arrangement.spacedBy(GrahbookSpacing.sectionGap)
     ) {
         // ===== SECTION 1: SUMMARY CARDS =====
         item {
-            Spacer(modifier = Modifier.height(GrahbookSpacing.md))
-            Spacer(modifier = Modifier.height(GrahbookSpacing.md))
+            Spacer(modifier = Modifier.height(GrahbookSpacing.sm))
             Text(
-                text = stringResource(R.string.aaj_ka_hisab).uppercase(),
+                text = stringResource(R.string.aaj_ka_hisab),
                 style = TextStyle(
-                    fontFamily = Syne,
+                    fontFamily = Poppins,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    letterSpacing = 1.5.sp
+                    fontSize = GrahbookFontSize.heading,
+                    color = MaterialTheme.colorScheme.onSurface
                 ),
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = GrahbookSpacing.xs)
+                modifier = Modifier.padding(horizontal = GrahbookSpacing.screenHorizontal)
             )
+            Spacer(modifier = Modifier.height(GrahbookSpacing.xs))
+            Text(
+                text = stringResource(R.string.todays_summary),
+                style = TextStyle(
+                    fontFamily = Poppins,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = GrahbookFontSize.body,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                modifier = Modifier.padding(horizontal = GrahbookSpacing.screenHorizontal)
+            )
+            Spacer(modifier = Modifier.height(GrahbookSpacing.md))
             
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(horizontal = GrahbookSpacing.screenHorizontal),
+                horizontalArrangement = Arrangement.spacedBy(GrahbookSpacing.md)
             ) {
                 item {
                     MetricCard(
                         label = stringResource(R.string.outstanding_label),
                         amount = (totalOutstanding * 100).toLong(),
-                        trend = if (totalOutstanding > 0) 12.5f else null,
+                        trend = null,
                         accentColor = DebtRed,
                         type = GrahbookAmountType.OUTSTANDING,
                         icon = Icons.Default.AccountBalanceWallet,
@@ -365,7 +380,7 @@ private fun DashboardContent(
                     MetricCard(
                         label = stringResource(R.string.todays_collection),
                         amount = (report.paymentTotal * 100).toLong(),
-                        trend = 8.3f,
+                        trend = null,
                         accentColor = RupeeGreen,
                         type = GrahbookAmountType.RECEIVED,
                         icon = Icons.Default.TrendingUp
@@ -378,7 +393,7 @@ private fun DashboardContent(
                         trend = null,
                         accentColor = PendingAmber,
                         type = GrahbookAmountType.PENDING,
-                        icon = Icons.Default.ReceiptLong
+                        icon = Icons.AutoMirrored.Filled.ReceiptLong
                     )
                 }
                 item {
@@ -407,17 +422,16 @@ private fun DashboardContent(
         // ===== SECTION 2: QUICK ACTIONS =====
         item {
             Text(
-                text = stringResource(R.string.quick_actions).uppercase(),
+                text = stringResource(R.string.quick_actions),
                 style = TextStyle(
-                    fontFamily = Syne,
+                    fontFamily = Poppins,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    letterSpacing = 1.5.sp
+                    fontSize = GrahbookFontSize.heading,
+                    color = MaterialTheme.colorScheme.onSurface
                 ),
-                modifier = Modifier.padding(horizontal = 20.dp)
+                modifier = Modifier.padding(horizontal = GrahbookSpacing.screenHorizontal)
             )
-            Spacer(modifier = Modifier.height(GrahbookSpacing.xs))
+            Spacer(modifier = Modifier.height(GrahbookSpacing.sm))
             QuickActionsCard(
                 onCreateInvoice = onCreateInvoice,
                 onAddCustomer = onAddCustomer,
@@ -436,23 +450,27 @@ private fun DashboardContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
+                    .padding(horizontal = GrahbookSpacing.screenHorizontal),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = stringResource(R.string.recent_transactions),
                     style = TextStyle(
-                        fontFamily = Syne,
+                        fontFamily = Poppins,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
+                        fontSize = GrahbookFontSize.heading,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 )
                 Text(
                     text = "${stringResource(R.string.see_all)} →",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = TextStyle(
+                        fontFamily = Poppins,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = GrahbookFontSize.body,
+                        color = MaterialTheme.colorScheme.primary
+                    ),
                     modifier = Modifier.clickable { onNavigateToCustomers() }
                 )
             }
@@ -471,7 +489,7 @@ private fun DashboardContent(
                     detail = if (isCredit) stringResource(R.string.bill_created_event) else stringResource(R.string.payment_received_label),
                     outstanding = (txn.amount * 100).toLong(),
                     isPositive = !isCredit,
-                    time = "2h ago",
+                    time = FormatUtils.getRelativeTimeSpan(txn.timestamp) ?: "recent",
                     onClick = { onNavigateToCustomers() }
                 )
             }
@@ -480,19 +498,49 @@ private fun DashboardContent(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                        .height(120.dp)
+                        .padding(horizontal = GrahbookSpacing.screenHorizontal)
+                        .height(140.dp)
                         .clip(RoundedCornerShape(GrahbookRadius.lg))
-                        .background(MaterialTheme.colorScheme.surface),
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.ReceiptLong, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
-                        Spacer(Modifier.height(GrahbookSpacing.xs))
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ReceiptLong,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(Modifier.height(GrahbookSpacing.sm))
                         Text(
                             text = stringResource(R.string.no_transactions_yet),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = TextStyle(
+                                fontFamily = Poppins,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = GrahbookFontSize.body,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                        Spacer(Modifier.height(GrahbookSpacing.xs))
+                        Text(
+                            text = stringResource(R.string.create_your_first_bill),
+                            style = TextStyle(
+                                fontFamily = Poppins,
+                                fontWeight = FontWeight.Normal,
+                                fontSize = GrahbookFontSize.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
                         )
                     }
                 }
@@ -514,40 +562,42 @@ private fun QuickActionsCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = GrahbookSpacing.screenHorizontal),
         shape = RoundedCornerShape(GrahbookRadius.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = GrahbookSpacing.md),
+                .padding(vertical = GrahbookSpacing.lg, horizontal = GrahbookSpacing.sm),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             val actions = listOf(
-                Triple("New Bill", Icons.Default.ReceiptLong, Brush.horizontalGradient(listOf(Saffron500, Saffron600))) to onCreateInvoice,
+                Triple("New Bill", Icons.AutoMirrored.Filled.ReceiptLong, Brush.horizontalGradient(listOf(Saffron500, Saffron600))) to onCreateInvoice,
                 Triple("Add Customer", Icons.Default.PersonAdd, Brush.horizontalGradient(listOf(Brand500, Brand600))) to onAddCustomer,
                 Triple("Record Payment", Icons.Default.Payments, Brush.horizontalGradient(listOf(RupeeGreen, RupeeGreenDim))) to onRecordPayment,
-                Triple("Send Reminder", Icons.Default.Notifications, Brush.horizontalGradient(listOf(Color(0xFF128C7E), Color(0xFF075E54)))) to onSendReminder
+                Triple("Send Reminder", Icons.Default.Notifications, Brush.horizontalGradient(listOf(WhatsAppDark, WhatsAppDark))) to onSendReminder
             )
 
             actions.forEach { (info, onClick) ->
                 val (label, icon, brush) = info
-                var isPressed by remember { mutableStateOf(false) }
+                val interactionSource = remember { MutableInteractionSource() }
+                val isPressed by interactionSource.collectIsPressedAsState()
                 val scale by animateFloatAsState(
-                    targetValue = if (isPressed) 0.92f else 1f,
-                    animationSpec = spring(dampingRatio = 0.5f, stiffness = 400f),
+                    targetValue = if (isPressed) 0.95f else 1f,
+                    animationSpec = spring(dampingRatio = 0.6f, stiffness = 800f),
                     label = "action_scale"
                 )
 
                 Column(
                     modifier = Modifier
                         .scale(scale)
-                        .clickable {
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null
+                        ) {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            isPressed = true
-                            isPressed = false
                             onClick()
                         }
                         .padding(horizontal = 8.dp),
@@ -590,7 +640,7 @@ private fun WhatsAppBotActiveCard(onWhatsApp: () -> Unit) {
             .padding(horizontal = 20.dp),
         shape = RoundedCornerShape(GrahbookRadius.lg),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        border = BorderStroke(1.dp, Color(0xFF25D366).copy(alpha = 0.25f))
+        border = BorderStroke(1.dp, WhatsAppGreen.copy(alpha = 0.25f))
     ) {
         val infiniteTransition = rememberInfiniteTransition(label = "pulse")
         val dotScale by infiniteTransition.animateFloat(
@@ -608,7 +658,7 @@ private fun WhatsAppBotActiveCard(onWhatsApp: () -> Unit) {
                 .fillMaxWidth()
                 .background(
                     Brush.linearGradient(
-                        colors = listOf(Color(0xFF0A3D2E), Color(0xFF0D1F3C))
+                        colors = listOf(Brand800, Brand900)
                     )
                 )
                 .clickable { onWhatsApp() }
@@ -626,7 +676,7 @@ private fun WhatsAppBotActiveCard(onWhatsApp: () -> Unit) {
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Bot Active",
+                        text = stringResource(R.string.bot_active),
                         style = MaterialTheme.typography.bodySmall,
                         color = RupeeGreen,
                         fontWeight = FontWeight.Bold
@@ -634,14 +684,14 @@ private fun WhatsAppBotActiveCard(onWhatsApp: () -> Unit) {
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "AI Assistant\nReady hai",
+                    text = stringResource(R.string.ai_assistant_ready),
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "Ramesh ne 500 diya → ✓ Recorded",
+                    text = stringResource(R.string.ai_assistant_prompt),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.7f),
                     fontWeight = FontWeight.Normal
@@ -649,9 +699,9 @@ private fun WhatsAppBotActiveCard(onWhatsApp: () -> Unit) {
             }
             
             Icon(
-                imageVector = Icons.Default.Chat,
+                imageVector = Icons.AutoMirrored.Filled.Chat,
                 contentDescription = null,
-                tint = Color(0xFF25D366),
+                tint = WhatsAppGreen,
                 modifier = Modifier.size(32.dp)
             )
         }
@@ -667,10 +717,19 @@ private fun TransactionItem(
     time: String,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = PressSpring,
+        label = "txn_scale"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 20.dp)
+            .scale(scale),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
@@ -678,7 +737,11 @@ private fun TransactionItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onClick() }
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick
+                )
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

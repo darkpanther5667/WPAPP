@@ -92,7 +92,7 @@ export default function SettingsPage() {
             <Store className="h-6 w-6 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-extrabold text-foreground truncate">{store?.name}</h2>
+            <h2 className="text-base font-extrabold text-foreground truncate">{store?.store_name}</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Your Business</p>
             {user?.phone && (
               <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
@@ -105,7 +105,7 @@ export default function SettingsPage() {
       </Card>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         <StatCard icon={<Users className="h-3.5 w-3.5" />} label="Customers" value={String(customers.length)} />
         <StatCard icon={<FileText className="h-3.5 w-3.5" />} label="Bills" value={String(bills.length)} />
         <StatCard icon={<TrendingUp className="h-3.5 w-3.5" />} label="Revenue" value={formatCurrency(totalRevenue)} />

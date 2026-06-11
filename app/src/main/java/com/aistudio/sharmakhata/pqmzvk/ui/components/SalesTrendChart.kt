@@ -98,7 +98,7 @@ fun SalesTrendChart(
                     Text(
                         text = stringResource(R.string.sales_trend).uppercase(),
                         style = TextStyle(
-                            fontFamily = Syne,
+                            fontFamily = Poppins,
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.primary,
@@ -117,7 +117,7 @@ fun SalesTrendChart(
                 Text(
                     text = FormatUtils.formatShort(totalTrailing7),
                     style = TextStyle(
-                        fontFamily = Syne,
+                        fontFamily = Poppins,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
                         color = RupeeGreen

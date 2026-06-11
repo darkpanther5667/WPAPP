@@ -36,6 +36,7 @@
     <string name="reports_title">रिपोर्ट</string>
     <string name="expenses_title">खर्च</string>
     <string name="inventory_title">इन्वेंटरी</string>
+    <string name="nav_home">होम</string>
     <string name="search_title">खोजें</string>
     <string name="ledger_title">लेज़र</string>
     <string name="financial_reports_title">वित्तीय रिपोर्ट</string>
@@ -81,12 +82,14 @@
     <string name="sync_status_title">सिंक की स्थिति</string>
     <string name="active_account">सक्रिय खाता</string>
     <string name="active_label">सक्रिय</string>
+    <string name="inactive_label">निष्क्रिय</string>
     <string name="not_logged_in">लॉग इन नहीं है</string>
 
     <!-- Dashboard -->
     <string name="aaj_ka_hisab">आज का हिसाब</string>
     <string name="sales_trend">बिक्री का ग्राफ</string>
     <string name="default_shop_name">व्हाट्सएप बिलिंग</string>
+    <string name="namaste_greeting">नमस्ते 👋</string>
     <string name="welcome_back">स्वागत है, 👋</string>
     <string name="could_not_load_dashboard">डैशबोर्ड लोड नहीं हो सका</string>
     <string name="todays_collection">आज का कलेक्शन</string>
@@ -112,6 +115,9 @@
     <string name="add_first_customer">आरंभ करने के लिए अपना पहला ग्राहक जोड़ें</string>
     <string name="add_customer_action">ग्राहक जोड़ें</string>
     <string name="search_by_name_or_phone">नाम या फ़ोन से खोजें...</string>
+    <string name="search_name_or_phone_hint">नाम या फ़ोन नंबर...</string>
+    <string name="naya_grahak">नया ग्राहक</string>
+    <string name="cancelled">रद्द किया गया</string>
     <string name="all_with_count">सभी (%d)</string>
     <string name="with_outstanding">बकाया के साथ</string>
     <string name="paid_filter">भुगतान किया</string>
@@ -483,6 +489,11 @@
     <string name="notes_label">नोट्स</string>
     <string name="delete_purchase">खरीदारी हटाएं</string>
 
+    <!-- Missing Staff -->
+    <string name="staff_management">स्टाफ प्रबंधन</string>
+    <string name="add_staff">स्टाफ जोड़ें</string>
+    <string name="remove_staff">स्टाफ हटाएं</string>
+
     <!-- Financial Reports -->
     <string name="tab_pl">लाभ/हानि</string>
     <string name="tab_balance_sheet">बैलेंस शीट</string>
@@ -550,4 +561,74 @@
     <string name="net_increase">शुद्ध वृद्धि</string>
     <string name="net_decrease">शुद्ध कमी</string>
     <string name="ending_period">अवधि का अंत</string>
+
+    <!-- Missing Bottom Nav / Navigation -->
+    <string name="home">होम</string>
+    <string name="customers_label">ग्राहक</string>
+    <string name="bills_label">बिल</string>
+    <string name="inventory_label">इन्वेंटरी</string>
+
+    <!-- Missing Search -->
+    <string name="search_hint">नाम या फ़ोन नंबर खोजें</string>
+
+    <!-- Missing Confirmations -->
+    <string name="confirm_delete">क्या आपको यकीन है?</string>
+
+    <!-- Missing Bills -->
+    <string name="mark_as_paid">भुगतान किया गया चिह्नित करें</string>
+    <string name="new_bill">नया बिल</string>
+    <string name="bills_overview">बिल अवलोकन</string>
+
+    <!-- Missing Bot / AI -->
+    <string name="bot_active">बॉट सक्रिय</string>
+    <string name="ai_assistant_ready">AI असिस्टेंट\nतैयार है</string>
+    <string name="bot_ask_me">बोल, मैं क्या कर सकता हूँ?</string>
+
+    <!-- Missing Customers -->
+    <string name="add_customer">ग्राहक जोड़ें</string>
+    <string name="customer_profile">ग्राहक प्रोफ़ाइल</string>
+
+    <!-- Missing Actions -->
+    <string name="send_reminder">रिमाइंडर भेजें</string>
+
+    <!-- Missing Error -->
+    <string name="error_label">त्रुटि:</string>
+
+    <!-- Missing Settings / Preferences -->
+    <string name="preferences_section">प्राथमिकताएं</string>
+    <string name="whatsapp_bot_section">व्हाट्सएप बॉट</string>
+    <string name="version_label">संस्करण</string>
+    <string name="sync_status">सिंक स्थिति</string>
+    <string name="logout_label">लॉगआउट</string>
+    <string name="data_export">डेटा एक्सपोर्ट (CSV)</string>
+
+    <!-- Missing Dashboard -->
+    <string name="total_outstanding">कुल बकाया</string>
+    <string name="today_collection">आज का कलेक्शन</string>
+
+    <!-- Onboarding Screen -->
+    <string name="skip_label">छोड़ें</string>
+    <string name="chalo_shuru_karein">चलो शुरू करें →</string>
+    <string name="aage_button">आगे →</string>
+    <string name="onboarding_welcome_title">आपका डिजिटल खाता</string>
+    <string name="onboarding_welcome_subtitle">बिल बनाओ, WhatsApp करो — बस इतना</string>
+    <string name="feature_bill_send">बिल बनाओ और भेजो</string>
+    <string name="feature_digital_khata">खाता डिजिटल रखो</string>
+    <string name="feature_whatsapp_reminder">WhatsApp से भुगतान याद दिलाओ</string>
+    <string name="onboarding_bot_title">ग्राहक बुक AI बॉट</string>
+    <string name="onboarding_bot_subtitle">बस WhatsApp करो, पूरा खाता अपडेट हो जाएगा</string>
+    <string name="onboarding_bot_name">ग्राहक बुक AI</string>
+    <string name="payment_recorded_check">भुगतान दर्ज ✓</string>
+    <string name="invoice_sent_check">इनवॉइस भेजा ✓</string>
+    <string name="no_app_needed">कोई ऐप नहीं चाहिए — बस WhatsApp!</string>
+    <string name="shop_setup_title">अपनी दुकान सेटअप करें</string>
+    <string name="shop_setup_subtitle">एक मिनट में तैयार</string>
+    <string name="shop_name_label">दुकान का नाम</string>
+    <string name="shop_name_placeholder">जैसे शर्मा इलेक्ट्रॉनिक्स</string>
+    <string name="category_label">श्रेणी</string>
+    <string name="language_label">भाषा</string>
+    <string name="onboarding_ready_title">सब तैयार है!</string>
+    <string name="onboarding_ready_subtitle">अब आप WhatsApp से अपना पूरा व्यवसाय चला सकते हैं</string>
+    <string name="onboarding_social_proof">10,000+ दुकानदार ग्राहक बुक पर भरोसा करते हैं</string>
+    <string name="chalo_shuru_karte_hain">चलो शुरू करते हैं →</string>
 </resources>

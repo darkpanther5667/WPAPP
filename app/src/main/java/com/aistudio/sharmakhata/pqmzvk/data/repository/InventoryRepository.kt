@@ -2,13 +2,16 @@ package com.aistudio.sharmakhata.pqmzvk.data.repository
 
 import com.aistudio.sharmakhata.pqmzvk.data.local.ItemDao
 import com.aistudio.sharmakhata.pqmzvk.data.local.ItemEntity
-import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiClient
+import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiService
 import com.aistudio.sharmakhata.pqmzvk.data.remote.StoredItem
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class InventoryRepository @Inject constructor(
-    private val itemDao: ItemDao
+    private val itemDao: ItemDao,
+    private val apiService: ApiService
 ) {
     fun getAllItems(): Flow<List<ItemEntity>> = itemDao.getAllItems()
 
@@ -28,7 +31,7 @@ class InventoryRepository @Inject constructor(
 
     suspend fun refreshFromServer() {
         try {
-            val response = ApiClient.apiService.getStoredItems()
+            val response = apiService.getStoredItems()
             response.items.forEach { serverItem ->
                 val existing = itemDao.getAllItemsList().find { it.name == serverItem.name }
                 if (existing != null) {
@@ -44,7 +47,7 @@ class InventoryRepository @Inject constructor(
 
     suspend fun loadStoredItems(): List<StoredItem> {
         return try {
-            val response = ApiClient.apiService.getStoredItems()
+            val response = apiService.getStoredItems()
             response.items
         } catch (e: Exception) {
             emptyList()

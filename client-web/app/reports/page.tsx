@@ -5,11 +5,8 @@ import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { Transaction, Bill, Customer } from "@/types";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, Skeleton } from "@/components/ui";
 import {
-  TrendingUp,
-  TrendingDown,
   Wallet,
   AlertTriangle,
   RefreshCw,
@@ -113,7 +110,7 @@ export default function ReportsPage() {
     return (
       <div className="px-4 py-5 space-y-4 page-enter">
         <Skeleton className="h-8 w-20 rounded-xl" />
-        <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-24 rounded-2xl" />
           ))}

@@ -55,7 +55,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.dp
 import com.aistudio.sharmakhata.pqmzvk.ui.screens.*
 import com.aistudio.sharmakhata.pqmzvk.ui.onboarding.OnboardingScreen
 import com.aistudio.sharmakhata.pqmzvk.ui.onboarding.isOnboardingComplete
@@ -209,7 +208,7 @@ class MainActivity : ComponentActivity() {
               Text(
                 text = "Verify your identity to continue",
                 style = MaterialTheme.typography.bodyLarge,
-                color = TextSecondaryLight
+                color = StitchTextSecondary
               )
               Spacer(modifier = Modifier.height(24.dp))
               CircularProgressIndicator()
@@ -277,10 +276,10 @@ class MainActivity : ComponentActivity() {
               AppUpdateManager.downloadAndInstall(context, pendingUpdate!!)
             }
           },
-          onDismiss = if (pendingUpdate?.isMandatory == true) null else {{
+          onDismiss = if (pendingUpdate?.isMandatory == true) null else ({
             showUpdateDialog = false
             AppUpdateManager.resetDownloadState()
-          }}
+          })
         )
       }
     }
@@ -320,7 +319,7 @@ fun BiometricLockScreen(
       Text(
         text = "Verify your identity to continue",
         style = MaterialTheme.typography.bodyLarge,
-        color = TextSecondaryLight
+        color = StitchTextSecondary
       )
       Spacer(modifier = Modifier.height(24.dp))
       Button(
@@ -527,7 +526,7 @@ fun ProfileScreen(
                   verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                   Text(text = customerCount.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = StitchTeal)
-                  Text(text = stringResource(R.string.customers_title), style = MaterialTheme.typography.labelSmall, color = TextSecondaryLight)
+                  Text(text = stringResource(R.string.customers_title), style = MaterialTheme.typography.labelSmall, color = StitchTextSecondary)
                 }
               }
               Card(
@@ -542,7 +541,7 @@ fun ProfileScreen(
                   verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                   Text(text = billCount.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = StitchSky)
-                  Text(text = stringResource(R.string.bills_title), style = MaterialTheme.typography.labelSmall, color = TextSecondaryLight)
+                  Text(text = stringResource(R.string.bills_title), style = MaterialTheme.typography.labelSmall, color = StitchTextSecondary)
                 }
               }
             }
@@ -820,7 +819,7 @@ private fun SettingsItem(
         Text(
           text = subtitle,
           style = MaterialTheme.typography.bodySmall,
-          color = TextSecondaryLight
+          color = StitchTextSecondary
         )
       }
     }

@@ -4,6 +4,7 @@ import com.aistudio.sharmakhata.pqmzvk.data.model.Customer
 import com.aistudio.sharmakhata.pqmzvk.data.model.DailyReport
 import com.aistudio.sharmakhata.pqmzvk.data.model.DeltaChanges
 import com.aistudio.sharmakhata.pqmzvk.data.model.FullDatabase
+import com.aistudio.sharmakhata.pqmzvk.data.model.Staff
 import com.squareup.moshi.Json
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -71,6 +72,12 @@ interface ApiService {
 
     @DELETE("api/bill/{id}")
     suspend fun deleteBill(@Path("id") id: String): retrofit2.Response<BasicSuccessResponse>
+
+    @POST("api/staff/add")
+    suspend fun addStaff(@Body request: AddStaffRequest): retrofit2.Response<AddStaffResponse>
+
+    @DELETE("api/staff/{id}")
+    suspend fun removeStaff(@Path("id") id: String): retrofit2.Response<BasicSuccessResponse>
 }
 
 data class AddCustomerRequest(
@@ -205,4 +212,16 @@ data class UpdateStoreProfileRequest(
     val upi_id: String?,
     val gstin: String?,
     val invoice_template: String? = null
+)
+
+data class AddStaffRequest(
+    val name: String,
+    val phone: String,
+    val role: String = "staff"
+)
+
+data class AddStaffResponse(
+    val success: Boolean,
+    val staff: Staff? = null,
+    val message: String? = null
 )

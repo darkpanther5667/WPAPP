@@ -3,5 +3,5 @@ export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 export { Input } from "./input";
 export { Skeleton } from "./skeleton";
 export { Badge } from "./badge";
-export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./dialog";
-export { Toast, ToastProvider, ToastViewport, ToastTitle, ToastDescription } from "./toast";
+export { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
+export { Toast, ToastProvider, ToastTitle, ToastDescription } from "./toast";

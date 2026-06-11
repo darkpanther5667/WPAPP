@@ -21,6 +21,7 @@
     <string name="paid">Paid</string>
     <string name="unpaid">Unpaid</string>
     <string name="overdue">Overdue</string>
+    <string name="cancelled">Cancelled</string>
     <string name="pending">Pending</string>
     <string name="today">Today</string>
     <string name="this_week">This Week</string>
@@ -37,6 +38,7 @@
     <string name="reports_title">Reports</string>
     <string name="expenses_title">Expenses</string>
     <string name="inventory_title">Inventory</string>
+    <string name="nav_home">Home</string>
     <string name="search_title">Search</string>
     <string name="ledger_title">Ledger</string>
     <string name="financial_reports_title">Financial Reports</string>
@@ -83,16 +85,29 @@
     <string name="active_account">Active Account</string>
     <string name="active_label">Active</string>
     <string name="not_logged_in">Not logged in</string>
+    <string name="inactive_label">Inactive</string>
+    <string name="whatsapp_bot_section">WHATSAPP BOT</string>
+    <string name="ai_whatsapp_bot_title">AI WhatsApp Bot</string>
+    <string name="bot_always_active">Bot hamesha active hai — bas WhatsApp karo</string>
+    <string name="bot_number_title">Bot Number</string>
+    <string name="daily_summary_time_title">Daily Summary Time</string>
+    <string name="reminder_8pm_active">8:00 PM reminder active</string>
+    <string name="data_export_csv">Data Export (CSV)</string>
+    <string name="share_data_csv">Share your data as CSV file</string>
 
     <!-- Dashboard -->
     <string name="aaj_ka_hisab">Today\'s Summary</string>
     <string name="sales_trend">Sales Trend</string>
     <string name="default_shop_name">WhatsApp Billing</string>
+    <string name="namaste_greeting">Namaste 👋</string>
     <string name="welcome_back">Welcome back, 👋</string>
     <string name="could_not_load_dashboard">Could not load dashboard</string>
     <string name="todays_collection">Today\'s Collection</string>
     <string name="bills_today">%d bills today</string>
     <string name="trend_vs_yesterday">↑12% vs yesterday</string>
+    <string name="bot_active">Bot Active</string>
+    <string name="ai_assistant_ready">AI Assistant\nReady hai</string>
+    <string name="ai_assistant_prompt">Bol, main kya kar sakta hoon?</string>
     <string name="revenue_label">Revenue</string>
     <string name="clients_label">Clients</string>
     <string name="invoices_label">Invoices</string>
@@ -113,6 +128,8 @@
     <string name="add_first_customer">Add your first customer to get started</string>
     <string name="add_customer_action">Add Customer</string>
     <string name="search_by_name_or_phone">Search by name or phone...</string>
+    <string name="search_name_or_phone_hint">Naam ya phone number...</string>
+    <string name="naya_grahak">Naya Grahak</string>
     <string name="all_with_count">All (%d)</string>
     <string name="with_outstanding">With Outstanding</string>
     <string name="paid_filter">Paid</string>
@@ -384,6 +401,8 @@
     <string name="no_bills_yet">No bills yet</string>
     <string name="recent_transactions">Recent Transactions</string>
     <string name="no_transactions_yet">No transactions yet</string>
+    <string name="create_your_first_bill">Create your first bill to get started</string>
+    <string name="todays_summary">Today\'s financial overview</string>
     <string name="phone_field">Phone</string>
     <string name="customer_id_field">Customer ID</string>
     <string name="total_bills_field">Total Bills</string>
@@ -412,6 +431,9 @@
     <string name="grahbook_logo_desc">Grahbook Logo</string>
     <string name="loading_workspace">Loading your workspace...</string>
     <string name="syncing_data">Syncing your data…</string>
+    <string name="syncing_now">Syncing…</string>
+    <string name="last_synced_recently">Last synced: recently</string>
+    <string name="sync_failed_will_retry">Sync failed — will retry</string>
     <string name="sync_timed_out">Sync timed out. The server may be waking up (cold start). Please try again.</string>
     <string name="sync_failed">Sync Failed</string>
     <string name="retry_button">Retry</string>
@@ -558,4 +580,76 @@
     <string name="payment_label">Payment</string>
     <string name="credit_label">Credit</string>
     <string name="placeholder_rupees">Amount in ₹</string>
+
+    <!-- Missing Bottom Nav / Navigation -->
+    <string name="home">Home</string>
+    <string name="customers_label">Customers</string>
+    <string name="bills_label">Bills</string>
+    <string name="inventory_label">Inventory</string>
+
+    <!-- Missing Search -->
+    <string name="search_hint">Naam ya phone number dhundhein</string>
+
+    <!-- Missing Confirmations -->
+    <string name="confirm_delete">Are you sure?</string>
+
+    <!-- Missing Bills -->
+    <string name="mark_as_paid">Mark as Paid</string>
+    <string name="new_bill">New Bill</string>
+    <string name="bills_overview">Bills Overview</string>
+
+    <!-- Missing Bot / AI -->
+    <string name="bot_ask_me">Bol, main kya kar sakta hoon?</string>
+
+    <!-- Missing Customers -->
+    <string name="add_customer">Add Customer</string>
+    <string name="customer_profile">Customer Profile</string>
+
+    <!-- Missing Actions -->
+    <string name="send_reminder">Send Reminder</string>
+
+    <!-- Missing Error -->
+    <string name="error_label">Error:</string>
+
+    <!-- Missing Staff -->
+    <string name="staff_management">Staff Management</string>
+    <string name="add_staff">Add Staff</string>
+    <string name="remove_staff">Remove Staff</string>
+
+    <!-- Missing Settings / Preferences -->
+    <string name="preferences_section">PREFERENCES</string>
+    <string name="version_label">Version</string>
+    <string name="sync_status">Sync Status</string>
+    <string name="logout_label">Logout</string>
+    <string name="data_export">Data Export (CSV)</string>
+
+    <!-- Missing Dashboard -->
+    <string name="total_outstanding">Total Outstanding</string>
+    <string name="today_collection">Today Collection</string>
+
+    <!-- Onboarding Screen -->
+    <string name="skip_label">Skip</string>
+    <string name="chalo_shuru_karein">Chalo Shuru Karein →</string>
+    <string name="aage_button">Aage →</string>
+    <string name="onboarding_welcome_title">Aapka Digital Khata</string>
+    <string name="onboarding_welcome_subtitle">Bill banao, WhatsApp karo — bas itna</string>
+    <string name="feature_bill_send">Bill banao aur bhejo</string>
+    <string name="feature_digital_khata">Khata digital rakho</string>
+    <string name="feature_whatsapp_reminder">WhatsApp se payment yaad dilao</string>
+    <string name="onboarding_bot_title">Grahbook AI Bot</string>
+    <string name="onboarding_bot_subtitle">Bas WhatsApp karo, pura khata update ho jayega</string>
+    <string name="onboarding_bot_name">Grahbook AI</string>
+    <string name="payment_recorded_check">Payment recorded ✓</string>
+    <string name="invoice_sent_check">Invoice sent ✓</string>
+    <string name="no_app_needed">No app needed — bas WhatsApp!</string>
+    <string name="shop_setup_title">Apni Dukaan Setup Karein</string>
+    <string name="shop_setup_subtitle">Ek minute mein taiyar</string>
+    <string name="shop_name_label">Shop Name</string>
+    <string name="shop_name_placeholder">e.g. Sharma Electronics</string>
+    <string name="category_label">Category</string>
+    <string name="language_label">Language</string>
+    <string name="onboarding_ready_title">Sab Taiyar Hai!</string>
+    <string name="onboarding_ready_subtitle">Ab aap WhatsApp se apna pura business chala sakte hain</string>
+    <string name="onboarding_social_proof">10,000+ shopkeepers trust Grahbook</string>
+    <string name="chalo_shuru_karte_hain">Chalo Shuru Karte Hain →</string>
 </resources>

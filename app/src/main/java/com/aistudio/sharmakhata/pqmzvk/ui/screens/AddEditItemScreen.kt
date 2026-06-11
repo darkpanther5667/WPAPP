@@ -28,6 +28,8 @@ import androidx.compose.ui.res.stringResource
 import com.aistudio.sharmakhata.pqmzvk.R
 import com.aistudio.sharmakhata.pqmzvk.data.local.ItemEntity
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
+import com.aistudio.sharmakhata.pqmzvk.util.DecimalVisualTransformation
+import com.aistudio.sharmakhata.pqmzvk.util.FormValidators
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,7 +37,7 @@ fun AddEditItemScreen(
     itemId: Long? = null,
     existingItem: ItemEntity? = null,
     onBack: () -> Unit,
-    onSave: (name: String, price: Double, stock: Int, lowStockAlert: Int) -> Unit,
+    onSave: (name: String, price: Double, stock: Int, lowStockAlert: Int, hsnCode: String) -> Unit,
     onDelete: (Long) -> Unit = {}
 ) {
     val isEditing = itemId != null || existingItem != null
@@ -44,17 +46,18 @@ fun AddEditItemScreen(
     var price by remember { mutableStateOf(existingItem?.price?.let { if (it == 0.0) "" else it.toString() } ?: "") }
     var stock by remember { mutableStateOf(existingItem?.stock?.toString() ?: "0") }
     var lowStockAlert by remember { mutableStateOf(existingItem?.lowStockAlert?.toString() ?: "5") }
+    var hsnCode by remember { mutableStateOf(existingItem?.hsnCode ?: "") }
 
     var nameError by remember { mutableStateOf(false) }
     var priceError by remember { mutableStateOf(false) }
 
-    val isValid = name.isNotBlank() && price.isNotBlank()
+    val isValid = FormValidators.isValidName(name) && FormValidators.isValidPrice(price)
 
     fun validateAndSave() {
-        nameError = name.isBlank()
-        priceError = price.isBlank()
-        if (name.isNotBlank() && price.isNotBlank()) {
-            onSave(name.trim(), price.toDoubleOrNull() ?: 0.0, stock.toIntOrNull() ?: 0, lowStockAlert.toIntOrNull() ?: 5)
+        nameError = !FormValidators.isValidName(name)
+        priceError = !FormValidators.isValidPrice(price)
+        if (isValid) {
+            onSave(name.trim(), FormValidators.parseDoubleSafe(price), FormValidators.parseIntSafe(stock, 0), FormValidators.parseIntSafe(lowStockAlert, 5), hsnCode.trim())
         }
     }
 
@@ -193,7 +196,7 @@ fun AddEditItemScreen(
                     },
                     isError = nameError,
                     supportingText = if (nameError) {
-                        { Text(stringResource(R.string.item_name_required), color = Color(0xFFFF6B6B)) }
+                        { Text(stringResource(R.string.item_name_required), color = DebtRed) }
                     } else null,
                     modifier = Modifier.fillMaxWidth(),
                     shape = TextFieldShape,
@@ -225,12 +228,39 @@ fun AddEditItemScreen(
                     },
                     isError = priceError,
                     supportingText = if (priceError) {
-                        { Text(stringResource(R.string.price_required), color = Color(0xFFFF6B6B)) }
+                        { Text(stringResource(R.string.price_required), color = DebtRed) }
                     } else null,
                     modifier = Modifier.fillMaxWidth(),
                     shape = TextFieldShape,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    visualTransformation = DecimalVisualTransformation(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = StitchPrimaryContainer,
+                        unfocusedBorderColor = StitchBorder,
+                        focusedContainerColor = StitchSurfaceLow,
+                        unfocusedContainerColor = StitchSurfaceLow,
+                        focusedTextColor = StitchTextPrimary,
+                        unfocusedTextColor = StitchTextPrimary,
+                        cursorColor = StitchPrimaryContainer,
+                        focusedLabelColor = StitchPrimaryContainer,
+                        unfocusedLabelColor = StitchTextSecondary
+                    )
+                )
+
+                // HSN/SAC Code
+                OutlinedTextField(
+                    value = hsnCode,
+                    onValueChange = { hsnCode = it },
+                    label = { Text("HSN/SAC Code") },
+                    placeholder = { Text("e.g. 1006, 9983") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Tag, contentDescription = null, tint = StitchPrimaryContainer)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = TextFieldShape,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = StitchPrimaryContainer,
                         unfocusedBorderColor = StitchBorder,
@@ -342,6 +372,7 @@ fun AddEditItemScreen(
                                 Text(
                                     text = buildString {
                                         append(if (price.isNotBlank()) "₹${price}" else "₹0.00")
+                                        if (hsnCode.isNotBlank()) append(" • HSN: $hsnCode")
                                         append(" • ${stock} units")
                                         append(" • Alert at ${lowStockAlert}")
                                     },
@@ -386,20 +417,20 @@ fun AddEditItemScreen(
                         .height(52.dp),
                     shape = ButtonShape,
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color(0xFFFF6B6B)
+                        contentColor = DebtRed
                     ),
                     border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(Color(0xFFFF6B6B).copy(alpha = 0.5f))
+                        brush = androidx.compose.ui.graphics.SolidColor(DebtRed.copy(alpha = 0.5f))
                     )
                 ) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
-                        tint = Color(0xFFFF6B6B)
+                        tint = DebtRed
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = stringResource(R.string.delete_item_button), fontWeight = FontWeight.Bold, color = Color(0xFFFF6B6B))
+                    Text(text = stringResource(R.string.delete_item_button), fontWeight = FontWeight.Bold, color = DebtRed)
                 }
             }
 

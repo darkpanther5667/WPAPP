@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.TextSnippet
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -103,7 +104,7 @@ fun InvoiceTemplateScreen(
                                     InvoiceTemplate.MODERN -> Icons.Outlined.Description
                                     InvoiceTemplate.CLASSIC -> Icons.Outlined.Receipt
                                     InvoiceTemplate.PROFESSIONAL -> Icons.Outlined.Business
-                                    InvoiceTemplate.MINIMAL -> Icons.Outlined.TextSnippet
+                                    InvoiceTemplate.MINIMAL -> Icons.AutoMirrored.Outlined.TextSnippet
                                 },
                                 contentDescription = null,
                                 tint = StitchPrimaryContainer,

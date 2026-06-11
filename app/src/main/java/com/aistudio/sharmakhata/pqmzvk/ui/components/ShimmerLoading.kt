@@ -7,8 +7,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -20,15 +22,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-// Custom shimmer colors
-private val ShimmerBase = Color(0xFFE0E0E0)
-private val ShimmerHighlight = Color(0xFFF5F5F5)
+@Composable
+private fun shimmerColors(): Pair<Color, Color> {
+    return MaterialTheme.colorScheme.surface to MaterialTheme.colorScheme.surfaceContainerHigh
+}
+
+@Composable
+private fun shimmerBase(): Color = shimmerColors().first
 
 @Composable
 private fun shimmerBrush(
     width: Dp = 200.dp,
     height: Dp = 20.dp,
 ): Brush {
+    val (base, highlight) = shimmerColors()
     val transition = rememberInfiniteTransition(label = "shimmer")
     val translateX by transition.animateFloat(
         initialValue = -width.value * 2,
@@ -41,7 +48,7 @@ private fun shimmerBrush(
     )
 
     return Brush.linearGradient(
-        colors = listOf(ShimmerBase, ShimmerHighlight, ShimmerBase),
+        colors = listOf(base, highlight, base),
         start = Offset(translateX, 0f),
         end = Offset(translateX + width.value, 0f)
     )
@@ -106,7 +113,7 @@ fun ShimmerListItem(
                         .fillMaxWidth(0.6f)
                         .height(16.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(ShimmerBase)
+                        .background(shimmerBase())
                 )
                 // Subtitle placeholder
                 Box(
@@ -114,7 +121,7 @@ fun ShimmerListItem(
                         .fillMaxWidth(0.4f)
                         .height(12.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(ShimmerBase)
+                        .background(shimmerBase())
                 )
             }
         }
@@ -130,7 +137,7 @@ fun ShimmerGridItem(
             .fillMaxWidth()
             .padding(16.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -140,7 +147,7 @@ fun ShimmerGridItem(
                 .fillMaxWidth(0.4f)
                 .height(16.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(ShimmerBase)
+                .background(shimmerBase())
         )
 
         // Value placeholder
@@ -149,7 +156,7 @@ fun ShimmerGridItem(
                 .fillMaxWidth(0.6f)
                 .height(32.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(ShimmerBase)
+                .background(shimmerBase())
         )
 
         Row(
@@ -161,7 +168,7 @@ fun ShimmerGridItem(
                 modifier = Modifier
                     .size(24.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(ShimmerBase)
+                    .background(shimmerBase())
             )
             // Label placeholder
             Box(
@@ -169,7 +176,7 @@ fun ShimmerGridItem(
                     .weight(1f)
                     .height(12.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(ShimmerBase)
+                    .background(shimmerBase())
             )
         }
     }
@@ -184,7 +191,7 @@ fun ShimmerCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -197,14 +204,14 @@ fun ShimmerCard(
                     .width(120.dp)
                     .height(16.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(ShimmerBase)
+                    .background(shimmerBase())
             )
             Box(
                 modifier = Modifier
                     .width(60.dp)
                     .height(16.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(ShimmerBase)
+                    .background(shimmerBase())
             )
         }
         Box(
@@ -212,7 +219,7 @@ fun ShimmerCard(
                 .fillMaxWidth()
                 .height(40.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(ShimmerBase)
+                .background(shimmerBase())
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -223,14 +230,14 @@ fun ShimmerCard(
                     .width(80.dp)
                     .height(12.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(ShimmerBase)
+                    .background(shimmerBase())
             )
             Box(
                 modifier = Modifier
                     .width(100.dp)
                     .height(12.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(ShimmerBase)
+                    .background(shimmerBase())
             )
         }
     }
@@ -280,14 +287,14 @@ fun DashboardShimmer(modifier: Modifier = Modifier) {
                         modifier = Modifier
                             .size(44.dp)
                             .clip(RoundedCornerShape(22.dp))
-                            .background(ShimmerBase)
+                            .background(shimmerBase())
                     )
                     Box(
                         modifier = Modifier
                             .width(40.dp)
                             .height(8.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(ShimmerBase)
+                            .background(shimmerBase())
                     )
                 }
             }
@@ -300,7 +307,7 @@ fun DashboardShimmer(modifier: Modifier = Modifier) {
                 .width(140.dp)
                 .height(16.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(ShimmerBase)
+                .background(shimmerBase())
         )
 
         // Transaction items
@@ -332,7 +339,7 @@ private fun ShimmerTxnRow() {
             modifier = Modifier
                 .size(40.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(ShimmerBase)
+                .background(shimmerBase())
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -341,7 +348,7 @@ private fun ShimmerTxnRow() {
                     .fillMaxWidth(0.45f)
                     .height(14.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(ShimmerBase)
+                    .background(shimmerBase())
             )
             Spacer(Modifier.height(4.dp))
             Box(
@@ -349,7 +356,7 @@ private fun ShimmerTxnRow() {
                     .width(60.dp)
                     .height(10.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(ShimmerBase)
+                    .background(shimmerBase())
             )
         }
         Box(
@@ -357,7 +364,7 @@ private fun ShimmerTxnRow() {
                 .width(80.dp)
                 .height(14.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(ShimmerBase)
+                .background(shimmerBase())
         )
     }
 }
@@ -391,7 +398,7 @@ fun CustomerListShimmer(count: Int = 6, modifier: Modifier = Modifier) {
                         .width(90.dp)
                         .height(32.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(ShimmerBase)
+                        .background(shimmerBase())
                 )
             }
         }
@@ -410,7 +417,7 @@ private fun CustomerCardShimmer() {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -419,7 +426,7 @@ private fun CustomerCardShimmer() {
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(ShimmerBase)
+                .background(shimmerBase())
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -428,7 +435,7 @@ private fun CustomerCardShimmer() {
                     .fillMaxWidth(0.5f)
                     .height(14.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(ShimmerBase)
+                    .background(shimmerBase())
             )
             Spacer(Modifier.height(6.dp))
             Box(
@@ -436,7 +443,7 @@ private fun CustomerCardShimmer() {
                     .width(80.dp)
                     .height(10.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(ShimmerBase)
+                    .background(shimmerBase())
             )
         }
         Box(
@@ -444,7 +451,7 @@ private fun CustomerCardShimmer() {
                 .width(70.dp)
                 .height(14.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(ShimmerBase)
+                .background(shimmerBase())
         )
     }
 }

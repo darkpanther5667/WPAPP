@@ -29,25 +29,14 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.sharmakhata.pqmzvk.data.local.ExpenseEntity
 import com.aistudio.sharmakhata.pqmzvk.ui.components.EmptyState
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
+import com.aistudio.sharmakhata.pqmzvk.util.Constants
 import androidx.compose.ui.res.stringResource
 import com.aistudio.sharmakhata.pqmzvk.R
 import java.text.SimpleDateFormat
 import java.util.*
 
-private val expenseCategories = listOf(
-    "Rent" to Icons.Default.Home,
-    "Utilities" to Icons.Default.Bolt,
-    "Salary" to Icons.Default.Groups,
-    "Inventory" to Icons.Default.Inventory2,
-    "Transport" to Icons.Default.LocalShipping,
-    "Marketing" to Icons.Default.Campaign,
-    "Food" to Icons.Default.Restaurant,
-    "Office Supplies" to Icons.Default.Build,
-    "Other" to Icons.Default.MoreHoriz
-)
-
 private fun categoryIcon(category: String): ImageVector {
-    return expenseCategories.firstOrNull { it.first == category }?.second ?: Icons.Default.MoreHoriz
+    return Constants.EXPENSE_CATEGORIES.firstOrNull { it.first == category }?.second ?: Icons.Default.MoreHoriz
 }
 
 private fun formatTimestamp(epochMillis: Long): String {
@@ -207,7 +196,7 @@ fun ExpensesScreen(
                                 Icon(
                                     Icons.Default.AccountBalance,
                                     contentDescription = null,
-                                    tint = ErrorRed,
+                                    tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(IconSize.small)
                                 )
                             }
@@ -215,7 +204,7 @@ fun ExpensesScreen(
                                 Text(
                                     text = if (selectedFilter == "All") stringResource(R.string.total_expenses_label) else stringResource(R.string.total_expenses_dynamic, selectedFilter),
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = TextSecondaryLight,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -223,14 +212,14 @@ fun ExpensesScreen(
                                     text = formatCurrencyTotal(filterTotal),
                                     style = AmountDisplayStyle,
                                     fontWeight = FontWeight.Bold,
-                                    color = ErrorRed,
+                                    color = MaterialTheme.colorScheme.error,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = stringResource(R.string.expense_count, filteredExpenses.size),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (filteredExpenses.size > 0) AmberWarning else TextSecondaryLight,
+                                    color = if (filteredExpenses.size > 0) AmberWarning else MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -255,7 +244,7 @@ fun ExpensesScreen(
                                     selectedContainerColor = IndigoPrimary,
                                     selectedLabelColor = Color.White,
                                     containerColor = MaterialTheme.colorScheme.surface,
-                                    labelColor = TextSecondaryLight
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                                 ),
                                 shape = RoundedCornerShape(10.dp)
                             )
@@ -277,14 +266,14 @@ fun ExpensesScreen(
                                 Icon(
                                     Icons.Outlined.SearchOff,
                                     contentDescription = null,
-                                    tint = TextTertiaryLight,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                     modifier = Modifier.size(IconSize.huge)
                                 )
                                 Text(
                                     text = stringResource(R.string.no_expenses_for_filter, selectedFilter),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = TextSecondaryLight,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center
                                 )
                             }
@@ -399,7 +388,7 @@ private fun ExpenseCard(
                     Text(
                         text = formatTimestamp(expense.createdAt),
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondaryLight
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 if (!expense.note.isNullOrBlank()) {
@@ -407,7 +396,7 @@ private fun ExpenseCard(
                     Text(
                         text = expense.note,
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextTertiaryLight,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -422,7 +411,7 @@ private fun ExpenseCard(
                     text = String.format("₹%.2f", expense.amount),
                     style = AmountMediumStyle,
                     fontWeight = FontWeight.Bold,
-                    color = ErrorRed,
+                    color = MaterialTheme.colorScheme.error,
                     maxLines = 1
                 )
                 IconButton(
@@ -432,7 +421,7 @@ private fun ExpenseCard(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = stringResource(R.string.delete_expense_desc),
-                        tint = ErrorRed.copy(alpha = 0.7f),
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                         modifier = Modifier.size(IconSize.small)
                     )
                 }

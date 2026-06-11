@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -77,7 +78,7 @@ fun ReportsScreen(
                             selectedContainerColor = StitchPrimaryContainer.copy(alpha = 0.15f),
                             selectedLabelColor = StitchPrimaryContainer,
                             containerColor = MaterialTheme.colorScheme.surface,
-                            labelColor = TextSecondaryLight
+                            labelColor = StitchTextSecondary
                         ),
                         shape = RoundedCornerShape(10.dp)
                     )
@@ -100,7 +101,7 @@ fun ReportsScreen(
                         ReportStatCard(
                             label = stringResource(R.string.total_sales),
                             value = FormatUtils.formatCurrency(report.billsTotal),
-                            icon = Icons.Outlined.TrendingUp,
+                            icon = Icons.AutoMirrored.Outlined.TrendingUp,
                             gradient = GradientWhatsApp,
                             valueColor = StitchPrimaryContainer,
                             modifier = Modifier.weight(1f)
@@ -285,7 +286,7 @@ private fun ReportStatCard(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = TextSecondaryLight,
+                color = StitchTextSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -323,7 +324,7 @@ private fun BreakdownRow(
             Text(
                 text = count,
                 style = MaterialTheme.typography.bodySmall,
-                color = TextSecondaryLight
+                color = StitchTextSecondary
             )
         }
         Text(

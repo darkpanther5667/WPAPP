@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useParams, Link } from "next/navigation";
+import { useParams } from "next/navigation";
+import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { formatCurrency, getCustomerOutstanding, formatPhone, cn } from "@/lib/utils";

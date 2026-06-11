@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
-import { formatCurrency, getCustomerOutstanding, formatPhone } from "@/lib/utils";
+import { formatCurrency, getCustomerOutstanding, formatPhone, cn } from "@/lib/utils";
 import { Customer, Transaction, Bill } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

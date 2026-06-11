@@ -4,18 +4,19 @@ import android.content.Context
 import com.aistudio.sharmakhata.pqmzvk.data.local.PendingDao
 import com.aistudio.sharmakhata.pqmzvk.data.local.PendingOperation
 import com.aistudio.sharmakhata.pqmzvk.data.remote.*
-import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiClient
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.RepoResult
 import com.aistudio.sharmakhata.pqmzvk.util.Constants
 import com.aistudio.sharmakhata.pqmzvk.util.NetworkUtils
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class BillingRepository @Inject constructor(
-    private val pendingDao: PendingDao
+    private val pendingDao: PendingDao,
+    private val apiService: ApiService,
+    private val moshi: Moshi
 ) {
-    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
 
     suspend fun createBill(
         context: Context,
@@ -53,7 +54,7 @@ class BillingRepository @Inject constructor(
                 return Pair(RepoResult.Success("Bill saved - will sync when online"), null)
             }
 
-            val response = ApiClient.apiService.createBill(
+            val response = apiService.createBill(
                 CreateBillRequest(customerId, amount, items, gstType, gstRate, taxableAmount, totalCgst, totalSgst, totalIgst, grandTotal)
             )
             val billId = response.body()?.billId
@@ -108,7 +109,7 @@ class BillingRepository @Inject constructor(
                 return Pair(RepoResult.Success("Bill saved - will sync when online"), null)
             }
 
-            val response = ApiClient.apiService.createBill(
+            val response = apiService.createBill(
                 CreateBillRequest(Constants.WALK_IN_CUSTOMER_ID, total, items, gstType, gstRate, taxableAmount, totalCgst, totalSgst, totalIgst, grandTotal)
             )
             val billId = response.body()?.billId
@@ -134,7 +135,7 @@ class BillingRepository @Inject constructor(
                 return RepoResult.Success("Saved offline — will sync when online")
             }
 
-            val response = ApiClient.apiService.markBillPaid(MarkBillPaidRequest(billId))
+            val response = apiService.markBillPaid(MarkBillPaidRequest(billId))
             if (response.isSuccessful && response.body()?.success == true) {
                 RepoResult.Success("Bill marked as paid")
             } else {
@@ -152,7 +153,7 @@ class BillingRepository @Inject constructor(
             if (!NetworkUtils.isNetworkAvailable(context)) {
                 return RepoResult.Error("No internet connection")
             }
-            val response = ApiClient.apiService.sendInvoice(SendInvoiceRequest(billId))
+            val response = apiService.sendInvoice(SendInvoiceRequest(billId))
             if (response.isSuccessful && response.body()?.success == true) {
                 RepoResult.Success("Invoice sent on WhatsApp")
             } else {
@@ -168,7 +169,7 @@ class BillingRepository @Inject constructor(
             if (!NetworkUtils.isNetworkAvailable(context)) {
                 return RepoResult.Error("No internet connection")
             }
-            val response = ApiClient.apiService.sendStatement(SendStatementRequest(customerId))
+            val response = apiService.sendStatement(SendStatementRequest(customerId))
             if (response.isSuccessful && response.body()?.success == true) {
                 RepoResult.Success("Statement sent on WhatsApp")
             } else {
@@ -184,7 +185,7 @@ class BillingRepository @Inject constructor(
             if (!NetworkUtils.isNetworkAvailable(context)) {
                 return RepoResult.Error("No internet connection")
             }
-            val response = ApiClient.apiService.sendReminder(SendReminderRequest(customerId, message))
+            val response = apiService.sendReminder(SendReminderRequest(customerId, message))
             if (response.isSuccessful && response.body()?.success == true) {
                 RepoResult.Success("Reminder sent on WhatsApp")
             } else {
@@ -197,7 +198,7 @@ class BillingRepository @Inject constructor(
 
     suspend fun loadStoredItems(): List<StoredItem> {
         return try {
-            val response = ApiClient.apiService.getStoredItems()
+            val response = apiService.getStoredItems()
             response.items
         } catch (e: Exception) {
             emptyList()
@@ -209,7 +210,7 @@ class BillingRepository @Inject constructor(
             if (!NetworkUtils.isNetworkAvailable(context)) {
                 return RepoResult.Error("No internet connection — delete requires online access")
             }
-            val response = ApiClient.apiService.deleteBill(billId)
+            val response = apiService.deleteBill(billId)
             if (response.isSuccessful && response.body()?.success == true) {
                 RepoResult.Success("Bill deleted")
             } else {
@@ -225,7 +226,7 @@ class BillingRepository @Inject constructor(
             if (!NetworkUtils.isNetworkAvailable(context)) {
                 return RepoResult.Error("No internet connection — delete requires online access")
             }
-            val response = ApiClient.apiService.deleteTransaction(transactionId)
+            val response = apiService.deleteTransaction(transactionId)
             if (response.isSuccessful && response.body()?.success == true) {
                 RepoResult.Success("Transaction deleted")
             } else {

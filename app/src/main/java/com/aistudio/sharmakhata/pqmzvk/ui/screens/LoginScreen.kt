@@ -27,6 +27,8 @@ import androidx.compose.ui.res.stringResource
 import com.aistudio.sharmakhata.pqmzvk.R
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
+import com.aistudio.sharmakhata.pqmzvk.util.FormValidators
+import com.aistudio.sharmakhata.pqmzvk.util.PhoneVisualTransformation
 import com.aistudio.sharmakhata.pqmzvk.util.SessionManager
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -244,6 +246,7 @@ fun LoginScreen(
                                     keyboardType = KeyboardType.Phone,
                                     imeAction = ImeAction.Done
                                 ),
+                                visualTransformation = PhoneVisualTransformation(),
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
                                 colors = TextFieldDefaults.colors(

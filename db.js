@@ -22,6 +22,30 @@ async function connectDB() {
     await client.connect();
     db = client.db('sharma_store');
     console.log('✅ Connected to MongoDB Atlas');
+
+    // Create indexes for query performance
+    try {
+      await Promise.all([
+        db.collection('customers').createIndex({ store_id: 1, id: 1 }),
+        db.collection('customers').createIndex({ phone: 1 }),
+        db.collection('customers').createIndex({ store_id: 1, name: 1 }),
+        db.collection('transactions').createIndex({ customer_id: 1 }),
+        db.collection('transactions').createIndex({ store_id: 1, timestamp: -1 }),
+        db.collection('bills').createIndex({ customer_id: 1, status: 1 }),
+        db.collection('bills').createIndex({ store_id: 1 }),
+        db.collection('bills').createIndex({ id: 1, store_id: 1 }),
+        db.collection('staff').createIndex({ phone: 1, store_id: 1 }),
+        db.collection('staff').createIndex({ store_id: 1, status: 1 }),
+        db.collection('sessions').createIndex({ token: 1 }, { expireAfterSeconds: 2592000 }),
+        db.collection('sessions').createIndex({ store_id: 1 }),
+        db.collection('login_codes').createIndex({ phone: 1, expires_at: 1 }),
+        db.collection('login_codes').createIndex({ store_id: 1 }),
+        db.collection('login_codes').createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 }),
+      ]);
+      console.log('✅ MongoDB indexes ensured');
+    } catch (e) {
+      console.warn('⚠️ Index creation failed (non-fatal):', e.message);
+    }
   }
   return db;
 }

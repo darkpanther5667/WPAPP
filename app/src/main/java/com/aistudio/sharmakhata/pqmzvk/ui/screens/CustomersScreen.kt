@@ -3,6 +3,9 @@ package com.aistudio.sharmakhata.pqmzvk.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -15,12 +18,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -33,11 +38,13 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.sharmakhata.pqmzvk.data.model.Customer
 import com.aistudio.sharmakhata.pqmzvk.data.model.FullDatabase
 import com.aistudio.sharmakhata.pqmzvk.ui.components.EmptyState
+import com.aistudio.sharmakhata.pqmzvk.ui.components.FilterChipItem
 import com.aistudio.sharmakhata.pqmzvk.ui.components.HamburgerAppBar
 import com.aistudio.sharmakhata.pqmzvk.ui.components.ShimmerListItem
 import com.aistudio.sharmakhata.pqmzvk.ui.components.AmountText
 import com.aistudio.sharmakhata.pqmzvk.ui.components.GrahbookAmountType
 import com.aistudio.sharmakhata.pqmzvk.ui.components.CustomerAvatar
+import com.aistudio.sharmakhata.pqmzvk.ui.components.PressSpring
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.CustomerViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
@@ -80,22 +87,18 @@ fun CustomersScreen(
         },
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            val primaryColor = MaterialTheme.colorScheme.primary
-            val primaryVariant = if (primaryColor == Brand500) Brand700 else Saffron600
-            Box(
-                modifier = Modifier
-                    .height(52.dp)
-                    .clip(RoundedCornerShape(GrahbookRadius.md))
-                    .background(Brush.horizontalGradient(listOf(primaryColor, primaryVariant)))
-                    .clickable { onAddCustomer() }
-                    .padding(horizontal = 24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.PersonAdd, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
-                    Text("+ Naya Customer", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimary)
-                }
-            }
+            ExtendedFloatingActionButton(
+                onClick = onAddCustomer,
+                icon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
+                text = { Text(stringResource(R.string.naya_grahak)) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = RoundedCornerShape(GrahbookRadius.md),
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = Elevation.medium,
+                    pressedElevation = Elevation.high
+                )
+            )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
@@ -185,7 +188,7 @@ fun CustomersList(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { viewModel.setSearchQuery(it) },
-            placeholder = { Text("Naam ya phone number...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontFamily = DMSans) },
+            placeholder = { Text(stringResource(R.string.search_name_or_phone_hint), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontFamily = Poppins) },
             leadingIcon = {
                 Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
             },
@@ -215,7 +218,7 @@ fun CustomersList(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Ink900)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(horizontal = 20.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -223,7 +226,7 @@ fun CustomersList(
             Text(
                 text = stringResource(R.string.outstanding_label),
                 style = MaterialTheme.typography.bodySmall,
-                color = Ink300,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.SemiBold
             )
             AmountText(
@@ -277,7 +280,7 @@ fun CustomersList(
                     Icon(
                         Icons.Outlined.PersonSearch,
                         contentDescription = null,
-                        tint = Ink400,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(48.dp)
                     )
                     Text(
@@ -291,7 +294,7 @@ fun CustomersList(
                             stringResource(R.string.no_filter_customers, localizedFilter)
                         },
                         style = MaterialTheme.typography.titleLarge,
-                        color = Ink200,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
                     if (searchQuery.isNotEmpty()) {
@@ -327,39 +330,6 @@ fun CustomersList(
 }
 
 @Composable
-private fun FilterChipItem(
-    selected: Boolean,
-    onClick: () -> Unit,
-    text: String
-) {
-    val brush = if (selected) {
-        Brush.horizontalGradient(listOf(Brand500, Brand600))
-    } else {
-        Brush.horizontalGradient(listOf(Ink600, Ink600))
-    }
-
-    Box(
-        modifier = Modifier
-            .height(36.dp)
-            .clip(RoundedCornerShape(GrahbookRadius.pill))
-            .background(brush)
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            style = TextStyle(
-                fontFamily = Syne,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
-                color = if (selected) Color.White else Ink200
-            )
-        )
-    }
-}
-
-@Composable
 private fun CustomerItemRow(
     customer: Customer,
     db: FullDatabase,
@@ -388,62 +358,87 @@ private fun CustomerItemRow(
         else -> GrahbookAmountType.NEUTRAL
     }
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = PressSpring,
+        label = "customer_scale"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+            .scale(scale),
+        shape = RoundedCornerShape(GrahbookRadius.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = {
+                        val haptic = LocalHapticFeedback.current
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onClick()
+                    }
+                )
+                .padding(horizontal = GrahbookSpacing.lg, vertical = GrahbookSpacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             CustomerAvatar(
                 name = customer.name,
                 outstandingPaise = (balance * 100).toLong(),
-                size = 44.dp
+                size = 48.dp
             )
 
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(GrahbookSpacing.md))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = customer.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    style = TextStyle(
+                        fontFamily = Poppins,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = GrahbookFontSize.title,
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(3.dp))
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(GrahbookSpacing.xs),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Default.Phone,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.size(12.dp)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(13.dp)
                     )
                     Text(
                         text = customer.phone ?: stringResource(R.string.no_phone),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        style = TextStyle(
+                            fontFamily = Poppins,
+                            fontWeight = FontWeight.Normal,
+                            fontSize = GrahbookFontSize.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(GrahbookSpacing.sm))
 
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 AmountText(
                     amount = (abs(balance) * 100).toLong(),
@@ -452,8 +447,12 @@ private fun CustomerItemRow(
                 )
                 Text(
                     text = relativeTime,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    style = TextStyle(
+                        fontFamily = Poppins,
+                        fontWeight = FontWeight.Normal,
+                        fontSize = GrahbookFontSize.caption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
                 )
             }
         }

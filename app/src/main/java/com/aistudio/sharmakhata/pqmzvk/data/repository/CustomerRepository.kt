@@ -4,17 +4,19 @@ import android.content.Context
 import com.aistudio.sharmakhata.pqmzvk.data.local.PendingDao
 import com.aistudio.sharmakhata.pqmzvk.data.local.PendingOperation
 import com.aistudio.sharmakhata.pqmzvk.data.remote.AddCustomerRequest
-import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiClient
+import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiService
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.RepoResult
 import com.aistudio.sharmakhata.pqmzvk.util.NetworkUtils
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class CustomerRepository @Inject constructor(
-    private val pendingDao: PendingDao
+    private val pendingDao: PendingDao,
+    private val apiService: ApiService,
+    private val moshi: Moshi
 ) {
-    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
 
     suspend fun addCustomer(name: String, phone: String, context: Context): RepoResult {
         return try {
@@ -25,7 +27,7 @@ class CustomerRepository @Inject constructor(
                 return RepoResult.Success("Customer saved — will sync when online")
             }
 
-            val response = ApiClient.apiService.addCustomer(AddCustomerRequest(name, phone))
+            val response = apiService.addCustomer(AddCustomerRequest(name, phone))
             if (response.isSuccessful && response.body()?.success == true) {
                 RepoResult.Success("Customer added successfully")
             } else {

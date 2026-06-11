@@ -30,6 +30,8 @@ import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
 import com.aistudio.sharmakhata.pqmzvk.util.SessionManager
+import androidx.compose.ui.res.stringResource
+import com.aistudio.sharmakhata.pqmzvk.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +65,7 @@ fun MoreSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(topStart = GrahbookRadius.xxl, topEnd = GrahbookRadius.xxl),
-        containerColor = Ink700,
+        containerColor = MaterialTheme.colorScheme.surface,
         scrimColor = Color.Black.copy(alpha = 0.6f),
         dragHandle = {
             Box(
@@ -71,7 +73,7 @@ fun MoreSheet(
                     .padding(top = 12.dp, bottom = 8.dp)
                     .size(width = 40.dp, height = 4.dp)
                     .clip(RoundedCornerShape(GrahbookRadius.pill))
-                    .background(Ink400)
+                    .background(MaterialTheme.colorScheme.outline)
             )
         }
     ) {
@@ -106,27 +108,27 @@ fun MoreSheet(
                 Text(
                     text = storeName,
                     style = MaterialTheme.typography.titleLarge,
-                    color = Ink000
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 if (ownerName.isNotBlank()) {
                     Text(
                         text = ownerName,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Ink200
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Spacer(Modifier.height(8.dp))
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(GrahbookRadius.pill))
-                        .background(if (token != null) RupeeGreen.copy(alpha = 0.15f) else Ink500)
+                        .background(if (token != null) RupeeGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.outline)
                         .padding(horizontal = 16.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = if (token != null) "Active Account" else "Not logged in",
+                        text = if (token != null) stringResource(R.string.active_account) else stringResource(R.string.not_logged_in),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (token != null) RupeeGreen else Ink200
+                        color = if (token != null) RupeeGreen else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -143,7 +145,7 @@ fun MoreSheet(
                 Card(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(GrahbookRadius.lg),
-                    colors = CardDefaults.cardColors(containerColor = Ink600)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.outline)
                 ) {
                     Column(
                         modifier = Modifier
@@ -158,16 +160,16 @@ fun MoreSheet(
                             color = Brand300
                         )
                         Text(
-                            text = "Customers",
+                            text = stringResource(R.string.customers_title),
                             style = MaterialTheme.typography.bodySmall,
-                            color = Ink200
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
                 Card(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(GrahbookRadius.lg),
-                    colors = CardDefaults.cardColors(containerColor = Ink600)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.outline)
                 ) {
                     Column(
                         modifier = Modifier
@@ -182,9 +184,9 @@ fun MoreSheet(
                             color = Saffron500
                         )
                         Text(
-                            text = "Bills",
+                            text = stringResource(R.string.bills_title),
                             style = MaterialTheme.typography.bodySmall,
-                            color = Ink200
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -193,12 +195,12 @@ fun MoreSheet(
             Spacer(Modifier.height(8.dp))
 
             // === WHATSAPP BOT SECTION ===
-            SectionHeader("WHATSAPP BOT")
+            SectionHeader(stringResource(R.string.whatsapp_bot_section))
             SheetSettingItem(
                 icon = Icons.Default.SmartToy,
                 iconTint = RupeeGreen,
-                title = "AI WhatsApp Bot",
-                subtitle = "Bot hamesha active hai — bas WhatsApp karo",
+                title = stringResource(R.string.ai_whatsapp_bot_title),
+                subtitle = stringResource(R.string.bot_always_active),
                 trailing = {
                     Switch(
                         checked = true,
@@ -211,23 +213,23 @@ fun MoreSheet(
                     )
                 }
             )
-            HorizontalDivider(color = Ink600, modifier = Modifier.padding(horizontal = 24.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(horizontal = 24.dp))
 
             SheetSettingItem(
                 icon = Icons.Default.Phone,
                 iconTint = RupeeGreen,
-                title = "Bot Number",
+                title = stringResource(R.string.bot_number_title),
                 subtitle = "+91 98765 43210"
             )
-            HorizontalDivider(color = Ink600, modifier = Modifier.padding(horizontal = 24.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(horizontal = 24.dp))
 
             // === PREFERENCES ===
-            SectionHeader("PREFERENCES")
+            SectionHeader(stringResource(R.string.preferences_title))
             SheetSettingItem(
                 icon = if (isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
                 iconTint = Saffron500,
-                title = "Dark Mode",
-                subtitle = if (isDarkTheme) "Dark mode active" else "Light mode active",
+                title = stringResource(R.string.dark_mode_title),
+                subtitle = if (isDarkTheme) stringResource(R.string.dark_mode_currently_dark) else stringResource(R.string.dark_mode_currently_light),
                 trailing = {
                     Switch(
                         checked = isDarkTheme,
@@ -240,40 +242,40 @@ fun MoreSheet(
                     )
                 }
             )
-            HorizontalDivider(color = Ink600, modifier = Modifier.padding(horizontal = 24.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(horizontal = 24.dp))
 
             SheetSettingItem(
                 icon = Icons.Default.Notifications,
                 iconTint = Saffron500,
-                title = "Daily Summary Time",
-                subtitle = "8:00 PM reminder active"
+                title = stringResource(R.string.daily_summary_time_title),
+                subtitle = stringResource(R.string.reminder_8pm_active)
             )
-            HorizontalDivider(color = Ink600, modifier = Modifier.padding(horizontal = 24.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(horizontal = 24.dp))
 
             // === ABOUT ===
-            SectionHeader("ABOUT")
+            SectionHeader(stringResource(R.string.about_section))
             SheetSettingItem(
                 icon = Icons.Default.Info,
-                iconTint = Ink200,
-                title = "Version",
+                iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                title = stringResource(R.string.version_title),
                 subtitle = "${BuildConfig.VERSION_NAME} (${BuildConfig.BUILD_TYPE})"
             )
-            HorizontalDivider(color = Ink600, modifier = Modifier.padding(horizontal = 24.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(horizontal = 24.dp))
 
             SheetSettingItem(
                 icon = Icons.Default.Sync,
                 iconTint = RupeeGreen,
-                title = "Sync Status",
-                subtitle = if (token != null) "Active" else "Inactive"
+                title = stringResource(R.string.sync_status_title),
+                subtitle = if (token != null) stringResource(R.string.active_label) else stringResource(R.string.inactive_label)
             )
-            HorizontalDivider(color = Ink600, modifier = Modifier.padding(horizontal = 24.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(horizontal = 24.dp))
 
             // Data Export
             SheetSettingItem(
                 icon = Icons.Default.Share,
                 iconTint = Brand300,
-                title = "Data Export (CSV)",
-                subtitle = "Share your data as CSV file",
+                title = stringResource(R.string.data_export_csv),
+                subtitle = stringResource(R.string.share_data_csv),
                 onClick = {
                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
@@ -292,7 +294,7 @@ fun MoreSheet(
                     .padding(horizontal = 24.dp)
             ) {
                 GrahbookDestructiveButton(
-                    text = "Logout",
+                    text = stringResource(R.string.logout_button),
                     onClick = onLogout,
                     icon = Icons.AutoMirrored.Filled.Logout
                 )
@@ -308,10 +310,10 @@ private fun SectionHeader(title: String) {
     Text(
         text = title,
         style = TextStyle(
-            fontFamily = Syne,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Bold,
             fontSize = 11.sp,
-            color = Ink300,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             letterSpacing = 1.sp
         ),
         modifier = Modifier.padding(start = 24.dp, top = 16.dp, bottom = 4.dp)
@@ -357,13 +359,13 @@ private fun SheetSettingItem(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = Ink000
+                color = MaterialTheme.colorScheme.onBackground
             )
             if (subtitle.isNotBlank()) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Ink200
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

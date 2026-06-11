@@ -4,17 +4,19 @@ import android.content.Context
 import com.aistudio.sharmakhata.pqmzvk.data.local.PendingDao
 import com.aistudio.sharmakhata.pqmzvk.data.local.PendingOperation
 import com.aistudio.sharmakhata.pqmzvk.data.remote.AddPaymentRequest
-import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiClient
+import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiService
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.RepoResult
 import com.aistudio.sharmakhata.pqmzvk.util.NetworkUtils
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class PaymentRepository @Inject constructor(
-    private val pendingDao: PendingDao
+    private val pendingDao: PendingDao,
+    private val apiService: ApiService,
+    private val moshi: Moshi
 ) {
-    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
 
     suspend fun addPayment(
         context: Context,
@@ -33,7 +35,7 @@ class PaymentRepository @Inject constructor(
                 return RepoResult.Success("Payment saved - will sync when online")
             }
 
-            val response = ApiClient.apiService.addPayment(
+            val response = apiService.addPayment(
                 AddPaymentRequest(customerId, amount, note, paymentMode, type)
             )
             if (response.isSuccessful) {

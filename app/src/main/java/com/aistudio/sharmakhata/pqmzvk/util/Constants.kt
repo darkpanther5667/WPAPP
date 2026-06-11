@@ -1,5 +1,8 @@
 package com.aistudio.sharmakhata.pqmzvk.util
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+
 object Constants {
     // ── PRODUCTION ─────────────────────────────────────────────────────
     // Points to the Render service that runs both the Express API + Next.js panel.
@@ -14,4 +17,17 @@ object Constants {
 
     // TODO: Replace with your actual Sentry DSN from https://sentry.io
     const val SENTRY_DSN = "https://examplePublicKey@o0.ingest.sentry.io/0"
+
+    // ── EXPENSE CATEGORIES ────────────────────────────────────────────
+    val EXPENSE_CATEGORIES = listOf(
+        "Rent" to Icons.Default.Home,
+        "Utilities" to Icons.Default.Bolt,
+        "Salary" to Icons.Default.Groups,
+        "Inventory" to Icons.Default.Inventory2,
+        "Transport" to Icons.Default.LocalShipping,
+        "Marketing" to Icons.Default.Campaign,
+        "Food" to Icons.Default.Restaurant,
+        "Office Supplies" to Icons.Default.Build,
+        "Other" to Icons.Default.MoreHoriz
+    )
 }

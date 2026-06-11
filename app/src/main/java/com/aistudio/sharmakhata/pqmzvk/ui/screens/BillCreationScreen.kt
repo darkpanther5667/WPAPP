@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,6 +33,8 @@ import com.aistudio.sharmakhata.pqmzvk.data.remote.StoredItem
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.BillingViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
+import com.aistudio.sharmakhata.pqmzvk.util.DecimalVisualTransformation
+import com.aistudio.sharmakhata.pqmzvk.util.FormValidators
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 
 data class BillItemEntry(
@@ -114,9 +117,9 @@ fun BillCreationScreen(
                                 viewModel.resetOperationState()
                                 onBack()
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
+                            colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen)
                         ) {
-                            Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(stringResource(R.string.whatsapp_label))
                         }
@@ -160,7 +163,9 @@ fun BillCreationScreen(
         }
     }
 
-    val isValid = items.any { it.name.isNotBlank() && it.price.isNotBlank() }
+    val isValid = items.any {
+        it.name.isNotBlank() && FormValidators.isValidPrice(it.price) && (it.qty.toIntOrNull() ?: 0) > 0
+    }
 
     Scaffold(
         topBar = {
@@ -219,7 +224,7 @@ fun BillCreationScreen(
                             Icon(
                                 Icons.Default.Person,
                                 contentDescription = null,
-                                tint = IndigoPrimary,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(IconSize.small)
                             )
                         }
@@ -227,7 +232,7 @@ fun BillCreationScreen(
                             Text(
                                 text = stringResource(R.string.billing_for),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = TextSecondaryLight
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = customerName,
@@ -257,7 +262,7 @@ fun BillCreationScreen(
                                     Icon(
                                         Icons.Default.ShoppingCart,
                                         contentDescription = null,
-                                        tint = IndigoPrimary,
+                                        tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(IconSize.small)
                                     )
                                     Spacer(modifier = Modifier.width(Spacing.small))
@@ -334,7 +339,7 @@ fun BillCreationScreen(
                     ) {
                         Icon(Icons.Default.AddCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.add_item_button), color = IndigoPrimary)
+                        Text(stringResource(R.string.add_item_button), color = MaterialTheme.colorScheme.primary)
                     }
                 }
 
@@ -359,14 +364,14 @@ fun BillCreationScreen(
                                     modifier = Modifier.weight(1.5f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextSecondaryLight
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     stringResource(R.string.qty_column),
                                     modifier = Modifier.weight(0.6f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextSecondaryLight,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center
                                 )
                                 Text(
@@ -374,7 +379,7 @@ fun BillCreationScreen(
                                     modifier = Modifier.weight(1f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextSecondaryLight,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.End
                                 )
                                 Text(
@@ -382,13 +387,13 @@ fun BillCreationScreen(
                                     modifier = Modifier.weight(1f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextSecondaryLight,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.End
                                 )
                                 Spacer(modifier = Modifier.width(32.dp)) // for delete button
                             }
 
-                            HorizontalDivider(color = CardBorder)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                             Spacer(modifier = Modifier.height(8.dp))
 
@@ -415,10 +420,10 @@ fun BillCreationScreen(
                                         singleLine = true,
                                         shape = RoundedCornerShape(8.dp),
                                         colors = TextFieldDefaults.colors(
-                                            focusedIndicatorColor = IndigoPrimary,
-                                            unfocusedIndicatorColor = CardBorder,
+                                            focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
                                             focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                            unfocusedContainerColor = BackgroundLight
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                                         )
                                     )
 
@@ -441,10 +446,10 @@ fun BillCreationScreen(
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                         shape = RoundedCornerShape(8.dp),
                                         colors = TextFieldDefaults.colors(
-                                            focusedIndicatorColor = IndigoPrimary,
-                                            unfocusedIndicatorColor = CardBorder,
+                                            focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
                                             focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                            unfocusedContainerColor = BackgroundLight
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                                         )
                                     )
 
@@ -465,12 +470,13 @@ fun BillCreationScreen(
                                         textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.End),
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                        visualTransformation = DecimalVisualTransformation(),
                                         shape = RoundedCornerShape(8.dp),
                                         colors = TextFieldDefaults.colors(
-                                            focusedIndicatorColor = IndigoPrimary,
-                                            unfocusedIndicatorColor = CardBorder,
+                                            focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
                                             focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                            unfocusedContainerColor = BackgroundLight
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                                         )
                                     )
 
@@ -516,7 +522,7 @@ fun BillCreationScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = IndigoPrimary.copy(alpha = 0.05f)
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
                         )
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -524,7 +530,7 @@ fun BillCreationScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(stringResource(R.string.subtotal), style = MaterialTheme.typography.bodyMedium, color = TextSecondaryLight)
+                                Text(stringResource(R.string.subtotal), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(FormatUtils.formatCurrency(totalAmount), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             }
                             Spacer(modifier = Modifier.height(4.dp))
@@ -532,12 +538,12 @@ fun BillCreationScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(stringResource(R.string.gst_optional), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
-                                Text("—", style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                                Text(stringResource(R.string.gst_optional), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("—", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
-                            HorizontalDivider(color = CardBorder)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             Spacer(modifier = Modifier.height(8.dp))
 
                             Row(
@@ -555,7 +561,7 @@ fun BillCreationScreen(
                                     FormatUtils.formatCurrency(totalAmount),
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = IndigoPrimary
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
@@ -584,7 +590,7 @@ fun BillCreationScreen(
                         .height(ComponentSize.buttonHeight),
                     enabled = isValid && operationState !is OperationState.Loading,
                     shape = ButtonShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
                     if (operationState is OperationState.Loading) {
                         CircularProgressIndicator(

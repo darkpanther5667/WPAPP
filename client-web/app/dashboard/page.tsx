@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
-import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { formatCurrency, formatDateTime, formatPhone, cn, formatDate } from "@/lib/utils";
 import {
   FullDatabase,
   Transaction,
@@ -29,10 +29,8 @@ import {
   ArrowDownRight,
   Plus,
   RefreshCw,
-  MessageCircle,
   Wallet,
 } from "lucide-react";
-import { cn, formatDate } from "@/lib/utils";
 
 export default function DashboardPage() {
   const { store } = useAuthStore();

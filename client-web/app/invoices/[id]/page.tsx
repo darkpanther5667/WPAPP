@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useParams, Link } from "next/navigation";
+import { useParams } from "next/navigation";
+import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { formatCurrency, formatDate, formatDateTime, cn } from "@/lib/utils";
@@ -79,7 +80,7 @@ export default function InvoiceDetailPage() {
     if (!bill) return;
     setMarking(true);
     try {
-      await apiClient.post("/api/bill/mark-paid", { customerId: bill.customer_id });
+      await apiClient.post("/api/bill/mark-paid", { billId: bill.id });
       setBill({ ...bill, status: "paid", paid_at: new Date().toISOString() });
     } catch (err: any) {
       alert(err?.response?.data?.message || "Failed to mark as paid");

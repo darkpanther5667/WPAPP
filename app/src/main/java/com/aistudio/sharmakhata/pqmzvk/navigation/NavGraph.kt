@@ -21,6 +21,7 @@ import com.aistudio.sharmakhata.pqmzvk.ui.components.AppSidebarDrawer
 import com.aistudio.sharmakhata.pqmzvk.ui.components.FloatingBottomNav
 import com.aistudio.sharmakhata.pqmzvk.ui.screens.*
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.*
+import com.aistudio.sharmakhata.pqmzvk.ui.components.EmilEaseOut
 import com.aistudio.sharmakhata.pqmzvk.util.SessionManager
 import com.aistudio.sharmakhata.pqmzvk.ProfileScreen
 import kotlinx.coroutines.launch
@@ -117,6 +118,7 @@ fun AppNavGraph(
         is UiState.Success -> s.data.bills.size
         else -> 0
     }
+    val shopPhone = SessionManager.getPhoneSafe()
 
     val isMainApp = currentRoute in MAIN_ROUTES
 
@@ -146,27 +148,27 @@ fun AppNavGraph(
                 startDestination = startDestination,
                 modifier = Modifier.padding(padding),
                 enterTransition = {
-                    fadeIn(animationSpec = tween(220)) + slideIntoContainer(
+                    fadeIn(animationSpec = tween(180, easing = EmilEaseOut)) + slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Start,
-                        animationSpec = tween(220)
+                        animationSpec = tween(180, easing = EmilEaseOut)
                     )
                 },
                 exitTransition = {
-                    fadeOut(animationSpec = tween(220)) + slideOutOfContainer(
+                    fadeOut(animationSpec = tween(140, easing = EmilEaseOut)) + slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Start,
-                        animationSpec = tween(220)
+                        animationSpec = tween(140, easing = EmilEaseOut)
                     )
                 },
                 popEnterTransition = {
-                    fadeIn(animationSpec = tween(220)) + slideIntoContainer(
+                    fadeIn(animationSpec = tween(140, easing = EmilEaseOut)) + slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.End,
-                        animationSpec = tween(220)
+                        animationSpec = tween(140, easing = EmilEaseOut)
                     )
                 },
                 popExitTransition = {
-                    fadeOut(animationSpec = tween(220)) + slideOutOfContainer(
+                    fadeOut(animationSpec = tween(180, easing = EmilEaseOut)) + slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.End,
-                        animationSpec = tween(220)
+                        animationSpec = tween(180, easing = EmilEaseOut)
                     )
                 }
             ) {
@@ -451,8 +453,8 @@ fun AppNavGraph(
                     val invVm: InventoryViewModel = hiltViewModel()
                     AddEditItemScreen(
                         onBack = { navController.popBackStack() },
-                        onSave = { name, price, stock, alert ->
-                            invVm.saveItem(name, price, stock, alert)
+                        onSave = { name, price, stock, alert, hsnCode ->
+                            invVm.saveItem(name, price, stock, alert, hsnCode)
                             navController.popBackStack()
                         }
                     )
@@ -470,8 +472,8 @@ fun AppNavGraph(
                         itemId = itemId,
                         existingItem = item,
                         onBack = { navController.popBackStack() },
-                        onSave = { name, price, stock, alert ->
-                            invVm.saveItem(name, price, stock, alert, itemId)
+                        onSave = { name, price, stock, alert, hsnCode ->
+                            invVm.saveItem(name, price, stock, alert, hsnCode, itemId)
                             navController.popBackStack()
                         },
                         onDelete = { id -> invVm.deleteItem(id); navController.popBackStack() }
@@ -620,6 +622,27 @@ fun AppNavGraph(
                         }
                     )
                 }
+
+                // ===== STAFF MANAGEMENT =====
+                composable(NavRoutes.STAFF) {
+                    val staffVm: StaffViewModel = hiltViewModel()
+                    val staffList by staffVm.staffList.collectAsState()
+                    val opState by staffVm.operationState.collectAsState()
+                    LaunchedEffect(Unit) { staffVm.loadStaff() }
+                    StaffScreen(
+                        staffList = staffList,
+                        currentUserPhone = shopPhone,
+                        operationState = opState,
+                        onBack = { navController.popBackStack() },
+                        onAddStaff = { name, phone, role ->
+                            staffVm.addStaff(name, phone, role, context)
+                        },
+                        onRemoveStaff = { id ->
+                            staffVm.removeStaff(id, context)
+                        },
+                        onResetOperation = { staffVm.resetOperationState() }
+                    )
+                }
             }
         }
     }
@@ -630,6 +653,7 @@ fun AppNavGraph(
             currentScreen = currentRoute ?: NavRoutes.HOME,
             shopName = shopName,
             shopOwner = shopOwner,
+            shopPhone = shopPhone,
             customerCount = customerCount,
             billCount = billCount,
             onNavigate = drawerNavigate,

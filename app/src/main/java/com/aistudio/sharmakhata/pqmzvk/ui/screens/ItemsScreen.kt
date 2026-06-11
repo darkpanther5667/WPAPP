@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.*
@@ -34,12 +33,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.sharmakhata.pqmzvk.data.local.ItemEntity
+import com.aistudio.sharmakhata.pqmzvk.ui.components.EmptyState
+import com.aistudio.sharmakhata.pqmzvk.ui.components.FilterChipItem
 import com.aistudio.sharmakhata.pqmzvk.ui.components.HamburgerAppBar
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
@@ -75,7 +77,8 @@ fun ItemsScreen(
         derivedStateOf {
             items.filter { item ->
                 val matchesSearch = searchQuery.isBlank() ||
-                    item.name.contains(searchQuery, ignoreCase = true)
+                    item.name.contains(searchQuery, ignoreCase = true) ||
+                    item.hsnCode.contains(searchQuery, ignoreCase = true)
                 val matchesFilter = when (selectedFilter) {
                     "Low Stock" -> item.stock > 0 && item.stock <= item.lowStockAlert
                     "Out of Stock" -> item.stock == 0
@@ -85,6 +88,9 @@ fun ItemsScreen(
             }
         }
     }
+
+    // Delete confirmation dialog state
+    var itemToDelete by remember { mutableStateOf<ItemEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -203,7 +209,7 @@ fun ItemsScreen(
                 StatBadge(
                     label = stringResource(R.string.out_stat),
                     value = "$outOfStockItems",
-                    color = Color(0xFFFF6B6B),
+                    color = DebtRed,
                     icon = Icons.Outlined.Block,
                     modifier = Modifier.weight(1f)
                 )
@@ -237,7 +243,7 @@ fun ItemsScreen(
                         label = stringResource(R.string.out_of_stock_with_count, outOfStockItems),
                         selected = selectedFilter == "Out of Stock",
                         onClick = { selectedFilter = "Out of Stock" },
-                        color = Color(0xFFFF6B6B)
+                        color = DebtRed
                     )
                 }
             }
@@ -256,22 +262,26 @@ fun ItemsScreen(
                     }
                     filteredItems.isEmpty() && !isLoading -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(GrahbookSpacing.sm)) {
                                 Icon(
                                     Icons.Default.Search,
                                     contentDescription = null,
-                                    tint = StitchTextSecondary.copy(alpha = 0.4f),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                                     modifier = Modifier.size(48.dp)
                                 )
                                 Text(
                                     text = if (searchQuery.isNotEmpty()) stringResource(R.string.no_items_found, searchQuery)
                                     else stringResource(R.string.no_filter_items, selectedFilter.lowercase()),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = StitchTextSecondary
+                                    style = TextStyle(
+                                        fontFamily = Poppins,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = GrahbookFontSize.body,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 )
                                 if (searchQuery.isNotEmpty()) {
                                     TextButton(onClick = { searchQuery = "" }) {
-                                        Text(stringResource(R.string.clear_search), color = StitchPrimaryContainer)
+                                        Text(stringResource(R.string.clear_search), color = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
@@ -286,7 +296,7 @@ fun ItemsScreen(
                                 ModernItemCard(
                                     item = item,
                                     onEdit = { onEditItem(item.id) },
-                                    onDelete = { onDeleteItem(item.id) }
+                                    onDelete = { itemToDelete = item }
                                 )
                             }
                         }
@@ -294,6 +304,48 @@ fun ItemsScreen(
                 }
             }
         }
+    }
+
+    // Delete confirmation dialog
+    itemToDelete?.let { item ->
+        AlertDialog(
+            onDismissRequest = { itemToDelete = null },
+            title = {
+                Text(
+                    "Delete Item",
+                    fontWeight = FontWeight.Bold,
+                    color = StitchTextPrimary
+                )
+            },
+            text = {
+                Text(
+                    "Are you sure you want to delete \"${item.name}\"? This action cannot be undone.",
+                    color = StitchTextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteItem(item.id)
+                        itemToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DebtRed,
+                        contentColor = Color.White
+                    ),
+                    shape = ButtonShape
+                ) {
+                    Text("Delete", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { itemToDelete = null }) {
+                    Text("Cancel", color = StitchTextSecondary)
+                }
+            },
+            containerColor = StitchSurface,
+            shape = CardShape
+        )
     }
 }
 
@@ -359,7 +411,7 @@ private fun ModernItemCard(
     }
 
     val stockColor = when (stockLevel) {
-        StockLevel.OutOfStock -> Color(0xFFFF6B6B)
+        StockLevel.OutOfStock -> DebtRed
         StockLevel.Low -> StitchTertiaryContainer
         StockLevel.InStock -> StitchPrimaryContainer
     }
@@ -434,6 +486,17 @@ private fun ModernItemCard(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // HSN code (if present)
+                if (item.hsnCode.isNotBlank()) {
+                    Text(
+                        text = "HSN: ${item.hsnCode}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = StitchTextSecondary.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
                 // Stock info row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -505,7 +568,7 @@ private fun ModernItemCard(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = stringResource(R.string.delete),
-                        tint = Color(0xFFFF6B6B).copy(alpha = 0.7f),
+                        tint = DebtRed.copy(alpha = 0.7f),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -519,51 +582,75 @@ private fun ModernEmptyInventory(onAddItem: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(48.dp),
+            .padding(GrahbookSpacing.screenHorizontal * 2),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(GrahbookSpacing.md)
         ) {
             Box(
                 modifier = Modifier
-                    .size(96.dp)
-                    .clip(CircleShape)
-                    .background(StitchPrimaryContainer.copy(alpha = 0.1f)),
+                    .size(140.dp)
+                    .clip(RoundedCornerShape(GrahbookRadius.xxl))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Outlined.Inventory2,
-                    contentDescription = null,
-                    tint = StitchPrimaryContainer.copy(alpha = 0.5f),
-                    modifier = Modifier.size(48.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.Inventory2,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(42.dp)
+                    )
+                }
             }
             Text(
                 text = stringResource(R.string.inventory_empty),
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = StitchTextPrimary
+                style = TextStyle(
+                    fontFamily = Poppins,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = GrahbookFontSize.heading,
+                    color = MaterialTheme.colorScheme.onBackground
+                ),
+                textAlign = TextAlign.Center
             )
             Text(
                 text = stringResource(R.string.add_first_item),
-                style = MaterialTheme.typography.bodyMedium,
-                color = StitchTextSecondary,
+                style = TextStyle(
+                    fontFamily = Poppins,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = GrahbookFontSize.body,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
                 textAlign = TextAlign.Center
             )
+            Spacer(modifier = Modifier.height(GrahbookSpacing.sm))
             Button(
                 onClick = onAddItem,
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(48.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = StitchPrimaryContainer,
-                    contentColor = StitchOnPrimaryContainer
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
-                shape = ButtonShape,
-                modifier = Modifier.height(48.dp)
+                shape = RoundedCornerShape(GrahbookRadius.md)
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.add_item_button), fontWeight = FontWeight.Bold)
+                Text(
+                    stringResource(R.string.add_item_button),
+                    fontFamily = Poppins,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = GrahbookFontSize.body
+                )
             }
         }
     }
@@ -573,16 +660,6 @@ private enum class StockLevel { InStock, Low, OutOfStock }
 
 @Composable
 private fun getItemAvatarColor(name: String): Color {
-    val colors = listOf(
-        StitchPrimaryContainer,
-        StitchSecondaryContainer,
-        StitchTertiaryContainer,
-        StitchSecondary,
-        StitchTertiary,
-        Color(0xFF4A9EFF),
-        Color(0xFF8B5CF6),
-        Color(0xFFEC4899),
-        Color(0xFF06B6D4),
-    )
+    val colors = AvatarColors.map { it.first() }
     return colors[abs(name.hashCode()) % colors.size]
 }

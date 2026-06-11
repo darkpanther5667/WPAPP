@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -31,6 +32,8 @@ import com.aistudio.sharmakhata.pqmzvk.ui.screens.BillItemEntry
 import com.aistudio.sharmakhata.pqmzvk.data.remote.StoredItem
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
+import com.aistudio.sharmakhata.pqmzvk.util.DecimalVisualTransformation
+import com.aistudio.sharmakhata.pqmzvk.util.FormValidators
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 import androidx.compose.animation.AnimatedVisibility
 import com.aistudio.sharmakhata.pqmzvk.util.GstCalculator
@@ -109,9 +112,9 @@ fun QuickBillScreen(
                                 onResetOperation()
                                 onBack()
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
+                            colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen)
                         ) {
-                            Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(stringResource(R.string.whatsapp_label))
                         }
@@ -161,7 +164,9 @@ fun QuickBillScreen(
         }
     }
 
-    val isValid = items.any { it.name.isNotBlank() && it.price.isNotBlank() }
+    val isValid = items.any {
+        it.name.isNotBlank() && FormValidators.isValidPrice(it.price) && (it.qty.toIntOrNull() ?: 0) > 0
+    }
 
     Scaffold(
         topBar = {
@@ -222,7 +227,7 @@ fun QuickBillScreen(
                                 Icon(
                                     Icons.Default.Person,
                                     contentDescription = null,
-                                    tint = IndigoPrimary,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(IconSize.small)
                                 )
                             }
@@ -236,7 +241,7 @@ fun QuickBillScreen(
                                 Text(
                                     text = stringResource(R.string.optional_details),
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = TextSecondaryLight
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -252,15 +257,15 @@ fun QuickBillScreen(
                                     Icons.Default.PersonOutline,
                                     contentDescription = null,
                                     modifier = Modifier.size(IconSize.small),
-                                    tint = TextSecondaryLight
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(GrahbookRadius.sm),
                             colors = TextFieldDefaults.colors(
-                                focusedIndicatorColor = IndigoPrimary,
-                                unfocusedIndicatorColor = CardBorder,
+                                focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
                                 focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                unfocusedContainerColor = BackgroundLight
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                         )
 
@@ -281,15 +286,15 @@ fun QuickBillScreen(
                                     Icons.Default.Phone,
                                     contentDescription = null,
                                     modifier = Modifier.size(IconSize.small),
-                                    tint = TextSecondaryLight
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(GrahbookRadius.sm),
                             colors = TextFieldDefaults.colors(
-                                focusedIndicatorColor = IndigoPrimary,
-                                unfocusedIndicatorColor = CardBorder,
+                                focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
                                 focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                unfocusedContainerColor = BackgroundLight
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                         )
                     }
@@ -313,7 +318,7 @@ fun QuickBillScreen(
                                     Icon(
                                         Icons.Default.ShoppingCart,
                                         contentDescription = null,
-                                        tint = IndigoPrimary,
+                                        tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(IconSize.small)
                                     )
                                     Spacer(modifier = Modifier.width(Spacing.small))
@@ -383,42 +388,42 @@ fun QuickBillScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.Receipt, contentDescription = null, tint = IndigoPrimary, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.Receipt, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                                 Text(stringResource(R.string.gst_configuration), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                             }
                             Switch(
                                 checked = enableGst,
                                 onCheckedChange = { enableGst = it },
-                                colors = SwitchDefaults.colors(checkedTrackColor = IndigoPrimary)
+                                colors = SwitchDefaults.colors(checkedTrackColor = MaterialTheme.colorScheme.primary)
                             )
                         }
                         AnimatedVisibility(visible = enableGst) {
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 12.dp)) {
-                                Text(stringResource(R.string.gst_type), style = MaterialTheme.typography.labelMedium, color = TextSecondaryLight)
+                                Text(stringResource(R.string.gst_type), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     FilterChip(
                                         selected = gstTypeState == GstType.CGST_SGST,
                                         onClick = { gstTypeState = GstType.CGST_SGST },
                                         label = { Text(stringResource(R.string.cgst_sgst_label)) },
                                         leadingIcon = { if (gstTypeState == GstType.CGST_SGST) Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = IndigoPrimary.copy(alpha = 0.15f), selectedLabelColor = IndigoPrimary)
+                                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), selectedLabelColor = MaterialTheme.colorScheme.primary)
                                     )
                                     FilterChip(
                                         selected = gstTypeState == GstType.IGST,
                                         onClick = { gstTypeState = GstType.IGST },
                                         label = { Text(stringResource(R.string.igst_label)) },
                                         leadingIcon = { if (gstTypeState == GstType.IGST) Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = IndigoPrimary.copy(alpha = 0.15f), selectedLabelColor = IndigoPrimary)
+                                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), selectedLabelColor = MaterialTheme.colorScheme.primary)
                                     )
                                 }
-                                Text(stringResource(R.string.gst_rate), style = MaterialTheme.typography.labelMedium, color = TextSecondaryLight)
+                                Text(stringResource(R.string.gst_rate), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     GstCalculator.gstRates.forEach { rate ->
                                         FilterChip(
                                             selected = gstRateState == rate,
                                             onClick = { gstRateState = rate },
                                             label = { Text("$rate%") },
-                                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = IndigoPrimary.copy(alpha = 0.15f), selectedLabelColor = IndigoPrimary)
+                                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), selectedLabelColor = MaterialTheme.colorScheme.primary)
                                         )
                                     }
                                 }
@@ -448,7 +453,7 @@ fun QuickBillScreen(
                     ) {
                         Icon(Icons.Default.AddCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.add_item_button), color = IndigoPrimary)
+                        Text(stringResource(R.string.add_item_button), color = MaterialTheme.colorScheme.primary)
                     }
                 }
 
@@ -473,14 +478,14 @@ fun QuickBillScreen(
                                     modifier = Modifier.weight(1.5f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextSecondaryLight
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     stringResource(R.string.qty_column),
                                     modifier = Modifier.weight(0.6f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextSecondaryLight,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center
                                 )
                                 Text(
@@ -488,7 +493,7 @@ fun QuickBillScreen(
                                     modifier = Modifier.weight(1f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextSecondaryLight,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.End
                                 )
                                 Text(
@@ -496,13 +501,13 @@ fun QuickBillScreen(
                                     modifier = Modifier.weight(1f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextSecondaryLight,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.End
                                 )
                                 Spacer(modifier = Modifier.width(32.dp)) // for delete button
                             }
 
-                            HorizontalDivider(color = CardBorder)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                             Spacer(modifier = Modifier.height(8.dp))
 
@@ -541,12 +546,12 @@ fun QuickBillScreen(
                                             placeholder = { Text("Item name", fontSize = 12.sp) },
                                             textStyle = MaterialTheme.typography.bodySmall,
                                             singleLine = true,
-                                            shape = RoundedCornerShape(8.dp),
+                                            shape = RoundedCornerShape(GrahbookRadius.sm),
                                             colors = TextFieldDefaults.colors(
-                                                focusedIndicatorColor = IndigoPrimary,
-                                                unfocusedIndicatorColor = CardBorder,
+                                                focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                                unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
                                                 focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                                unfocusedContainerColor = BackgroundLight
+                                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                                             )
                                         )
                                         // Dropdown of suggestions
@@ -555,7 +560,7 @@ fun QuickBillScreen(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .padding(top = 48.dp),
-                                                shape = RoundedCornerShape(8.dp),
+                                                shape = RoundedCornerShape(GrahbookRadius.sm),
                                                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                                             ) {
@@ -588,12 +593,12 @@ fun QuickBillScreen(
                                                             Text(
                                                                 text = "₹${suggestion.lastPrice.toInt()}",
                                                                 style = MaterialTheme.typography.labelSmall,
-                                                                color = IndigoPrimary,
+                                                                color = MaterialTheme.colorScheme.primary,
                                                                 fontWeight = FontWeight.SemiBold
                                                             )
                                                         }
                                                         if (suggestion != suggestions.last()) {
-                                                            HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
+                                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
                                                         }
                                                     }
                                                 }
@@ -618,12 +623,12 @@ fun QuickBillScreen(
                                         textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.Center),
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(GrahbookRadius.sm),
                                         colors = TextFieldDefaults.colors(
-                                            focusedIndicatorColor = IndigoPrimary,
-                                            unfocusedIndicatorColor = CardBorder,
+                                            focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
                                             focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                            unfocusedContainerColor = BackgroundLight
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                                         )
                                     )
 
@@ -644,12 +649,13 @@ fun QuickBillScreen(
                                         textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.End),
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                        shape = RoundedCornerShape(8.dp),
+                                        visualTransformation = DecimalVisualTransformation(),
+                                        shape = RoundedCornerShape(GrahbookRadius.sm),
                                         colors = TextFieldDefaults.colors(
-                                            focusedIndicatorColor = IndigoPrimary,
-                                            unfocusedIndicatorColor = CardBorder,
+                                            focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
                                             focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                            unfocusedContainerColor = BackgroundLight
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                                         )
                                     )
 
@@ -695,50 +701,50 @@ fun QuickBillScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = CardShape,
-                        colors = CardDefaults.cardColors(containerColor = IndigoPrimary.copy(alpha = 0.05f))
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
                     ) {
                         Column(modifier = Modifier.padding(Spacing.cardPadding)) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(stringResource(R.string.subtotal), style = MaterialTheme.typography.bodyMedium, color = TextSecondaryLight)
+                                Text(stringResource(R.string.subtotal), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(FormatUtils.formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             }
                             if (enableGst) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(stringResource(R.string.taxable_amount), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                                    Text(stringResource(R.string.taxable_amount), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text(FormatUtils.formatCurrency(gstBreakdown.taxableAmount), style = MaterialTheme.typography.bodySmall)
                                 }
                                 if (gstTypeState == GstType.CGST_SGST) {
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(stringResource(R.string.cgst_at_rate, gstRateState / 2), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                                        Text(stringResource(R.string.cgst_at_rate, gstRateState / 2), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Text(FormatUtils.formatCurrency(gstBreakdown.cgst), style = MaterialTheme.typography.bodySmall, color = AccentBlue)
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(stringResource(R.string.sgst_at_rate, gstRateState / 2), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                                        Text(stringResource(R.string.sgst_at_rate, gstRateState / 2), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Text(FormatUtils.formatCurrency(gstBreakdown.sgst), style = MaterialTheme.typography.bodySmall, color = AccentBlue)
                                     }
                                 } else {
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(stringResource(R.string.igst_at_rate, gstRateState), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                                        Text(stringResource(R.string.igst_at_rate, gstRateState), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Text(FormatUtils.formatCurrency(gstBreakdown.igst), style = MaterialTheme.typography.bodySmall, color = AccentBlue)
                                     }
                                 }
                             } else {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(stringResource(R.string.gst_optional), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
-                                    Text("---", style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                                    Text(stringResource(R.string.gst_optional), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("---", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                             Spacer(modifier = Modifier.height(8.dp))
-                            HorizontalDivider(color = CardBorder)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Text(stringResource(R.string.grand_total), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                                Text(FormatUtils.formatCurrency(gstBreakdown.grandTotal), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = IndigoPrimary)
+                                Text(FormatUtils.formatCurrency(gstBreakdown.grandTotal), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -754,7 +760,7 @@ fun QuickBillScreen(
                         .height(ComponentSize.buttonHeight),
                     enabled = isValid && operationState !is OperationState.Loading,
                     shape = ButtonShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
                     if (operationState is OperationState.Loading) {
                         CircularProgressIndicator(
@@ -782,41 +788,41 @@ fun QuickBillScreen(
             onDismissRequest = { showPreview = false },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Receipt, contentDescription = null, tint = IndigoPrimary)
+                    Icon(Icons.Default.Receipt, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Text(stringResource(R.string.invoice_preview), fontWeight = FontWeight.Bold)
                 }
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(8.dp)) {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(GrahbookRadius.sm)) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(if (customerName.isNotBlank()) customerName else stringResource(R.string.walk_in_customer_fallback), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                            Text(stringResource(R.string.invoice_type_label, if (enableGst) (if (gstTypeState == GstType.CGST_SGST) stringResource(R.string.cgst_sgst_label) else stringResource(R.string.igst_label)) else stringResource(R.string.non_gst)), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                            Text(stringResource(R.string.invoice_type_label, if (enableGst) (if (gstTypeState == GstType.CGST_SGST) stringResource(R.string.cgst_sgst_label) else stringResource(R.string.igst_label)) else stringResource(R.string.non_gst)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     items.filter { it.name.isNotBlank() }.forEach { item ->
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(item.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                                Text("${item.qty} x ${FormatUtils.formatCurrency(item.price.toDoubleOrNull() ?: 0.0)}", style = MaterialTheme.typography.labelSmall, color = TextSecondaryLight)
+                                Text("${item.qty} x ${FormatUtils.formatCurrency(item.price.toDoubleOrNull() ?: 0.0)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Text(FormatUtils.formatCurrency((item.price.toDoubleOrNull() ?: 0.0) * (item.qty.toIntOrNull() ?: 1)), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
                         }
                     }
-                    HorizontalDivider(color = CardBorder)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     if (enableGst) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(stringResource(R.string.subtotal), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                            Text(stringResource(R.string.subtotal), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(FormatUtils.formatCurrency(previewSubtotal), style = MaterialTheme.typography.bodySmall)
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(stringResource(R.string.gst_rate_label, gstRateState), style = MaterialTheme.typography.bodySmall, color = TextSecondaryLight)
+                            Text(stringResource(R.string.gst_rate_label, gstRateState), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(FormatUtils.formatCurrency(previewGst.totalGst), style = MaterialTheme.typography.bodySmall, color = AccentBlue)
                         }
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(stringResource(R.string.grand_total), fontWeight = FontWeight.Bold)
-                        Text(FormatUtils.formatCurrency(previewGst.grandTotal), fontWeight = FontWeight.Bold, color = IndigoPrimary)
+                        Text(FormatUtils.formatCurrency(previewGst.grandTotal), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             },
@@ -830,7 +836,7 @@ fun QuickBillScreen(
                         if (billItems.isNotEmpty()) {
                             onCreateBill(customerName.ifBlank { null }, customerPhone.ifBlank { null }, previewGst.grandTotal, billItems)
                         }
-                    }, colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary)) {
+                    }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) {
                         Text(stringResource(R.string.create_invoice_button), fontWeight = FontWeight.Bold)
                     }
                 }

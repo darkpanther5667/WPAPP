@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -33,6 +34,7 @@ import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.components.AppAvatar
 import com.aistudio.sharmakhata.pqmzvk.ui.components.AppDivider
 import com.aistudio.sharmakhata.pqmzvk.ui.components.InfoRow
+import com.aistudio.sharmakhata.pqmzvk.ui.components.GrahbookStatus
 import com.aistudio.sharmakhata.pqmzvk.ui.components.StatusBadge
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.BillingViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.CustomerViewModel
@@ -84,10 +86,10 @@ fun CustomerDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Customer Profile", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.customer_profile_title), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -119,7 +121,7 @@ fun CustomerDetailScreen(
                         Icon(Icons.Default.Error, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(48.dp))
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            "Error: ${(dbState as UiState.Error).message}",
+                            stringResource(R.string.error_search_prefix, (dbState as UiState.Error).message),
                             color = ErrorRed,
                             textAlign = TextAlign.Center
                         )
@@ -132,9 +134,9 @@ fun CustomerDetailScreen(
                     if (customer == null) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.PersonOff, contentDescription = null, modifier = Modifier.size(64.dp), tint = TextSecondaryLight)
+                                Icon(Icons.Default.PersonOff, contentDescription = null, modifier = Modifier.size(64.dp), tint = StitchTextSecondary)
                                 Spacer(modifier = Modifier.height(12.dp))
-                                Text(stringResource(R.string.customer_not_found), color = TextSecondaryLight)
+                                Text(stringResource(R.string.customer_not_found), color = StitchTextSecondary)
                             }
                         }
                     } else {
@@ -242,7 +244,7 @@ fun CustomerDetailContent(
                     Text(
                         text = customer.phone ?: "No phone",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondaryLight
+                        color = StitchTextSecondary
                     )
                 }
             }
@@ -296,7 +298,7 @@ fun CustomerDetailContent(
                 Text(
                     text = stringResource(R.string.outstanding_balance),
                     style = MaterialTheme.typography.titleSmall,
-                    color = TextSecondaryLight,
+                    color = StitchTextSecondary,
                     fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -344,13 +346,13 @@ fun CustomerDetailContent(
             QuickActionIconButton(
                 icon = Icons.Default.Description,
                 label = stringResource(R.string.statement_action),
-                color = Color(0xFF8B5CF6),
+                color = GradientPurple[0],
                 onClick = onSendStatement
             )
             QuickActionIconButton(
-                icon = Icons.Default.Chat,
+                icon = Icons.AutoMirrored.Filled.Chat,
                 label = stringResource(R.string.whatsapp_action),
-                color = Color(0xFF25D366),
+                color = WhatsAppGreen,
                 onClick = onWhatsAppDirect
             )
         }
@@ -381,7 +383,7 @@ fun CustomerDetailContent(
                         }
                     },
                     selectedContentColor = IndigoPrimary,
-                    unselectedContentColor = TextSecondaryLight
+                    unselectedContentColor = StitchTextSecondary
                 )
                 Tab(
                     selected = selectedTab == 1,
@@ -393,7 +395,7 @@ fun CustomerDetailContent(
                         }
                     },
                     selectedContentColor = IndigoPrimary,
-                    unselectedContentColor = TextSecondaryLight
+                    unselectedContentColor = StitchTextSecondary
                 )
                 Tab(
                     selected = selectedTab == 2,
@@ -405,7 +407,7 @@ fun CustomerDetailContent(
                         }
                     },
                     selectedContentColor = IndigoPrimary,
-                    unselectedContentColor = TextSecondaryLight
+                    unselectedContentColor = StitchTextSecondary
                 )
             }
 
@@ -431,10 +433,10 @@ fun CustomerDetailContent(
                                         billToDelete = null
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
-                                ) { Text("Delete", color = Color.White) }
+                                ) { Text(stringResource(R.string.delete), color = Color.White) }
                             },
                             dismissButton = {
-                                TextButton(onClick = { billToDelete = null }) { Text("Cancel") }
+                                TextButton(onClick = { billToDelete = null }) { Text(stringResource(R.string.cancel)) }
                             },
                             shape = RoundedCornerShape(16.dp)
                         )
@@ -469,7 +471,7 @@ fun CustomerDetailContent(
                                     verticalArrangement = Arrangement.spacedBy(Spacing.small)
                                 ) {
                                     Icon(Icons.Outlined.Receipt, contentDescription = null, tint = TextTertiaryLight, modifier = Modifier.size(IconSize.xlarge))
-                                    Text(stringResource(R.string.no_bills_yet), color = TextSecondaryLight, style = MaterialTheme.typography.bodyMedium)
+                                    Text(stringResource(R.string.no_bills_yet), color = StitchTextSecondary, style = MaterialTheme.typography.bodyMedium)
                                 }
                             } else {
                                 sortedBills.take(5).forEachIndexed { index, bill ->
@@ -504,7 +506,7 @@ fun CustomerDetailContent(
                                         txToDelete = null
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
-                                ) { Text("Delete", color = Color.White) }
+                                ) { Text(stringResource(R.string.delete), color = Color.White) }
                             },
                             dismissButton = {
                                 TextButton(onClick = { txToDelete = null }) { Text("Cancel") }
@@ -543,7 +545,7 @@ fun CustomerDetailContent(
                                     verticalArrangement = Arrangement.spacedBy(Spacing.small)
                                 ) {
                                     Icon(Icons.Outlined.History, contentDescription = null, tint = TextTertiaryLight, modifier = Modifier.size(IconSize.xlarge))
-                                    Text(stringResource(R.string.no_transactions_yet), color = TextSecondaryLight, style = MaterialTheme.typography.bodyMedium)
+                                    Text(stringResource(R.string.no_transactions_yet), color = StitchTextSecondary, style = MaterialTheme.typography.bodyMedium)
                                 }
                             } else {
                                 sortedTransactions.take(5).forEachIndexed { index, tx ->
@@ -604,10 +606,8 @@ private fun BillRowItem(
     onDeleteClick: () -> Unit = {}
 ) {
     val isPaid = bill.status == "paid"
-    val statusColor = if (isPaid) SuccessGreen else ErrorRed
-    val statusLabel = if (isPaid) stringResource(R.string.paid) else stringResource(R.string.unpaid)
-    val statusBg = if (isPaid) BadgePaidBg else BadgeUnpaidBg
-    val statusText = if (isPaid) BadgePaidText else BadgeUnpaidText
+    val statusColor = if (isPaid) RupeeGreen else MaterialTheme.colorScheme.error
+    val statusBg = statusColor.copy(alpha = 0.1f)
 
     Column {
         Row(
@@ -643,7 +643,7 @@ private fun BillRowItem(
                 Text(
                     text = FormatUtils.formatDate(bill.createdAt),
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondaryLight
+                    color = StitchTextSecondary
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -654,9 +654,7 @@ private fun BillRowItem(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 StatusBadge(
-                    label = statusLabel,
-                    bgColor = statusBg,
-                    textColor = statusText
+                    status = if (isPaid) GrahbookStatus.PAID else GrahbookStatus.UNPAID,
                 )
             }
             IconButton(
@@ -665,7 +663,7 @@ private fun BillRowItem(
             ) {
                 Icon(
                     Icons.Default.DeleteOutline,
-                    contentDescription = "Delete bill",
+                    contentDescription = stringResource(R.string.delete_item_desc),
                     tint = ErrorRed.copy(alpha = 0.7f),
                     modifier = Modifier.size(18.dp)
                 )
@@ -713,7 +711,7 @@ fun StatsCard(
             Text(
                 text = label,
                 fontSize = 11.sp,
-                color = TextSecondaryLight,
+                color = StitchTextSecondary,
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
@@ -747,7 +745,7 @@ fun QuickActionIconButton(
             text = label,
             fontSize = 10.sp,
             fontWeight = FontWeight.Medium,
-            color = TextSecondaryLight,
+            color = StitchTextSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -820,13 +818,13 @@ fun TransactionTimelineItem(
                 Text(
                     text = "${FormatUtils.formatDateTime(transaction.timestamp)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondaryLight
+                    color = StitchTextSecondary
                 )
                 if (!transaction.note.isNullOrBlank()) {
                     Text(
                         text = transaction.note,
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondaryLight
+                        color = StitchTextSecondary
                     )
                 }
             }
@@ -842,7 +840,7 @@ fun TransactionTimelineItem(
             ) {
                 Icon(
                     Icons.Default.DeleteOutline,
-                    contentDescription = "Delete entry",
+                    contentDescription = stringResource(R.string.delete_item_desc),
                     tint = ErrorRed.copy(alpha = 0.6f),
                     modifier = Modifier.size(16.dp)
                 )

@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import com.aistudio.sharmakhata.pqmzvk.R
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
@@ -47,7 +48,12 @@ fun AmountText(
     size: TextUnit = 17.sp,
     modifier: Modifier = Modifier
 ) {
-    val formatted = "₹${NumberFormat.getNumberInstance(Locale("en", "IN")).format(amount / 100.0)}"
+    val rupees = amount / 100.0
+    val formatted = "₹${if (rupees == rupees.toLong().toDouble()) {
+        NumberFormat.getNumberInstance(Locale("en", "IN")).format(rupees.toLong())
+    } else {
+        NumberFormat.getNumberInstance(Locale("en", "IN")).format(rupees)
+    }}"
     val color = when (type) {
         GrahbookAmountType.RECEIVED    -> RupeeGreen
         GrahbookAmountType.OUTSTANDING -> DebtRed
@@ -80,9 +86,10 @@ fun GrahbookPrimaryButton(
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (isPressed && enabled && !isLoading) 0.97f else 1f,
-        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+        animationSpec = PressSpring,
         label = "button_scale"
     )
+    val haptic = LocalHapticFeedback.current
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val primaryVariant = if (primaryColor == Brand500) Brand700 else Saffron600
@@ -103,7 +110,10 @@ fun GrahbookPrimaryButton(
                 interactionSource = interactionSource,
                 indication = null,
                 enabled = enabled && !isLoading,
-                onClick = onClick
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onClick()
+                }
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -153,6 +163,7 @@ fun GrahbookSecondaryButton(
         animationSpec = spring(stiffness = Spring.StiffnessHigh),
         label = "button_scale"
     )
+    val haptic = LocalHapticFeedback.current
 
     val color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
 
@@ -172,7 +183,10 @@ fun GrahbookSecondaryButton(
                 interactionSource = interactionSource,
                 indication = null,
                 enabled = enabled && !isLoading,
-                onClick = onClick
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onClick()
+                }
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -222,6 +236,7 @@ fun GrahbookDestructiveButton(
         animationSpec = spring(stiffness = Spring.StiffnessHigh),
         label = "button_scale"
     )
+    val haptic = LocalHapticFeedback.current
 
     Box(
         modifier = modifier
@@ -234,7 +249,10 @@ fun GrahbookDestructiveButton(
                 interactionSource = interactionSource,
                 indication = null,
                 enabled = enabled && !isLoading,
-                onClick = onClick
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onClick()
+                }
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -281,73 +299,75 @@ fun MetricCard(
 ) {
     Card(
         modifier = modifier
-            .width(160.dp)
-            .height(105.dp)
+            .widthIn(min = 150.dp)
+            .heightIn(min = 100.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(GrahbookRadius.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(GrahbookSpacing.lg),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Left Accent Border
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(3.dp)
-                    .background(accentColor)
-            )
-            
-            // Content Area
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(GrahbookSpacing.md),
-                verticalArrangement = Arrangement.SpaceBetween
+            // Top row: Icon + Trend
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                // Icon with accent background
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(GrahbookRadius.sm))
+                        .background(accentColor.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         tint = accentColor,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    
-                    if (trend != null) {
-                        val isPositive = trend >= 0
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(GrahbookRadius.pill))
-                                .background(if (isPositive) RupeeGreen.copy(alpha = 0.15f) else DebtRed.copy(alpha = 0.15f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "${if (isPositive) "↑" else "↓"} ${kotlin.math.abs(trend)}%",
-                                style = TextStyle(
-                                    fontFamily = DMSans,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isPositive) RupeeGreen else DebtRed
-                                )
+                }
+
+                if (trend != null) {
+                    val isPositive = trend >= 0
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(GrahbookRadius.pill))
+                            .background(if (isPositive) RupeeGreen.copy(alpha = 0.12f) else DebtRed.copy(alpha = 0.12f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = "${if (isPositive) "+" else ""}${String.format("%.1f", trend)}%",
+                            style = TextStyle(
+                                fontFamily = Poppins,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isPositive) RupeeGreen else DebtRed
                             )
-                        }
+                        )
                     }
                 }
-                
-                Column {
-                    AmountText(amount = amount, type = type, size = 20.sp)
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodySmall,
+            }
+
+            // Amount — the hero of the card
+            Column {
+                AmountText(amount = amount, type = type, size = 22.sp)
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = label,
+                    style = TextStyle(
+                        fontFamily = Poppins,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
+                )
             }
         }
     }
@@ -380,7 +400,7 @@ fun CustomerAvatar(
         Text(
             text = initial,
             style = TextStyle(
-                fontFamily = Syne,
+                fontFamily = Poppins,
                 fontWeight = FontWeight.Bold,
                 fontSize = (size.value * 0.45f).sp,
                 color = textColor
@@ -391,7 +411,7 @@ fun CustomerAvatar(
 
 // === STATUS BADGE ===
 enum class GrahbookStatus {
-    PAID, UNPAID, PARTIAL, ACTIVE, LOW_STOCK
+    PAID, UNPAID, PARTIAL, ACTIVE, LOW_STOCK, OVERDUE, CANCELLED
 }
 
 @Composable
@@ -400,11 +420,13 @@ fun StatusBadge(
     modifier: Modifier = Modifier
 ) {
     val (bgColor, textColor, text) = when (status) {
-        GrahbookStatus.PAID -> Triple(RupeeGreen.copy(alpha = 0.15f), RupeeGreen, stringResource(R.string.paid) + " ✓")
+        GrahbookStatus.PAID -> Triple(RupeeGreen.copy(alpha = 0.15f), RupeeGreen, stringResource(R.string.paid))
         GrahbookStatus.UNPAID -> Triple(DebtRed.copy(alpha = 0.15f), DebtRed, stringResource(R.string.unpaid))
         GrahbookStatus.PARTIAL -> Triple(PendingAmber.copy(alpha = 0.15f), PendingAmber, stringResource(R.string.partial_label))
         GrahbookStatus.ACTIVE -> Triple(Brand500.copy(alpha = 0.15f), Brand300, stringResource(R.string.active_label))
         GrahbookStatus.LOW_STOCK -> Triple(PendingAmber.copy(alpha = 0.15f), PendingAmber, stringResource(R.string.low_stock))
+        GrahbookStatus.OVERDUE -> Triple(DebtRed.copy(alpha = 0.15f), DebtRed, stringResource(R.string.overdue))
+        GrahbookStatus.CANCELLED -> Triple(MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), MaterialTheme.colorScheme.onSurfaceVariant, stringResource(R.string.cancelled))
     }
 
     Box(
@@ -416,7 +438,7 @@ fun StatusBadge(
         Text(
             text = text,
             style = TextStyle(
-                fontFamily = DMSans,
+                fontFamily = Poppins,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
                 color = textColor
@@ -455,7 +477,7 @@ fun GrahbookTextField(
         Text(
             text = label.uppercase(),
             style = TextStyle(
-                fontFamily = Syne,
+                fontFamily = Poppins,
                 fontWeight = FontWeight.Medium,
                 fontSize = 11.sp,
                 color = if (error != null) DebtRed else MaterialTheme.colorScheme.primary
@@ -485,7 +507,7 @@ fun GrahbookTextField(
                             fontFamily = JetBrainsMono,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
-                            color = Ink300
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }
@@ -505,4 +527,95 @@ fun GrahbookTextField(
             )
         }
     }
+}
+
+// ============================================================
+// APP AVATAR (gradient-based avatar with initial letter)
+// ============================================================
+
+@Composable
+fun AppAvatar(
+    name: String,
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = ComponentSize.avatarMedium,
+    colorIndex: Int = 0
+) {
+    val gradient = AvatarColors[colorIndex % AvatarColors.size]
+    val initial = name.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Brush.linearGradient(colors = gradient)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = initial,
+            color = Color.White,
+            style = when {
+                size >= ComponentSize.avatarLarge -> MaterialTheme.typography.titleMedium
+                size >= ComponentSize.avatarMedium -> MaterialTheme.typography.titleSmall
+                else -> MaterialTheme.typography.labelMedium
+            },
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+// ============================================================
+// INFO ROW (label-value pair for detail screens)
+// ============================================================
+
+@Composable
+fun InfoRow(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    valueStyle: TextStyle = MaterialTheme.typography.bodyMedium,
+    trailing: @Composable (() -> Unit)? = null
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = Spacing.small),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        if (trailing != null) {
+            trailing()
+        } else {
+            Text(
+                text = value,
+                style = valueStyle,
+                color = valueColor,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.End
+            )
+        }
+    }
+}
+
+// ============================================================
+// DIVIDER
+// ============================================================
+
+@Composable
+fun AppDivider(
+    modifier: Modifier = Modifier
+) {
+    HorizontalDivider(
+        modifier = modifier,
+        thickness = 1.dp,
+        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+    )
 }

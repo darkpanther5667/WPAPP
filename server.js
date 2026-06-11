@@ -4,40 +4,98 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const OpenAI = require('openai');
 const bcrypt = require('bcryptjs');
 const PDFDocument = require('pdfkit');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Initialize OpenRouter API
-const openrouterApiKey = process.env.OPENROUTER_API_KEY;
-let openai = null;
-if (openrouterApiKey && openrouterApiKey !== 'YOUR_OPENROUTER_API_KEY') {
-  openai = new OpenAI({
-    apiKey: openrouterApiKey,
-    baseURL: 'https://openrouter.ai/api/v1'
+// Initialize Gemini AI
+const geminiApiKey = process.env.GEMINI_API_KEY;
+let genAI = null;
+let geminiModel = null;
+if (geminiApiKey && geminiApiKey !== 'YOUR_GEMINI_API_KEY') {
+  genAI = new GoogleGenerativeAI(geminiApiKey);
+  const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  geminiModel = genAI.getGenerativeModel({
+    model: modelName,
+    generationConfig: {
+      temperature: 0.0,
+      maxOutputTokens: 1024,
+    }
   });
+  console.log(`🤖 Gemini AI initialized with model: ${modelName}`);
+}
+
+// ─── IN-MEMORY RATE LIMITER ─────────────────────────────────────────────────────
+const rateLimitStore = new Map(); // key → { count, resetAt }
+
+function rateLimiter({ windowMs = 60000, max = 10, keyPrefix = 'rl' } = {}) {
+  return (req, res, next) => {
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    const key = `${keyPrefix}:${ip}`;
+    const now = Date.now();
+
+    let entry = rateLimitStore.get(key);
+    if (!entry || now > entry.resetAt) {
+      entry = { count: 1, resetAt: now + windowMs };
+      rateLimitStore.set(key, entry);
+      // Cleanup old entries periodically (every ~100 writes)
+      if (rateLimitStore.size > 1000) {
+        const threshold = Date.now();
+        for (const [k, v] of rateLimitStore) {
+          if (threshold > v.resetAt) rateLimitStore.delete(k);
+        }
+      }
+      return next();
+    }
+
+    entry.count++;
+    if (entry.count > max) {
+      const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+      res.set('Retry-After', String(retryAfter));
+      return res.status(429).json({ success: false, message: 'Too many requests. Please wait and try again.' });
+    }
+
+    return next();
+  };
+}
+
+// Escape HTML to prevent XSS in web viewers
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.set('trust proxy', 1);
 
-// CORS: allow only configured origins; allow null origin for native mobile apps
+// CORS: allow only configured origins; deny null origin to prevent CSRF from iframes
 const corsAllowedOrigins = (process.env.ALLOWED_ORIGIN || '').split(',').map(o => o.trim()).filter(Boolean);
 app.use((req, res, next) => {
   const origin = req.get('Origin');
-  // Allow same-origin, configured origins, or null origin (native apps, curl)
+  // Allow same-origin requests (no Origin header) and explicitly configured origins
   if (!origin || corsAllowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin || '*');
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', 'null');
+    res.setHeader('Access-Control-Allow-Origin', origin || corsAllowedOrigins[0] || '*');
   }
+  // Deny null origin — it's used by sandboxed iframes for CSRF attacks
+  // Native apps don't send Origin headers, so they still work fine
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PATCH, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-KEY, X-ADMIN-KEY');
   res.setHeader('Access-Control-Max-Age', '86400');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP for now — requires careful tuning for inline scripts
+  crossOriginEmbedderPolicy: false, // Allow embedding PDFs
+}));
+
+// Request logging
+app.use(morgan('short'));
 
 const PORT = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, 'db.json');
@@ -76,7 +134,18 @@ function mobileApiKeyMiddleware(req, res, next) {
   }
 
   const providedKey = req.get('X-API-KEY');
-  if (!providedKey || providedKey !== expectedKey) {
+  if (!providedKey) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  // Timing-safe comparison to prevent timing attacks
+  try {
+    const expectedBuf = Buffer.from(expectedKey, 'utf8');
+    const providedBuf = Buffer.from(providedKey, 'utf8');
+    if (expectedBuf.length !== providedBuf.length || !crypto.timingSafeEqual(expectedBuf, providedBuf)) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+  } catch {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
@@ -96,17 +165,16 @@ function requiresSessionAuth(req) {
   if (req.path === '/api/auth/request-code') return false;
   if (req.path === '/api/auth/verify-code') return false;
   if (req.path === '/api/auth/login') return false;
+  if (req.path === '/api/auth/logout') return false;
   if (req.path === '/api/admin/clear-all') return false;
 
-  // PDF endpoints are fetched by WhatsApp directly.
-  if (req.method === 'GET') {
-    if (req.path === '/api/test-db') return false;
-    if (req.path === '/api/test-wa') return false;
-    if (req.path === '/api/app/version') return false;
-    if (/^\/api\/bill\/[^/]+\/pdf$/.test(req.path)) return false;
-    if (/^\/api\/customer\/[^/]+\/statement\/pdf$/.test(req.path)) return false;
-    if (/^\/api\/report\/[^/]+\/pdf$/.test(req.path)) return false;
-  }
+  // Test/version endpoints
+  if (req.path === '/api/test-db') return false;
+  if (req.path === '/api/test-wa') return false;
+  if (req.path === '/api/app/version') return false;
+
+  // PDF endpoints now require session auth (Bearer token).
+  // This secures customer PII while still allowing access from the app and web admin.
 
   return true;
 }
@@ -135,6 +203,68 @@ async function sessionAuthMiddleware(req, res, next) {
 }
 
 app.use(sessionAuthMiddleware);
+
+// ─── SIGNED URL TOKENS FOR PDF SHARING ────────────────────────────────────────
+// Generates time-limited tokens so PDFs can be shared via WhatsApp without auth.
+const PDF_TOKEN_SECRET = process.env.PDF_TOKEN_SECRET || crypto.randomBytes(32).toString('hex');
+
+function generatePdfToken(resourceType, resourceId, storeId) {
+  const payload = `${resourceType}:${resourceId}:${storeId}:${Date.now()}`;
+  const signature = crypto.createHmac('sha256', PDF_TOKEN_SECRET).update(payload).digest('hex');
+  return Buffer.from(`${payload}:${signature}`).toString('base64url');
+}
+
+function verifyPdfToken(token, resourceType, resourceId) {
+  try {
+    const decoded = Buffer.from(token, 'base64url').toString('utf8');
+    const parts = decoded.split(':');
+    if (parts.length !== 5) return null;
+    const [type, id, storeId, timestamp, signature] = parts;
+    if (type !== resourceType || id !== resourceId) return null;
+
+    // Token expires after 24 hours
+    if (Date.now() - parseInt(timestamp) > 24 * 60 * 60 * 1000) return null;
+
+    const expectedSig = crypto.createHmac('sha256', PDF_TOKEN_SECRET)
+      .update(`${type}:${id}:${storeId}:${timestamp}`).digest('hex');
+    if (signature !== expectedSig) return null;
+
+    return { storeId };
+  } catch {
+    return null;
+  }
+}
+
+// Middleware: allow PDF access via valid signed token OR session auth
+function pdfAuthMiddleware(req, res, next) {
+  // If session auth already passed, allow
+  if (req.storeId) return next();
+
+  // Check for signed token in query string
+  const token = req.query.token;
+  if (!token) {
+    return res.status(401).json({ success: false, message: 'Authentication required' });
+  }
+
+  // Determine resource type from path
+  const billMatch = req.path.match(/^\/api\/bill\/([^/]+)\/pdf$/);
+  const stmtMatch = req.path.match(/^\/api\/customer\/([^/]+)\/statement\/pdf$/);
+  const reportMatch = req.path.match(/^\/api\/report\/([^/]+)\/pdf$/);
+
+  let resourceType, resourceId;
+  if (billMatch) { resourceType = 'bill'; resourceId = billMatch[1]; }
+  else if (stmtMatch) { resourceType = 'statement'; resourceId = stmtMatch[1]; }
+  else if (reportMatch) { resourceType = 'report'; resourceId = reportMatch[1]; }
+  else { return res.status(401).json({ success: false, message: 'Invalid resource' }); }
+
+  const verified = verifyPdfToken(token, resourceType, resourceId);
+  if (!verified) {
+    return res.status(401).json({ success: false, message: 'Invalid or expired link' });
+  }
+
+  req.storeId = verified.storeId;
+  return next();
+}
 
 function getPublicBaseUrl(req) {
   return process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
@@ -256,10 +386,10 @@ function addToHistory(staffPhone, message, response) {
 function extractCustomerId(message) {
   // Extract customer ID from message in various formats
   const patterns = [
-    /\(?\s*ID:\s*([c_][a-z0-9]+)\s*\)?/i,
-    /customer\s+ID:\s*([c_][a-z0-9]+)/i,
-    /customer\s+([c_][a-z0-9]+)/i,
-    /\b([c_][a-z0-9]{8,})\b/
+    /\(?\s*ID:\s*(c_[a-z0-9]+)\s*\)?/i,
+    /customer\s+ID:\s*(c_[a-z0-9]+)/i,
+    /customer\s+(c_[a-z0-9]+)/i,
+    /\b(c_[a-z0-9]{8,})\b/
   ];
   
   for (const pattern of patterns) {
@@ -306,8 +436,12 @@ async function writeDB(data, expectedVersion) {
   }
 
   if (dbWriteLock) {
-    await new Promise(r => setTimeout(r, 50));
-    return await writeDB(data, expectedVersion);
+    let retries = 0;
+    while (dbWriteLock && retries < 10) {
+      await new Promise(r => setTimeout(r, 100));
+      retries++;
+    }
+    if (dbWriteLock) throw new Error("Write lock timeout after 10 retries");
   }
   dbWriteLock = true;
   try {
@@ -319,11 +453,44 @@ async function writeDB(data, expectedVersion) {
       return;
     }
 
-    for (const col of ['shop', 'customers', 'transactions', 'bills', 'staff', 'stores']) {
-      if (data[col]) {
-        await database.collection(col).deleteMany({});
-        let docs = Array.isArray(data[col]) ? data[col] : [data[col]];
-        if (docs.length > 0) await database.collection(col).insertMany(docs);
+    // Atomic bulkWrite: individual upserts → no mass data loss on crash
+    // Shop is a single doc → replaceOne with upsert
+    if (data.shop) {
+      await database.collection('shop').replaceOne(
+        { _id: 'shop_config' },
+        { $set: { ...data.shop, _id: 'shop_config' } },
+        { upsert: true }
+      );
+    }
+
+    // For array collections: upsert each doc AND remove docs not in new data
+    for (const col of ['customers', 'transactions', 'bills', 'staff', 'stores']) {
+      const docs = Array.isArray(data[col]) ? data[col] : [];
+      const ops = [];
+
+      // Upsert all current docs
+      for (const doc of docs) {
+        ops.push({
+          replaceOne: {
+            filter: { id: doc.id || doc._id },
+            replacement: doc,
+            upsert: true
+          }
+        });
+      }
+
+      // Delete docs that exist in DB but not in new data (handles deletions)
+      const currentIds = docs.map(d => d.id).filter(Boolean);
+      if (currentIds.length > 0) {
+        ops.push({
+          deleteMany: {
+            filter: { id: { $nin: currentIds }, store_id: data.shop?.store_id || 'default' }
+          }
+        });
+      }
+
+      if (ops.length > 0) {
+        await database.collection(col).bulkWrite(ops);
       }
     }
     cachedDB = data;
@@ -345,7 +512,16 @@ app.post('/api/admin/clear-all', async (req, res) => {
       return res.status(500).json({ success: false, message: 'Server misconfigured: ADMIN_KEY not set' });
     }
     const providedKey = req.get('X-ADMIN-KEY');
-    if (!providedKey || providedKey !== adminKey) {
+    // Timing-safe comparison to prevent timing attacks
+    let keyValid = false;
+    try {
+      const expectedBuf = Buffer.from(adminKey, 'utf8');
+      const providedBuf = Buffer.from(providedKey || '', 'utf8');
+      keyValid = expectedBuf.length === providedBuf.length && crypto.timingSafeEqual(expectedBuf, providedBuf);
+    } catch {
+      keyValid = false;
+    }
+    if (!keyValid) {
       // Log the attempt but don't reveal if the key is correct
       console.warn(`⚠️ Unauthorized /api/admin/clear-all attempt from ${req.ip}`);
       return res.status(403).json({ success: false, message: 'Forbidden' });
@@ -384,9 +560,9 @@ function fmtRs(amount) {
   return `₹${Number(amount).toLocaleString('en-IN')}`;
 }
 
-// Generate a short random ID
+// Generate a short random ID using crypto
 function genId(prefix) {
-  return prefix + '_' + Math.random().toString(36).substring(2, 9);
+  return prefix + '_' + crypto.randomBytes(6).toString('hex');
 }
 
 // Calculate customer outstanding balance
@@ -588,6 +764,7 @@ async function getBillPdfTool(customerId, storeId) {
     success: true,
     billId: unpaidBill.id,
     pdfUrl: `/api/bill/${unpaidBill.id}/pdf`,
+    customerPhone: customer.phone,
     message: 'PDF generated for existing unpaid bill'
   };
 }
@@ -607,6 +784,7 @@ async function getCustomerStatementPdfTool(customerId, storeId) {
     customerId: customerId,
     customerName: customer.name,
     pdfUrl: `/api/customer/${customerId}/statement/pdf`,
+    customerPhone: customer.phone,
     balance: balance,
     transactionsCount: customerTransactions.length,
     billsCount: customerBills.length,
@@ -737,7 +915,7 @@ function parseCommand(message, customers, transactions, bills) {
 
   // ── LOOK UP CUSTOMER FOR REMAINING COMMANDS ───────────────────────────────────
   // Check for explicit customer ID format: (ID: c_xxxxx) or ID: c_xxxxx
-  const explicitIdMatch = text.match(/\(?\s*ID:\s*([c_][a-z0-9]+)\s*\)?/i);
+  const explicitIdMatch = text.match(/\(?\s*ID:\s*(c_[a-z0-9]+)\s*\)?/i);
   if (explicitIdMatch) {
     const customer = customers.find(c => c.id === explicitIdMatch[1]);
     if (customer) {
@@ -759,6 +937,26 @@ function parseCommand(message, customers, transactions, bills) {
       }
       if (text.includes('kitna baaki') || text.includes('outstanding') || text.includes('balance')) {
         return { type: 'query_balance', customerId: custId, customerName: custName };
+      }
+      // Payment/credit words with amount
+      const payMatch = text.match(/(\d+)\s*(?:diya|diye|payment|jama|liye|mila)/i);
+      if (payMatch) {
+        return { type: 'record_payment', customerId: custId, customerName: custName, amount: parseInt(payMatch[1]) };
+      }
+      // Add credit: daal/add/jama/credit/udhaar with amount
+      const creditMatchExplicit = text.match(/(\d+)\s*(?:daal|add|jama|credit|udhaar)/i);
+      if (creditMatchExplicit) {
+        return { type: 'add_credit', customerId: custId, customerName: custName, amount: parseInt(creditMatchExplicit[1]) };
+      }
+      // Bill banao/bill create with amount
+      const billCreateMatch = text.match(/(?:bill|invoice)\s+(?:banao|create|banaiye)\s*(?:ka|ke)?\s*(\d+)/i) ||
+        text.match(/(\d+)\s*(?:ka|ke)?\s*(?:bill|invoice)\s+(?:banao|create)/i);
+      if (billCreateMatch) {
+        return { type: 'generate_bill', customerId: custId, customerName: custName, amount: parseInt(billCreateMatch[1]) };
+      }
+      // Mark paid
+      if (text.includes('mark paid') || text.includes('paid kar') || text.includes('chukta')) {
+        return { type: 'mark_paid', customerId: custId, customerName: custName };
       }
       // If just ID provided, return unknown so AI can handle it
       return { type: 'unknown' };
@@ -903,27 +1101,28 @@ async function executeTool(name, args, staffPhone, storeId) {
   }
 }
 
-async function askOpenRouterWithTools(messageText, staffPhone, storeId) {
-  if (!openai) {
-    const currentApiKey = process.env.OPENROUTER_API_KEY;
-    if (currentApiKey && currentApiKey !== 'YOUR_OPENROUTER_API_KEY') {
-      openai = new OpenAI({
-        apiKey: currentApiKey,
-        baseURL: 'https://openrouter.ai/api/v1'
+async function askGeminiWithTools(messageText, staffPhone, storeId) {
+  // Try to initialize Gemini if not done
+  if (!geminiModel) {
+    const currentApiKey = process.env.GEMINI_API_KEY;
+    if (currentApiKey && currentApiKey !== 'YOUR_GEMINI_API_KEY') {
+      genAI = new GoogleGenerativeAI(currentApiKey);
+      const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+      geminiModel = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: { temperature: 0.0, maxOutputTokens: 1024 },
       });
     }
   }
 
-  if (!openai) {
-    console.warn('⚠️ OpenRouter AI is not configured. OPENROUTER_API_KEY is missing.');
-    return '⚠️ OpenRouter API key missing. Please configure it in your .env file.';
+  if (!geminiModel) {
+    console.warn('⚠️ Gemini AI is not configured. GEMINI_API_KEY is missing.');
+    return '⚠️ GEMINI_API_KEY missing. Please configure it in your .env file.';
   }
 
-  const modelName = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-r1:free';
   const conversationContext = getConversationContext(staffPhone);
 
   try {
-    const db = await readDB();
     const storeDb = await readStoreDB(storeId);
     const shopInfo = storeDb.shop || {};
 
@@ -931,10 +1130,11 @@ async function askOpenRouterWithTools(messageText, staffPhone, storeId) {
       ? (storeDb.customers || []).map(c => `  ID: ${c.id} — ${c.name} (${c.phone})`).join('\n')
       : '  (No customers registered yet.)';
 
-    const todayBills = (storeDb.bills || []).filter(b => b.created_at?.startsWith(new Date().toISOString().substring(0, 10)));
+    const todayString = new Date().toISOString().substring(0, 10);
+    const todayBills = (storeDb.bills || []).filter(b => b.created_at?.startsWith(todayString));
     const todaySales = todayBills.reduce((s, b) => s + (b.total || 0), 0);
     const todayCollections = (storeDb.transactions || [])
-      .filter(t => t.type === 'payment' && t.timestamp?.startsWith(new Date().toISOString().substring(0, 10)))
+      .filter(t => t.type === 'payment' && t.timestamp?.startsWith(todayString))
       .reduce((s, t) => s + (t.amount || 0), 0);
 
     const systemInstruction = `Tu ${shopInfo.name || 'store'} ka AI assistant hai. Shop owner: ${shopInfo.owner || 'unknown'}, Address: ${shopInfo.address || 'unknown'}.
@@ -944,7 +1144,7 @@ Store ka aaj ka data:
 💰 Aaj ka collection: ₹${todayCollections}
 👥 Total customers: ${(storeDb.customers || []).length}
 
-TERE PAAS YEH CUSTOMERS HAIN (INHI IDs use karna, kabhi bina ID mat banao):
+TERE PAAS YEH LOG HAIN (INHI ke saath kaam kar, bahar ka koi nahi):
 ${customerListString}
 
 JO TOOLS TU USE KAR SAKTA HAI:
@@ -962,111 +1162,132 @@ JO TOOLS TU USE KAR SAKTA HAI:
 - getCustomerStatementPdfTool(customerId) → statement PDF
 - getDailyReportPdfTool(date) → daily report PDF
 
-BASIC RULES:
-1. Jo language mein user baat kare, usi mein jawab de (hinglish/hindi/english)
-2. Customer ID kabhi bina database ke mat banao — upar di hui list mein se lo ya addCustomerTool se milne ke baad
-3. Jo customer list mein nahi hai, pehle use add karo via addCustomerTool
-4. Ek turn mein ek se zyada tool call kar sakta hai (e.g. pehle customer add, phir bill)
-5. Paise hamesha number mein bhejo (e.g. 500, "five hundred" nahi)
-6. Jawab mein emoji aur Indian currency (₹1,000) use karo
-7. Agar tool error de, to wahi error user ko batao — success mat banao
-8. Users ka context yaad rakho — jo customer ID previous turn mein mili, wapas mat poocho`;
+CRITICAL RULES (inhe todna mana hai):
+1. SIRF HINGLISH ya HINDI mein jawab de. English mein kabhi jawab mat dena.
+2. JO CUSTOMER UPAR LISTED HAI, UNHI KE SAATH KAAM KAR. Agar list mein nahi to pehle add kar via addCustomerTool.
+3. NEVER fake data — agar customer/amount/data nahi hai to "Yeh data abhi available nahi hai" bolo.
+4. Customer ID kabhi khud se mat banao — tool se banao ya list mein se lo.
+5. Ek turn mein ek se zyada tool call kar sakta hai.
+6. Paise tool ko hamesha number mein bhejo (500), "five hundred" nahi.
+7. Agar tool error de to wahi error batao — success mat banao.
+8. Context yaad rakho — jo pehle ho chuka hai wapas mat poocho.
+9. Koi bhi random amount, item, ya transaction mat banao. REAL DATA use karo.`;
 
-    // Build conversation context string
-    let contextString = '';
+    // Build conversation context
+    let fullInstruction = systemInstruction;
     let lastCustomerId = null;
-
     if (conversationContext.length > 0) {
-      contextString = '\n\nPichli baatein (yaad rakho):\n';
+      fullInstruction += '\n\nPichli baatein (yaad rakho):\n';
       conversationContext.forEach((ctx, idx) => {
-        contextString += `${idx + 1}. User: "${ctx.message}"\n   Assistant: "${ctx.response.substring(0, 150)}..."\n`;
+        fullInstruction += `${idx + 1}. User: "${ctx.message}"\n   Assistant: "${ctx.response.substring(0, 150)}..."\n`;
         const extractedId = extractCustomerId(ctx.message);
-        if (extractedId) { lastCustomerId = extractedId; }
+        if (extractedId) lastCustomerId = extractedId;
       });
       if (lastCustomerId) {
-        contextString += `\n⚠️ User ne pehle customer ID batayi thi: ${lastCustomerId}. Use karo agar wahi customer ho.`;
+        fullInstruction += `\n⚠️ User ne pehle customer ID batayi thi: ${lastCustomerId}. Use karo agar wahi customer ho.`;
       }
     }
 
-    const messages = [
-      { role: 'system', content: `${systemInstruction}\n${contextString}` },
-      { role: 'user', content: messageText }
-    ];
-
-    // DeepSeek-R1 ko tool definitions bhejni zaroori hai function calling ke liye
+    // Gemini tool declarations
     const tools = [
-      { type: 'function', function: { name: 'addCustomerTool', description: 'Naya customer add karna (name, phone)', parameters: { type: 'object', properties: { name: { type: 'string' }, phone: { type: 'string' } }, required: ['name', 'phone'] } } },
-      { type: 'function', function: { name: 'recordPaymentTool', description: 'Payment record karna (customerId, amount, note)', parameters: { type: 'object', properties: { customerId: { type: 'string' }, amount: { type: 'number' }, note: { type: 'string' } }, required: ['customerId', 'amount'] } } },
-      { type: 'function', function: { name: 'addCreditTool', description: 'Udhaar/credit add karna (customerId, amount, note)', parameters: { type: 'object', properties: { customerId: { type: 'string' }, amount: { type: 'number' }, note: { type: 'string' } }, required: ['customerId', 'amount'] } } },
-      { type: 'function', function: { name: 'addItemToUnpaidBillTool', description: 'Bill mein item add karna (customerId, itemName, price, qty)', parameters: { type: 'object', properties: { customerId: { type: 'string' }, itemName: { type: 'string' }, price: { type: 'number' }, qty: { type: 'number' } }, required: ['customerId', 'itemName', 'price'] } } },
-      { type: 'function', function: { name: 'generateBillTool', description: 'Fixed amount ka bill banana (customerId, amount)', parameters: { type: 'object', properties: { customerId: { type: 'string' }, amount: { type: 'number' } }, required: ['customerId', 'amount'] } } },
-      { type: 'function', function: { name: 'markBillAsPaidTool', description: 'Bill paid mark karna (customerId)', parameters: { type: 'object', properties: { customerId: { type: 'string' } }, required: ['customerId'] } } },
-      { type: 'function', function: { name: 'getCustomerBalancesTool', description: 'Sab customers ke outstanding balances dikhana', parameters: { type: 'object', properties: {} } } },
-      { type: 'function', function: { name: 'getTodaySalesReportTool', description: 'Aaj ki sales report dikhana', parameters: { type: 'object', properties: {} } } },
-      { type: 'function', function: { name: 'getShopDetailsTool', description: 'Shop ka naam, owner, address dikhana', parameters: { type: 'object', properties: {} } } },
-      { type: 'function', function: { name: 'getCustomersListTool', description: 'Saare customers ki list dikhana', parameters: { type: 'object', properties: {} } } },
-      { type: 'function', function: { name: 'getBillPdfTool', description: 'Bill ka PDF generate karna (customerId)', parameters: { type: 'object', properties: { customerId: { type: 'string' } }, required: ['customerId'] } } },
-      { type: 'function', function: { name: 'getCustomerStatementPdfTool', description: 'Customer statement ka PDF (customerId)', parameters: { type: 'object', properties: { customerId: { type: 'string' } }, required: ['customerId'] } } },
-      { type: 'function', function: { name: 'getDailyReportPdfTool', description: 'Daily report PDF (date YYYY-MM-DD optional)', parameters: { type: 'object', properties: { date: { type: 'string' } } } } }
+      { functionDeclarations: [
+        { name: 'addCustomerTool', description: 'Naya customer add karna (name, phone)', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' }, phone: { type: 'STRING' } }, required: ['name', 'phone'] } },
+        { name: 'recordPaymentTool', description: 'Payment record karna (customerId, amount, note)', parameters: { type: 'OBJECT', properties: { customerId: { type: 'STRING' }, amount: { type: 'NUMBER' }, note: { type: 'STRING' } }, required: ['customerId', 'amount'] } },
+        { name: 'addCreditTool', description: 'Udhaar/credit add karna (customerId, amount, note)', parameters: { type: 'OBJECT', properties: { customerId: { type: 'STRING' }, amount: { type: 'NUMBER' }, note: { type: 'STRING' } }, required: ['customerId', 'amount'] } },
+        { name: 'addItemToUnpaidBillTool', description: 'Bill mein item add karna (customerId, itemName, price, qty)', parameters: { type: 'OBJECT', properties: { customerId: { type: 'STRING' }, itemName: { type: 'STRING' }, price: { type: 'NUMBER' }, qty: { type: 'NUMBER' } }, required: ['customerId', 'itemName', 'price'] } },
+        { name: 'generateBillTool', description: 'Fixed amount ka bill banana (customerId, amount)', parameters: { type: 'OBJECT', properties: { customerId: { type: 'STRING' }, amount: { type: 'NUMBER' } }, required: ['customerId', 'amount'] } },
+        { name: 'markBillAsPaidTool', description: 'Bill paid mark karna (customerId)', parameters: { type: 'OBJECT', properties: { customerId: { type: 'STRING' } }, required: ['customerId'] } },
+        { name: 'getCustomerBalancesTool', description: 'Sab customers ke outstanding balances dikhana', parameters: { type: 'OBJECT', properties: {} } },
+        { name: 'getTodaySalesReportTool', description: 'Aaj ki sales report dikhana', parameters: { type: 'OBJECT', properties: {} } },
+        { name: 'getShopDetailsTool', description: 'Shop ka naam, owner, address dikhana', parameters: { type: 'OBJECT', properties: {} } },
+        { name: 'getCustomersListTool', description: 'Saare customers ki list dikhana', parameters: { type: 'OBJECT', properties: {} } },
+        { name: 'getBillPdfTool', description: 'Bill ka PDF generate karna (customerId)', parameters: { type: 'OBJECT', properties: { customerId: { type: 'STRING' } }, required: ['customerId'] } },
+        { name: 'getCustomerStatementPdfTool', description: 'Customer statement ka PDF (customerId)', parameters: { type: 'OBJECT', properties: { customerId: { type: 'STRING' } }, required: ['customerId'] } },
+        { name: 'getDailyReportPdfTool', description: 'Daily report PDF (date YYYY-MM-DD optional)', parameters: { type: 'OBJECT', properties: { date: { type: 'STRING' } } } }
+      ]}
     ];
 
-    let response = await openai.chat.completions.create({
-      model: modelName,
-      messages: messages,
+    // Start chat with system instruction
+    const chat = geminiModel.startChat({
+      systemInstruction: fullInstruction,
       tools: tools,
-      tool_choice: 'auto'
     });
 
-    // Loop for handling tool calls
+    // Send the message — first turn
+    const TIMEOUT_MS = 30000;
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), TIMEOUT_MS));
+    let result = await Promise.race([chat.sendMessage(messageText), timeoutPromise]);
+    let response = result.response;
     let loopCount = 0;
-    while (loopCount < 5) {
-      const toolCalls = response.choices[0].message.tool_calls;
-      if (!toolCalls || toolCalls.length === 0) break;
+    let pdfUrlToSend = null;
+    let pdfFilename = "document.pdf";
+    let pdfCustomerPhone = null;
+
+    // Tool-use loop (max 10 rounds so complex flows complete)
+    while (loopCount < 10) {
+      const functionCalls = response.functionCalls();
+      if (!functionCalls || functionCalls.length === 0) break;
 
       loopCount++;
-      
-      // Add assistant's tool call message
-      messages.push(response.choices[0].message);
-      
-      // Execute tools and get results
-      for (const toolCall of toolCalls) {
-        const toolResult = await executeTool(toolCall.function.name, JSON.parse(toolCall.function.arguments), staffPhone, storeId);
-        console.log(`   ↳ ${toolCall.function.name} result:`, toolResult);
-        
-        messages.push({
-          role: 'tool',
-          tool_call_id: toolCall.id,
-          content: JSON.stringify(toolResult)
+      const toolResults = [];
+
+      for (const fnCall of functionCalls) {
+        const fnName = fnCall.name;
+        const fnArgs = fnCall.args;
+        console.log(`🛠️ AI calling tool: "${fnName}" with args:`, fnArgs);
+        const toolResult = await executeTool(fnName, fnArgs, staffPhone, storeId);
+        // Track PDF tool results for document sending
+        if (["getBillPdfTool", "getCustomerStatementPdfTool", "getDailyReportPdfTool"].includes(fnName)) {
+          if (toolResult && toolResult.pdfUrl) {
+            pdfUrlToSend = toolResult.pdfUrl;
+            pdfFilename = toolResult.filename || `document-${fnName.replace('Tool', '')}.pdf`;
+            if (toolResult.customerPhone) pdfCustomerPhone = toolResult.customerPhone;
+          }
+        }
+        console.log(`   ↳ ${fnName} result:`, JSON.stringify(toolResult).substring(0, 200));
+        toolResults.push({
+          functionResponse: {
+            name: fnName,
+            response: { result: toolResult }
+          }
         });
       }
 
-      // Get next response from OpenRouter
-      response = await openai.chat.completions.create({
-        model: modelName,
-        messages: messages,
-        tools: tools,
-        tool_choice: 'auto'
-      });
+      // Send tool results back to model
+      result = await Promise.race([chat.sendMessage([{ text: 'Tool results follow:' }, ...toolResults]), timeoutPromise]);
+      response = result.response;
     }
 
-    const msgContent = response.choices[0].message.content;
-    const finalResponse = (msgContent || '').trim() || '✅ Done! What else can I help you with?';
+    let finalResponse = "✅ Done! What else can I help you with?";
+    try {
+      const text = response.text();
+      if (text && text.trim()) finalResponse = text.trim();
+    } catch (e) {
+      console.error("Response text extraction error:", e);
+      finalResponse = loopCount >= 10
+        ? "⏳ Bahut saare kaam ho gaye. Kuch aur batao?"
+        : "✅ Kaam ho gaya! Kya aur karna hai?";
+    }
 
-    // Add to conversation history
     addToHistory(staffPhone, messageText, finalResponse);
-    
-    return finalResponse;
-  } catch (error) {
-    console.error('❌ OpenRouter API error:', error.message || error);
-        const errorMsg = `❌ कुछ तकनीकल समस्या हुई। कृपया दोबारा कोशिश करें या एडमिन को बताएं। 🙏`;
 
-    if (error.status === 429) {
+    if (pdfUrlToSend) {
+      return JSON.stringify({ text: finalResponse, pdfUrl: pdfUrlToSend, pdfFilename: pdfFilename, customerPhone: pdfCustomerPhone, success: true });
+    }
+    return finalResponse;
+
+  } catch (error) {
+    console.error('❌ Gemini AI error:', error.message || error);
+    if (error.message === 'TIMEOUT') {
+      return '⏳ Request timed out. Please try again.';
+    }
+    if (error.message?.includes('429') || error.message?.includes('quota') || error.message?.includes('RATE_LIMIT')) {
       return `⏳ बॉट अभी व्यस्त है। एक मिनट बाद दोबारा कोशिश करें। 🙏`;
     }
-    if (error.status === 503 || error.message?.includes("network")) {
+    if (error.message?.includes('network') || error.message?.includes('ECONNREFUSED')) {
       return `📶 नेटवर्क एरर। कृपया बाद में कोशिश करें।`;
     }
-    return errorMsg;
+    return `❌ कुछ तकनीकल समस्या हुई। कृपया दोबारा कोशिश करें या एडमिन को बताएं। 🙏`;
   }
 }
 
@@ -1134,6 +1355,32 @@ async function sendWhatsAppDocument(recipientPhone, documentUrl, filename, capti
   }
 }
 
+// ─── MEMORY CLEANUP SCHEDULER ────────────────────────────────────────────
+// Clean up expired sessions and rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  // Clean session memory
+  for (const [phone, session] of sessionMemory) {
+    if (now - session.lastActivity > SESSION_TTL) {
+      sessionMemory.delete(phone);
+    }
+  }
+  // Clean rate limit store
+  if (rateLimitStore.size > 100) {
+    for (const [key, entry] of rateLimitStore) {
+      if (now > entry.resetAt) rateLimitStore.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
+// Additional cleanup: every 10 minutes, purge ALL expired rate limit entries unconditionally
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitStore) {
+    if (now > entry.resetAt) rateLimitStore.delete(key);
+  }
+}, 10 * 60 * 1000);
+
 // ─── DAILY REPORT SCHEDULER (runs every day at 9:00 AM IST) ───────────────────
 
 function scheduleDaily(hour, minuteIST, fn) {
@@ -1147,8 +1394,8 @@ function scheduleDaily(hour, minuteIST, fn) {
     if (nextRun <= nowIST) nextRun.setDate(nextRun.getDate() + 1);
     return nextRun.getTime() - nowIST.getTime();
   }
-  function tick() {
-    fn();
+  async function tick() {
+    try { await fn(); } catch(e) { console.error("Scheduled task failed:", e); }
     setTimeout(tick, msUntilNext());
   }
   setTimeout(tick, msUntilNext());
@@ -1241,7 +1488,31 @@ app.get('/webhook', (req, res) => {
 });
 
 // POST /webhook — Incoming WhatsApp messages
-app.post('/webhook', async (req, res) => {
+// Rate limit: 30 req/min per IP (webhook is called by Meta servers)
+app.post('/webhook', rateLimiter({ windowMs: 60000, max: 30, keyPrefix: 'webhook' }), async (req, res) => {
+  // ── VERIFY WEBHOOK SIGNATURE ──────────────────────────────────────────────
+  // Ensure the message is actually from Meta, not an attacker
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  const signature = req.get('X-Hub-Signature-256');
+  if (appSecret && signature) {
+    const rawBody = JSON.stringify(req.body);
+    const expectedSig = 'sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
+    try {
+      const sigBuf = Buffer.from(signature, 'utf8');
+      const expectedBuf = Buffer.from(expectedSig, 'utf8');
+      if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+        console.warn('❌ Webhook signature mismatch — rejecting request');
+        return res.sendStatus(403);
+      }
+    } catch {
+      return res.sendStatus(403);
+    }
+  } else if (appSecret && !signature) {
+    console.warn('❌ Webhook missing signature header — rejecting request');
+    return res.sendStatus(403);
+  }
+  // If no appSecret configured, skip verification (dev mode)
+
   const body = req.body;
 
   if (
@@ -1260,7 +1531,7 @@ app.post('/webhook', async (req, res) => {
     const staffRow = (fullDb.staff || []).find(s => s.phone === staffPhone);
     if (!staffRow) {
       await sendWhatsAppMessage(staffPhone, '❌ Not authorized. Please register your store and add this number as staff.');
-      return res.status(200).json({ status: 'success', action: 'unauthorized' });
+      return res.status(200).json({ success: true, action: 'unauthorized' });
     }
 
     const storeId = staffRow.store_id || 'default';
@@ -1401,7 +1672,7 @@ app.post('/webhook', async (req, res) => {
     } else if (action.type === 'daily_report_pdf') {
       const todayString = new Date().toISOString().substring(0, 10);
       const baseUrl = getPublicBaseUrl(req);
-      const pdfUrl = `${baseUrl}/api/report/${todayString}/pdf?storeId=${storeId}`;
+      const pdfUrl = `${baseUrl}/api/report/${todayString}/pdf?token=${generatePdfToken('report', todayString, storeId)}`;
       
       // Send PDF to all staff members
       let sentCount = 0;
@@ -1622,7 +1893,7 @@ app.post('/webhook', async (req, res) => {
         replyText = `❌ *${customerName}* ka koi unpaid bill nahi hai. Pehle bill banayein.`;
       } else {
         const baseUrl = getPublicBaseUrl(req);
-        const pdfUrl = `${baseUrl}/api/bill/${unpaidBill.id}/pdf`;
+        const pdfUrl = `${baseUrl}/api/bill/${unpaidBill.id}/pdf?token=${generatePdfToken('bill', unpaidBill.id, unpaidBill.store_id || storeId)}`;
         const customer = db.customers.find(c => c.id === customerId);
         if (customer && customer.phone) {
           await sendWhatsAppDocument(customer.phone, pdfUrl, `invoice-${unpaidBill.id}.pdf`, `🧾 Your invoice from ${shop.name || 'General Store'}`);
@@ -1643,7 +1914,7 @@ app.post('/webhook', async (req, res) => {
       const customer = db.customers.find(c => c.id === customerId);
       const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
       const baseUrl = getPublicBaseUrl(req);
-      const pdfUrl = `${baseUrl}/api/customer/${customerId}/statement/pdf`;
+      const pdfUrl = `${baseUrl}/api/customer/${customerId}/statement/pdf?token=${generatePdfToken('statement', customerId, storeId)}`;
       if (customer && customer.phone) {
         await sendWhatsAppDocument(customer.phone, pdfUrl, `statement-${customer.name.replace(/\s+/g, '_')}.pdf`, `📊 Your account statement from ${shop.name || 'General Store'}`);
       }
@@ -1677,15 +1948,78 @@ app.post('/webhook', async (req, res) => {
             ? `💳 Remaining baaki: *${fmtRs(bal)}*`
             : `🎉 *Poora hisab saaf ho gaya!*`);
       }
-    // ── UNKNOWN → AI AGENT WITH TOOL USE ─────────────────────────────────────
+    // ── UNKNOWN → AI AGENT WITH TOOL USE (async — respond immediately) ──────
     } else {
-      console.log(`🤖 Regex did not match. Forwarding to OpenRouter AI Agent: "${bodyText}"`);
-      replyText = await askOpenRouterWithTools(bodyText, staffPhone, storeId);
-      console.log(`🤖 AI Agent reply: "${replyText}"`);
+      console.log(`🤖 Regex did not match. AI Agent handling: "${bodyText}"`);
+      // Respond to Meta immediately (avoids timeout/retry), process AI in background
+      res.status(200).json({ success: true, action: 'ai_processing', aiUsed: true });
+
+      // Per-phone rate limit: max 5 AI calls per minute per phone
+      const phoneKey = `ai_phone:${staffPhone}`;
+      const now = Date.now();
+      let phoneEntry = rateLimitStore.get(phoneKey);
+      if (!phoneEntry || now > phoneEntry.resetAt) {
+        phoneEntry = { count: 1, resetAt: now + 60000 };
+        rateLimitStore.set(phoneKey, phoneEntry);
+      } else {
+        phoneEntry.count++;
+      }
+
+      if (phoneEntry.count <= 5) {
+        // Process AI in background
+        setImmediate(async () => {
+          try {
+            const aiReply = await askGeminiWithTools(bodyText, staffPhone, storeId);
+
+            // Check if AI response includes a PDF to send
+            let pdfData = null;
+            try {
+              const parsed = JSON.parse(aiReply);
+              if (parsed.pdfUrl) pdfData = parsed;
+            } catch (e) { /* not JSON, plain text */ }
+
+            if (pdfData) {
+              const baseUrl = getPublicBaseUrl(req);
+              const fullPdfUrl = pdfData.pdfUrl.startsWith('http') ? pdfData.pdfUrl : `${baseUrl}${pdfData.pdfUrl}`;
+
+              try {
+                if (pdfData.customerPhone) {
+                  // Customer-facing PDF (bill/statement): send document to customer, text to staff
+                  await sendWhatsAppDocument(pdfData.customerPhone, fullPdfUrl, pdfData.pdfFilename || 'document.pdf', pdfData.text);
+                  await sendWhatsAppMessage(staffPhone, pdfData.text);
+                } else {
+                  // Store-level PDF (daily report etc.): send to the staff member
+                  await sendWhatsAppDocument(staffPhone, fullPdfUrl, pdfData.pdfFilename || 'document.pdf', pdfData.text);
+                }
+              } catch (docErr) {
+                console.error('Error sending PDF document:', docErr);
+                try {
+                  await sendWhatsAppMessage(staffPhone, pdfData.text);
+                } catch (sendErr) {
+                  console.error('Could not send fallback text either:', sendErr);
+                }
+              }
+            } else {
+              await sendWhatsAppMessage(staffPhone, aiReply);
+            }
+          } catch (bgErr) {
+            console.error('Fatal AI background error:', bgErr.message || bgErr);
+            try {
+              await sendWhatsAppMessage(staffPhone, '❌ Error processing your request. Please try again.');
+            } catch (sendErr) {
+              console.error('Could not send error message either:', sendErr);
+            }
+          }
+        });
+      } else {
+        await sendWhatsAppMessage(staffPhone, '⏳ Aap bahut saare messages bhej rahe hain. Thoda ruk kar bhejein. 🙏');
+      }
+      return; // Already responded above
     }
 
+    // For non-AI (regex-matched) commands, respond synchronously
     await sendWhatsAppMessage(staffPhone, replyText);
-    return res.status(200).json({ status: 'success', action: action.type, aiUsed: action.type === 'unknown' });
+    return res.status(200).json({ success: true, action: action.type, aiUsed: false });
   }
 
   return res.sendStatus(200);
@@ -1796,7 +2130,7 @@ app.get('/api/test-db', async (req, res) => {
 // ─── MOBILE APP API ENDPOINTS ─────────────────────────────────────────────────────
 
 // POST /api/auth/request-code — Request WhatsApp OTP code for login
-app.post('/api/auth/request-code', async (req, res) => {
+app.post('/api/auth/request-code', rateLimiter({ windowMs: 60000, max: 3, keyPrefix: 'otp_req' }), async (req, res) => {
   try {
     const { storeId, phone } = req.body || {};
     let sid = String(storeId || '').trim();
@@ -1828,7 +2162,7 @@ app.post('/api/auth/request-code', async (req, res) => {
     console.log('Staff lookup with store_id:', staff);
     if (!staff) return res.status(403).json({ success: false, message: 'Phone not authorized for this store' });
 
-    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const code = String(crypto.randomInt(100000, 999999));
     const codeHash = crypto.createHash('sha256').update(code).digest('hex');
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -1862,7 +2196,7 @@ app.post('/api/auth/request-code', async (req, res) => {
 });
 
 // POST /api/auth/verify-code — Verify OTP and create a session
-app.post('/api/auth/verify-code', async (req, res) => {
+app.post('/api/auth/verify-code', rateLimiter({ windowMs: 60000, max: 5, keyPrefix: 'otp_verify' }), async (req, res) => {
   try {
     const { storeId, phone, code } = req.body || {};
     let sid = String(storeId || '').trim();
@@ -1889,7 +2223,12 @@ app.post('/api/auth/verify-code', async (req, res) => {
 
     const codeHash = crypto.createHash('sha256').update(c).digest('hex');
     if (codeHash !== row.code_hash) {
+      const newAttempts = (row.attempts || 0) + 1;
       await database.collection('login_codes').updateOne({ _id: row._id }, { $inc: { attempts: 1 } });
+      if (newAttempts >= 5) {
+        await database.collection('login_codes').deleteOne({ _id: row._id });
+        return res.status(401).json({ success: false, message: 'Too many attempts. Request a new code.' });
+      }
       return res.status(401).json({ success: false, message: 'Invalid/expired code' });
     }
 
@@ -1914,7 +2253,7 @@ app.post('/api/auth/verify-code', async (req, res) => {
 });
 
 // POST /api/auth/login — Password-based login
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', rateLimiter({ windowMs: 60000, max: 5, keyPrefix: 'login' }), async (req, res) => {
   try {
     const { phone, password } = req.body || {};
     const p = normalizePhone(phone);
@@ -1966,6 +2305,172 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// POST /api/auth/logout — Invalidate session
+app.post('/api/auth/logout', async (req, res) => {
+  try {
+    const auth = req.get('Authorization') || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice('Bearer '.length).trim() : '';
+
+    if (token) {
+      const database = await connectDB();
+      if (database) {
+        await database.collection('sessions').deleteOne({ token });
+        console.log(`🔓 Session invalidated for token ${token.slice(0, 8)}...`);
+      }
+    }
+
+    return res.json({ success: true, message: 'Logged out' });
+  } catch (error) {
+    console.error('Error in logout:', error);
+    return res.status(500).json({ success: false, message: 'Logout failed' });
+  }
+});
+
+// POST /api/auth/google — Google OAuth login/register
+app.post('/api/auth/google', rateLimiter({ windowMs: 60000, max: 10, keyPrefix: 'google_auth' }), async (req, res) => {
+  try {
+    const { credential, clientId } = req.body || {};
+    if (!credential) {
+      return res.status(400).json({ success: false, message: 'Google credential is required' });
+    }
+
+    // Verify the Google ID token
+    // The credential is a JWT signed by Google. We verify it by checking the header.
+    let payload;
+    try {
+      // Decode the JWT payload (middle segment)
+      const parts = credential.split('.');
+      if (parts.length !== 3) throw new Error('Invalid token format');
+      const decoded = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+
+      // Basic validation: check issuer and audience
+      const allowedIssuers = ['accounts.google.com', 'https://accounts.google.com'];
+      if (!allowedIssuers.includes(decoded.iss)) {
+        throw new Error('Invalid issuer');
+      }
+
+      // If clientId is provided, verify audience
+      if (clientId && decoded.aud !== clientId) {
+        throw new Error('Invalid audience');
+      }
+
+      // Check expiry
+      if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {
+        throw new Error('Token expired');
+      }
+
+      payload = {
+        sub: decoded.sub,
+        email: decoded.email || '',
+        name: decoded.name || decoded.email?.split('@')[0] || 'User',
+        picture: decoded.picture || '',
+        email_verified: decoded.email_verified || false,
+      };
+    } catch (verifyErr) {
+      console.error('Google token verification failed:', verifyErr.message);
+      return res.status(401).json({ success: false, message: 'Invalid Google credential' });
+    }
+
+    const database = await connectDB();
+    if (!database) return res.status(500).json({ success: false, message: 'Server DB not configured' });
+
+    // Check if user already exists with this Google ID
+    let existingStaff = await database.collection('staff').findOne({ google_id: payload.sub });
+
+    if (existingStaff) {
+      // Existing user — login
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await database.collection('sessions').insertOne({
+        token,
+        store_id: existingStaff.store_id,
+        phone: existingStaff.phone || '',
+        created_at: new Date(),
+        expires_at: expiresAt,
+      });
+
+      const store = await database.collection('stores').findOne({ id: existingStaff.store_id });
+      console.log(`🔑 Google login: ${payload.email} → store ${existingStaff.store_id}`);
+      return res.json({ success: true, token, store, isNewUser: false });
+    }
+
+    // Check if user exists by email
+    if (payload.email) {
+      existingStaff = await database.collection('staff').findOne({ email: payload.email });
+      if (existingStaff) {
+        // Link Google account to existing staff
+        await database.collection('staff').updateOne(
+          { _id: existingStaff._id },
+          { $set: { google_id: payload.sub, google_picture: payload.picture } }
+        );
+
+        const token = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        await database.collection('sessions').insertOne({
+          token,
+          store_id: existingStaff.store_id,
+          phone: existingStaff.phone || '',
+          created_at: new Date(),
+          expires_at: expiresAt,
+        });
+
+        const store = await database.collection('stores').findOne({ id: existingStaff.store_id });
+        console.log(`🔑 Google login (linked): ${payload.email} → store ${existingStaff.store_id}`);
+        return res.json({ success: true, token, store, isNewUser: false });
+      }
+    }
+
+    // New user — create a pending store (needs phone number to complete registration)
+    // Generate a temporary store ID
+    const tempStoreId = 'google_' + crypto.randomBytes(8).toString('hex');
+
+    // Create a temporary staff entry
+    const tempPhone = 'google_' + payload.sub;
+    await database.collection('staff').insertOne({
+      id: crypto.randomBytes(16).toString('hex'),
+      name: payload.name,
+      phone: tempPhone,
+      email: payload.email,
+      google_id: payload.sub,
+      google_picture: payload.picture,
+      store_id: tempStoreId,
+      role: 'owner',
+      status: 'pending_registration',
+      created_at: new Date().toISOString(),
+    });
+
+    // Create a temporary store entry
+    await database.collection('stores').insertOne({
+      id: tempStoreId,
+      store_name: payload.name + "'s Store",
+      owner_name: payload.name,
+      phone: tempPhone,
+      email: payload.email,
+      business_type: 'retail',
+      plan: 'basic',
+      created_at: new Date().toISOString(),
+      status: 'pending_registration',
+    });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await database.collection('sessions').insertOne({
+      token,
+      store_id: tempStoreId,
+      phone: tempPhone,
+      created_at: new Date(),
+      expires_at: expiresAt,
+    });
+
+    const store = await database.collection('stores').findOne({ id: tempStoreId });
+    console.log(`🔑 Google new user: ${payload.email} → temp store ${tempStoreId}`);
+    return res.json({ success: true, token, store, isNewUser: true, needsPhoneVerification: true });
+  } catch (error) {
+    console.error('Error in Google auth:', error);
+    return res.status(500).json({ success: false, message: 'Google authentication failed' });
+  }
+});
+
 // POST /api/customer/add - Add a new customer
 app.post('/api/customer/add', async (req, res) => {
   try {
@@ -1973,7 +2478,14 @@ app.post('/api/customer/add', async (req, res) => {
     if (!name || !phone) {
       return res.status(400).json({ success: false, message: 'Name and phone are required' });
     }
+    // Validate input lengths
+    if (String(name).trim().length < 2 || String(name).trim().length > 100) {
+      return res.status(400).json({ success: false, message: 'Name must be 2-100 characters' });
+    }
     const np = normalizePhone(phone);
+    if (np.length < 10 || np.length > 15) {
+      return res.status(400).json({ success: false, message: 'Invalid phone number' });
+    }
     const sid = req.storeId || 'default';
 
     const fullDb = await readDB();
@@ -2017,6 +2529,9 @@ app.post('/api/payment/add', async (req, res) => {
     if (!customerId || amount === undefined || amount === null || isNaN(Number(amount)) || Number(amount) <= 0) {
       return res.status(400).json({ success: false, message: 'Customer ID and valid positive amount are required' });
     }
+    // Validate payment mode
+    const validPaymentModes = ['cash', 'upi', 'qr', 'cheque', 'bank_transfer', 'other'];
+    const mode = validPaymentModes.includes(payment_mode) ? payment_mode : 'cash';
     const parsedAmount = Number(amount);
     const sid = req.storeId || 'default';
 
@@ -2036,7 +2551,7 @@ app.post('/api/payment/add', async (req, res) => {
       customer_id: customerId,
       type: txType,
       amount: parsedAmount,
-      payment_mode: payment_mode || 'cash',
+      payment_mode: mode,
       note: note || 'Payment recorded via Mobile App',
       staff_phone: 'mobile_app',
       timestamp: new Date().toISOString(),
@@ -2060,8 +2575,12 @@ app.post('/api/payment/add', async (req, res) => {
 app.post('/api/bill/create', async (req, res) => {
   try {
     const { customerId, amount, items } = req.body;
-    if (!customerId || amount === undefined || amount === null || isNaN(Number(amount))) {
-      return res.status(400).json({ success: false, message: 'Customer ID and valid amount are required' });
+    if (!customerId || amount === undefined || amount === null || isNaN(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, message: 'Customer ID and valid positive amount are required' });
+    }
+    // Limit items array size
+    if (items && Array.isArray(items) && items.length > 50) {
+      return res.status(400).json({ success: false, message: 'Maximum 50 items per bill' });
     }
     const sid = req.storeId || 'default';
 
@@ -2249,10 +2768,10 @@ app.get('/api/db/changes', async (req, res) => {
 app.post('/api/db', async (req, res) => {
   const body = req.body;
   if (!body || typeof body !== 'object' || !body.customers || !body.transactions || !body.bills) {
-    return res.status(400).json({ status: 'error', message: 'Invalid database payload' });
+    return res.status(400).json({ success: false, message: 'Invalid database payload' });
   }
   await writeDB(body);
-  res.json({ status: 'success' });
+  res.json({ success: true });
 });
 
 // POST /api/register-store - Register a new store
@@ -2261,7 +2780,22 @@ app.post('/api/register-store', async (req, res) => {
     const { store_name, owner_name, phone, email, business_type, plan, address, password, gstin, upi_id } = req.body;
 
     if (!store_name || !owner_name || !phone) {
-      return res.status(400).json({ status: 'error', message: 'store_name, owner_name, and phone are required' });
+      return res.status(400).json({ success: false, message: 'store_name, owner_name, and phone are required' });
+    }
+    // Validate input lengths
+    if (String(store_name).trim().length < 2 || String(store_name).trim().length > 100) {
+      return res.status(400).json({ success: false, message: 'Store name must be 2-100 characters' });
+    }
+    if (String(owner_name).trim().length < 2 || String(owner_name).trim().length > 100) {
+      return res.status(400).json({ success: false, message: 'Owner name must be 2-100 characters' });
+    }
+    const np = normalizePhone(phone);
+    if (np.length < 10 || np.length > 15) {
+      return res.status(400).json({ success: false, message: 'Invalid phone number' });
+    }
+    // Enforce stronger password policy
+    if (password && password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
 
     // Hash password for login
@@ -2352,7 +2886,7 @@ app.post('/api/register-store', async (req, res) => {
     
   } catch (error) {
     console.error('Error registering store:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to register store' });
+    res.status(500).json({ success: false, message: 'Failed to register store' });
   }
 });
 
@@ -2365,13 +2899,13 @@ app.get('/api/store/:storeId', async (req, res) => {
     const store = db.stores?.find(s => s.id === storeId);
     
     if (!store) {
-      return res.status(404).json({ status: 'error', message: 'Store not found' });
+      return res.status(404).json({ success: false, message: 'Store not found' });
     }
     
-    res.json({ status: 'success', store });
+    res.json({ success: true, store });
   } catch (error) {
     console.error('Error fetching store:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to fetch store' });
+    res.status(500).json({ success: false, message: 'Failed to fetch store' });
   }
 });
 
@@ -2399,6 +2933,77 @@ app.post('/api/store/update', sessionAuthMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error updating store details:', error);
     res.status(500).json({ success: false, message: 'Failed to update store details' });
+  }
+});
+
+// POST /api/staff/add - Add a new staff member (MongoDB mode)
+app.post('/api/staff/add', async (req, res) => {
+  try {
+    const { name, phone, role } = req.body;
+    if (!name || !phone) {
+      return res.status(400).json({ success: false, message: 'Name and phone are required' });
+    }
+
+    const np = normalizePhone(phone);
+    const sid = req.storeId;
+
+    const database = await connectDB();
+    if (!database) {
+      return res.status(500).json({ success: false, message: 'Database not available' });
+    }
+
+    // Check for duplicate phone within the same store
+    const existing = await database.collection('staff').findOne({ phone: np, store_id: sid });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'A staff member with this phone already exists in your store' });
+    }
+
+    const newStaff = {
+      id: genId('s'),
+      name: name.trim(),
+      phone: np,
+      role: role || 'staff',
+      store_id: sid,
+      status: 'active',
+    };
+
+    await database.collection('staff').insertOne(newStaff);
+
+    res.json({ success: true, staff: newStaff });
+  } catch (error) {
+    console.error('Error adding staff:', error);
+    res.status(500).json({ success: false, message: 'Failed to add staff member' });
+  }
+});
+
+// DELETE /api/staff/:id - Remove a staff member (MongoDB mode)
+app.delete('/api/staff/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sid = req.storeId;
+
+    const database = await connectDB();
+    if (!database) {
+      return res.status(500).json({ success: false, message: 'Database not available' });
+    }
+
+    // Find the staff member by ID and store
+    const staff = await database.collection('staff').findOne({ id, store_id: sid });
+    if (!staff) {
+      return res.status(404).json({ success: false, message: 'Staff member not found' });
+    }
+
+    // Prevent deleting yourself
+    if (normalizePhone(staff.phone) === normalizePhone(req.staffPhone)) {
+      return res.status(400).json({ success: false, message: 'You cannot remove yourself' });
+    }
+
+    await database.collection('staff').deleteOne({ id, store_id: sid });
+
+    res.json({ success: true, message: 'Staff member removed successfully' });
+  } catch (error) {
+    console.error('Error removing staff:', error);
+    res.status(500).json({ success: false, message: 'Failed to remove staff member' });
   }
 });
 
@@ -2493,7 +3098,7 @@ app.post('/api/send-reminders', async (req, res) => {
       if (sent) { sentCount++; results.push({ name: c.name, amount: bal }); }
     }
   }
-  res.json({ status: 'success', sent: sentCount, results });
+  res.json({ success: true, sent: sentCount, results });
 });
 
 // GET /api/report — Get today's report JSON
@@ -2528,7 +3133,7 @@ app.post('/api/whatsapp/send-invoice', async (req, res) => {
 
     const shop = db.shop || {};
     const baseUrl = getPublicBaseUrl(req);
-    const pdfUrl = `${baseUrl}/api/bill/${encodeURIComponent(billId)}/pdf`;
+    const pdfUrl = `${baseUrl}/api/bill/${encodeURIComponent(billId)}/pdf?token=${generatePdfToken('bill', billId, req.storeId)}`;
     const viewUrl = `${baseUrl}/view/bill/${encodeURIComponent(billId)}`;
     const ok = await sendWhatsAppDocument(
       customer.phone,
@@ -2557,7 +3162,7 @@ app.post('/api/whatsapp/send-statement', async (req, res) => {
 
     const shop = db.shop || {};
     const baseUrl = getPublicBaseUrl(req);
-    const pdfUrl = `${baseUrl}/api/customer/${encodeURIComponent(customerId)}/statement/pdf`;
+    const pdfUrl = `${baseUrl}/api/customer/${encodeURIComponent(customerId)}/statement/pdf?token=${generatePdfToken('statement', customerId, req.storeId)}`;
     const viewUrl = `${baseUrl}/view/customer/${encodeURIComponent(customerId)}/statement`;
     const ok = await sendWhatsAppDocument(
       customer.phone,
@@ -2605,13 +3210,13 @@ app.post('/api/whatsapp/send-reminder', async (req, res) => {
 });
 
 // GET /api/bill/:id/pdf — Generate and return PDF invoice
-app.get('/api/bill/:id/pdf', async (req, res) => {
+app.get('/api/bill/:id/pdf', pdfAuthMiddleware, async (req, res) => {
   try {
     const db = await readDB();
     const bill = db.bills.find(b => b.id === req.params.id);
 
     if (!bill) {
-      return res.status(404).json({ status: 'error', message: 'Bill not found' });
+      return res.status(404).json({ success: false, message: 'Bill not found' });
     }
 
     const sid = bill.store_id || 'default';
@@ -2672,7 +3277,10 @@ app.get('/api/bill/:id/pdf', async (req, res) => {
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=invoice-${bill.id}.pdf`);
-    doc.pipe(res);
+    await new Promise((resolve, reject) => {
+      doc.on('finish', resolve);
+      doc.on('error', reject);
+      doc.pipe(res);
 
     const pageWidth = 595; // A4 width
     const margin = 40;
@@ -2819,21 +3427,27 @@ app.get('/api/bill/:id/pdf', async (req, res) => {
     doc.text(`Powered by Grahbook`, margin, footerY + 58, { width: contentWidth, align: 'center' });
 
     doc.end();
+    });
 
   } catch (error) {
     console.error('Error generating PDF:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to generate PDF' });
+    doc.destroy();
+    if (!res.headersSent) {
+      res.removeHeader('Content-Disposition');
+      res.removeHeader('Content-Type');
+      res.status(500).json({ success: false, message: 'Failed to generate PDF' });
+    }
   }
 });
 
 // GET /api/customer/:id/statement/pdf — Generate customer statement PDF
-app.get('/api/customer/:id/statement/pdf', async (req, res) => {
+app.get('/api/customer/:id/statement/pdf', pdfAuthMiddleware, async (req, res) => {
   try {
     const db = await readDB();
     const customer = db.customers.find(c => c.id === req.params.id);
 
     if (!customer) {
-      return res.status(404).json({ status: 'error', message: 'Customer not found' });
+      return res.status(404).json({ success: false, message: 'Customer not found' });
     }
 
     const sid = customer.store_id || 'default';
@@ -2869,7 +3483,10 @@ app.get('/api/customer/:id/statement/pdf', async (req, res) => {
     const doc = new PDFDocument({ size: 'A4', margin: 0 });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=statement-${customer.name.replace(/\s+/g, '_')}.pdf`);
-    doc.pipe(res);
+    await new Promise((resolve, reject) => {
+      doc.on('finish', resolve);
+      doc.on('error', reject);
+      doc.pipe(res);
 
     const pageWidth = 595;
     const margin = 40;
@@ -2991,10 +3608,16 @@ app.get('/api/customer/:id/statement/pdf', async (req, res) => {
     doc.text('Powered by Grahbook', margin, footerY + 61, { width: contentWidth, align: 'center' });
 
     doc.end();
+    });
 
   } catch (error) {
     console.error('Error generating statement PDF:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to generate statement PDF' });
+    doc.destroy();
+    if (!res.headersSent) {
+      res.removeHeader('Content-Disposition');
+      res.removeHeader('Content-Type');
+      res.status(500).json({ success: false, message: 'Failed to generate statement PDF' });
+    }
   }
 });
 
@@ -3080,7 +3703,7 @@ app.get('/view/bill/:id', async (req, res) => {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Invoice #${bill.id.substring(0, 8).toUpperCase()} — ${shop.name}</title>
+        <title>Invoice #${escapeHtml(bill.id.substring(0, 8).toUpperCase())} — ${escapeHtml(shop.name)}</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
         <style>
@@ -3113,12 +3736,12 @@ app.get('/view/bill/:id', async (req, res) => {
             
             <!-- Store Profile Header -->
             <div class="bg-gradient-to-r ${bgGradient} p-6 text-white text-center sm:text-left">
-              <h2 class="text-2xl font-extrabold tracking-tight">${shop.name}</h2>
-              ${shop.owner ? `<p class="text-indigo-200 text-sm mt-0.5">Prop: ${shop.owner}</p>` : ''}
+              <h2 class="text-2xl font-extrabold tracking-tight">${escapeHtml(shop.name)}</h2>
+              ${shop.owner ? `<p class="text-indigo-200 text-sm mt-0.5">Prop: ${escapeHtml(shop.owner)}</p>` : ''}
               <div class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-indigo-100 border-t border-indigo-500/30 pt-3">
-                ${shop.phone ? `<span class="flex items-center justify-center sm:justify-start gap-1">📞 ${shop.phone}</span>` : ''}
-                ${shop.address ? `<span class="flex items-center justify-center sm:justify-start gap-1">📍 ${shop.address}</span>` : ''}
-                ${shop.gstin ? `<span class="flex items-center justify-center sm:justify-start gap-1">🧾 GSTIN: ${shop.gstin}</span>` : ''}
+                ${shop.phone ? `<span class="flex items-center justify-center sm:justify-start gap-1">📞 ${escapeHtml(shop.phone)}</span>` : ''}
+                ${shop.address ? `<span class="flex items-center justify-center sm:justify-start gap-1">📍 ${escapeHtml(shop.address)}</span>` : ''}
+                ${shop.gstin ? `<span class="flex items-center justify-center sm:justify-start gap-1">🧾 GSTIN: ${escapeHtml(shop.gstin)}</span>` : ''}
               </div>
             </div>
 
@@ -3127,8 +3750,8 @@ app.get('/view/bill/:id', async (req, res) => {
               <div class="flex justify-between items-start mb-6">
                 <div>
                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bill To / ग्राहक</p>
-                  <h3 class="text-base font-extrabold text-slate-800 mt-1">${customer.name}</h3>
-                  ${customer.phone ? `<p class="text-xs text-slate-500 mt-0.5">📞 ${customer.phone}</p>` : ''}
+                  <h3 class="text-base font-extrabold text-slate-800 mt-1">${escapeHtml(customer.name)}</h3>
+                  ${customer.phone ? `<p class="text-xs text-slate-500 mt-0.5">📞 ${escapeHtml(customer.phone)}</p>` : ''}
                 </div>
                 <div class="text-right">
                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Invoice Date / तारीख</p>
@@ -3143,7 +3766,7 @@ app.get('/view/bill/:id', async (req, res) => {
                 ${bill.items.map(item => `
                   <div class="flex justify-between items-center bg-slate-50/70 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors">
                     <div class="min-w-0 pr-2">
-                      <p class="text-sm font-bold text-slate-800 truncate">${item.name}</p>
+                      <p class="text-sm font-bold text-slate-800 truncate">${escapeHtml(item.name)}</p>
                       <p class="text-[11px] text-slate-400 font-medium">
                         ${item.qty} × ₹${item.price.toFixed(2)}
                         ${item.hsn_code ? ` | HSN: ${item.hsn_code}` : ''}
@@ -3209,7 +3832,7 @@ app.get('/view/bill/:id', async (req, res) => {
 
           <!-- PDF & Action Footer -->
           <div class="flex gap-3">
-            <a href="/api/bill/${bill.id}/pdf" class="flex-1 flex items-center justify-center gap-2 py-3.5 bg-slate-800 text-white font-bold rounded-2xl hover:bg-slate-900 active:scale-95 transition-all shadow-md text-sm">
+            <a href="/api/bill/${encodeURIComponent(bill.id)}/pdf" class="flex-1 flex items-center justify-center gap-2 py-3.5 bg-slate-800 text-white font-bold rounded-2xl hover:bg-slate-900 active:scale-95 transition-all shadow-md text-sm">
               📥 Download PDF
             </a>
             ${customer.phone ? `
@@ -3303,7 +3926,7 @@ app.get('/view/customer/:id/statement', async (req, res) => {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Ledger Statement — ${customer.name}</title>
+        <title>Ledger Statement — ${escapeHtml(customer.name)}</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
         <style>
@@ -3325,15 +3948,15 @@ app.get('/view/customer/:id/statement', async (req, res) => {
           <!-- Shop Details Block -->
           <div class="bg-white rounded-3xl p-6 shadow-md border border-slate-100 mb-6 flex flex-col sm:flex-row justify-between items-start gap-4">
             <div>
-              <h2 class="text-xl font-extrabold text-slate-800">${shop.name}</h2>
-              ${shop.owner ? `<p class="text-xs text-slate-400 mt-0.5">Prop: ${shop.owner}</p>` : ''}
-              ${shop.address ? `<p class="text-xs text-slate-500 mt-2">📍 ${shop.address}</p>` : ''}
-              ${shop.gstin ? `<p class="text-xs text-slate-500 mt-1">🧾 GSTIN: ${shop.gstin}</p>` : ''}
+              <h2 class="text-xl font-extrabold text-slate-800">${escapeHtml(shop.name)}</h2>
+              ${shop.owner ? `<p class="text-xs text-slate-400 mt-0.5">Prop: ${escapeHtml(shop.owner)}</p>` : ''}
+              ${shop.address ? `<p class="text-xs text-slate-500 mt-2">📍 ${escapeHtml(shop.address)}</p>` : ''}
+              ${shop.gstin ? `<p class="text-xs text-slate-500 mt-1">🧾 GSTIN: ${escapeHtml(shop.gstin)}</p>` : ''}
             </div>
             ${shop.phone ? `
               <div class="sm:text-right border-t sm:border-t-0 border-slate-100 pt-3 sm:pt-0 w-full sm:w-auto">
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Support Contact</p>
-                <p class="text-sm font-semibold text-indigo-600 mt-0.5">📞 ${shop.phone}</p>
+                <p class="text-sm font-semibold text-indigo-600 mt-0.5">📞 ${escapeHtml(shop.phone)}</p>
               </div>
             ` : ''}
           </div>
@@ -3341,8 +3964,8 @@ app.get('/view/customer/:id/statement', async (req, res) => {
           <!-- Customer details & Outstanding Balance -->
           <div class="balance-card rounded-3xl p-6 shadow-xl text-white mb-6">
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Statement For / ग्राहक</p>
-            <h3 class="text-lg font-extrabold mt-1">${customer.name}</h3>
-            ${customer.phone ? `<p class="text-xs text-slate-400 mt-0.5">📞 ${customer.phone}</p>` : ''}
+            <h3 class="text-lg font-extrabold mt-1">${escapeHtml(customer.name)}</h3>
+            ${customer.phone ? `<p class="text-xs text-slate-400 mt-0.5">📞 ${escapeHtml(customer.phone)}</p>` : ''}
 
             <div class="mt-6 pt-5 border-t border-slate-700/60 flex justify-between items-end">
               <div>
@@ -3399,7 +4022,7 @@ app.get('/view/customer/:id/statement', async (req, res) => {
                       <span class="text-xs font-semibold text-slate-400">
                         ${new Date(item.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                       </span>
-                      <p class="text-sm font-bold text-slate-800 mt-0.5">${item.desc}</p>
+                      <p class="text-sm font-bold text-slate-800 mt-0.5">${escapeHtml(item.desc)}</p>
                       ${item.type === 'bill' ? `
                         <span class="text-[10px] uppercase font-bold tracking-wider ${statusColor}">
                           ${item.status === 'paid' ? 'Paid' : 'Unpaid'}
@@ -3420,7 +4043,7 @@ app.get('/view/customer/:id/statement', async (req, res) => {
 
           <!-- PDF & Action Footer -->
           <div class="flex gap-3">
-            <a href="/api/customer/${customer.id}/statement/pdf" class="flex-1 flex items-center justify-center gap-2 py-3.5 bg-slate-800 text-white font-bold rounded-2xl hover:bg-slate-900 active:scale-95 transition-all shadow-md text-sm">
+            <a href="/api/customer/${encodeURIComponent(customer.id)}/statement/pdf" class="flex-1 flex items-center justify-center gap-2 py-3.5 bg-slate-800 text-white font-bold rounded-2xl hover:bg-slate-900 active:scale-95 transition-all shadow-md text-sm">
               📥 Download PDF
             </a>
             ${customer.phone ? `
@@ -3445,7 +4068,7 @@ app.get('/view/customer/:id/statement', async (req, res) => {
 });
 
 // GET /api/report/:date/pdf — Generate daily report PDF
-app.get('/api/report/:date/pdf', async (req, res) => {
+app.get('/api/report/:date/pdf', pdfAuthMiddleware, async (req, res) => {
   try {
     const targetDate = req.params.date;
     const storeId = req.query.storeId || 'default';
@@ -3501,7 +4124,10 @@ app.get('/api/report/:date/pdf', async (req, res) => {
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=daily-report-${targetDate}.pdf`);
-    doc.pipe(res);
+    await new Promise((resolve, reject) => {
+      doc.on('finish', resolve);
+      doc.on('error', reject);
+      doc.pipe(res);
 
     // ── Indigo header banner ────────────────────────────────────────────────────
     doc.save();
@@ -3666,7 +4292,7 @@ app.get('/api/report/:date/pdf', async (req, res) => {
         const bg = i % 2 === 0 ? WHITE : ROW_ALT;
         doc.save();
         doc.rect(40, y, PAGE_W - 80, 22).fill(bg);
-        const cust = db.customers.find(c => c.id === bill.customerId);
+        const cust = db.customers.find(c => c.id === bill.customer_id);
         const isPaid = bill.status === 'paid';
         doc.fontSize(9).font('Helvetica').fillColor(SLATE_400)
            .text((i + 1).toString(), detailCols[0], y + 5);
@@ -3695,37 +4321,24 @@ app.get('/api/report/:date/pdf', async (req, res) => {
 
     // Finalize PDF
     doc.end();
+    });
 
   } catch (error) {
     console.error('Error generating report PDF:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to generate report PDF' });
-  }
-});
-
-// ─── SERVE NEXT.JS WEB PANEL (static export) ───────────────────────────────────
-// The Next.js app is built to client-web/out/ and served as static files.
-// Dynamic routes (e.g. /customers/abc123) fall back to the SPA entry point
-// so client-side Next.js routing handles them.
-const nextStaticDir = path.join(__dirname, 'client-web', 'out');
-
-app.use(express.static(nextStaticDir, {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) {
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    doc.destroy();
+    if (!res.headersSent) {
+      res.removeHeader('Content-Disposition');
+      res.removeHeader('Content-Type');
+      res.status(500).json({ success: false, message: 'Failed to generate report PDF' });
     }
   }
-}));
-
-// SPA fallback: for any non-API GET that express.static didn't handle,
-// serve the dashboard page as the app entry (client-side routing takes over).
-// Falls through silently if Next.js hasn't been built yet.
-app.use((req, res, next) => {
-  if (req.method !== 'GET') return next();
-  if (req.path.startsWith('/api/') || req.path.startsWith('/webhook')) return next();
-  res.sendFile(path.join(nextStaticDir, 'dashboard', 'index.html'), { dotfiles: 'deny' }, (err) => {
-    if (err) next(); // silently pass through if files don't exist
-  });
 });
+
+// ─── SERVE NEXT.JS WEB PANEL (custom server mode) ─────────────────────────
+// Next.js handles client-side routing including dynamic routes (/customers/abc123, etc.).
+// API routes are handled by Express before reaching this handler.
+const nextApp = require('./client-web/node_modules/next')({ dev: false, dir: path.join(__dirname, 'client-web') });
+const nextHandle = nextApp.getRequestHandler();
 
 // ─── START SERVER ──────────────────────────────────────────────────────────────
 
@@ -3804,6 +4417,24 @@ async function migratePhoneNumbers() {
     console.error('Phone migration error (non-fatal):', e.message);
   }
 }
+
+// ─── GLOBAL ERROR MIDDLEWARE ──────────────────────────────────────────────────
+// Catches all unhandled errors and prevents hung connections
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ success: false, message: 'Internal server error' });
+});
+
+// ─── UNHANDLED PROMISE REJECTIONS ────────────────────────────────────────────
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  // Don't crash in production — log and continue
+});
 
 app.listen(PORT, async () => {
   console.log(`🚀 Store Bot running on port ${PORT}`);

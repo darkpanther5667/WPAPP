@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { formatCurrency, formatPhone, cn } from "@/lib/utils";
@@ -210,7 +211,7 @@ export default function PaymentsPage() {
             <label className="text-sm font-semibold text-foreground block">
               Payment Mode
             </label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {modes.map((m) => (
                 <button
                   key={m.value}

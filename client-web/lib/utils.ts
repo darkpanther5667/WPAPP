@@ -66,6 +66,13 @@ export function getCustomerOutstanding(
   return balance;
 }
 
+export function formatPhone(phone?: string): string {
+  if (!phone) return "";
+  const p = String(phone).replace(/[^\d]/g, "");
+  if (p.startsWith("91") && p.length === 12) return `+91 ${p.slice(2)}`;
+  return phone;
+}
+
 export function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();

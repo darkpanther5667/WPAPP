@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -28,6 +29,8 @@ import com.aistudio.sharmakhata.pqmzvk.ui.components.AppAvatar
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.OperationState
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.PaymentViewModel
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
+import com.aistudio.sharmakhata.pqmzvk.util.DecimalVisualTransformation
+import com.aistudio.sharmakhata.pqmzvk.util.FormValidators
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,7 +68,7 @@ fun PaymentRecordingScreen(
         }
     }
 
-    val isValid = amount.toDoubleOrNull() != null && (amount.toDoubleOrNull() ?: 0.0) > 0
+    val isValid = FormValidators.isValidAmount(amount)
 
     LaunchedEffect(operationState) {
         when (operationState) {
@@ -94,7 +97,7 @@ fun PaymentRecordingScreen(
                     Icon(
                         if (isCredit) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
                         contentDescription = null,
-                        tint = if (isCredit) ErrorRed else SuccessGreen
+                        tint = if (isCredit) MaterialTheme.colorScheme.error else RupeeGreen
                     )
                     Text(
                         if (isCredit) stringResource(R.string.confirm_credit) else stringResource(R.string.confirm_payment),
@@ -114,10 +117,10 @@ fun PaymentRecordingScreen(
                     )
                     if (note.isNotBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("${stringResource(R.string.note_label)}: $note", color = TextSecondaryLight, fontSize = 14.sp)
+                        Text("${stringResource(R.string.note_label)}: $note", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                     }
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("${stringResource(R.string.mode_label)}: ${selectedPaymentMode.replaceFirstChar { it.uppercase() }}", color = TextSecondaryLight, fontSize = 14.sp)
+                    Text("${stringResource(R.string.mode_label)}: ${selectedPaymentMode.replaceFirstChar { it.uppercase() }}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 }
             },
             confirmButton = {
@@ -134,7 +137,7 @@ fun PaymentRecordingScreen(
                         )
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isCredit) ErrorRed else SuccessGreen
+                        containerColor = if (isCredit) MaterialTheme.colorScheme.error else RupeeGreen
                     )
                 ) {
                     Text(stringResource(R.string.confirm_button))
@@ -207,14 +210,14 @@ fun PaymentRecordingScreen(
                                 Text(
                                     text = "${stringResource(R.string.pending_label)}: ${FormatUtils.formatCurrency(pendingAmount)}",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = ErrorRed,
+                                    color = MaterialTheme.colorScheme.error,
                                     fontWeight = FontWeight.Medium
                                 )
                             } else {
                                 Text(
                                     text = stringResource(R.string.no_pending_amount),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = SuccessGreen,
+                                    color = RupeeGreen,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -235,7 +238,7 @@ fun PaymentRecordingScreen(
                             ),
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (!isCredit) SuccessGreen.copy(alpha = 0.1f)
+                            containerColor = if (!isCredit) RupeeGreen.copy(alpha = 0.1f)
                             else MaterialTheme.colorScheme.surface
                         ),
                         onClick = { isCredit = false },
@@ -253,18 +256,18 @@ fun PaymentRecordingScreen(
                             Icon(
                                 Icons.Default.ArrowDownward,
                                 contentDescription = null,
-                                tint = if (!isCredit) SuccessGreen else TextSecondaryLight,
+                                tint = if (!isCredit) RupeeGreen else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(28.dp)
                             )
                             Text(
                                 stringResource(R.string.payment_label),
                                 fontWeight = if (!isCredit) FontWeight.Bold else FontWeight.Medium,
-                                color = if (!isCredit) SuccessGreen else TextSecondaryLight
+                                color = if (!isCredit) RupeeGreen else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 stringResource(R.string.payment_received_label),
                                 fontSize = 11.sp,
-                                color = if (!isCredit) SuccessGreen.copy(alpha = 0.7f) else TextSecondaryLight
+                                color = if (!isCredit) RupeeGreen.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -277,7 +280,7 @@ fun PaymentRecordingScreen(
                             ),
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (isCredit) ErrorRed.copy(alpha = 0.1f)
+                            containerColor = if (isCredit) MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
                             else MaterialTheme.colorScheme.surface
                         ),
                         onClick = { isCredit = true },
@@ -295,18 +298,18 @@ fun PaymentRecordingScreen(
                             Icon(
                                 Icons.Default.ArrowUpward,
                                 contentDescription = null,
-                                tint = if (isCredit) ErrorRed else TextSecondaryLight,
+                                tint = if (isCredit) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(28.dp)
                             )
                             Text(
                                 stringResource(R.string.credit_label),
                                 fontWeight = if (isCredit) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isCredit) ErrorRed else TextSecondaryLight
+                                color = if (isCredit) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 stringResource(R.string.credit_given_label),
                                 fontSize = 11.sp,
-                                color = if (isCredit) ErrorRed.copy(alpha = 0.7f) else TextSecondaryLight
+                                color = if (isCredit) MaterialTheme.colorScheme.error.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -321,7 +324,7 @@ fun PaymentRecordingScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.AccountBalance, contentDescription = null, tint = if (!isCredit) StitchPrimaryContainer else ErrorRed, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.AccountBalance, contentDescription = null, tint = if (!isCredit) StitchPrimaryContainer else MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                             Text(stringResource(R.string.payment_mode), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = StitchTextPrimary)
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -345,8 +348,8 @@ fun PaymentRecordingScreen(
                                     label = { Text(modeLabel, style = MaterialTheme.typography.labelSmall) },
                                     leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp)) },
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = if (!isCredit) StitchPrimaryContainer.copy(alpha = 0.15f) else ErrorRed.copy(alpha = 0.15f),
-                                        selectedLabelColor = if (!isCredit) StitchPrimaryContainer else ErrorRed,
+                                        selectedContainerColor = if (!isCredit) StitchPrimaryContainer.copy(alpha = 0.15f) else MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
+                                        selectedLabelColor = if (!isCredit) StitchPrimaryContainer else MaterialTheme.colorScheme.error,
                                         containerColor = StitchSurface,
                                         labelColor = StitchTextSecondary
                                     ),
@@ -374,7 +377,7 @@ fun PaymentRecordingScreen(
                         Text(
                             text = stringResource(R.string.enter_amount),
                             style = MaterialTheme.typography.titleSmall,
-                            color = TextSecondaryLight,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Medium
                         )
 
@@ -393,13 +396,14 @@ fun PaymentRecordingScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             ),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            visualTransformation = DecimalVisualTransformation(),
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp),
                             colors = TextFieldDefaults.colors(
-                                focusedIndicatorColor = if (isCredit) ErrorRed else SuccessGreen,
-                                unfocusedIndicatorColor = CardBorder,
-                                focusedContainerColor = BackgroundLight,
-                                unfocusedContainerColor = BackgroundLight
+                                focusedIndicatorColor = if (isCredit) MaterialTheme.colorScheme.error else RupeeGreen,
+                                unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                         )
 
@@ -414,7 +418,7 @@ fun PaymentRecordingScreen(
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = if (isCredit) ErrorRed else SuccessGreen
+                                        contentColor = if (isCredit) MaterialTheme.colorScheme.error else RupeeGreen
                                     ),
                                     contentPadding = PaddingValues(horizontal = 4.dp)
                                 ) {
@@ -432,12 +436,12 @@ fun PaymentRecordingScreen(
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text(stringResource(R.string.add_note_optional)) },
                     leadingIcon = {
-                        Icon(Icons.Outlined.Notes, contentDescription = null, tint = TextSecondaryLight)
+                        Icon(Icons.AutoMirrored.Outlined.Notes, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     },
                     shape = RoundedCornerShape(14.dp),
                     colors = TextFieldDefaults.colors(
-                        focusedIndicatorColor = if (isCredit) ErrorRed else SuccessGreen,
-                        unfocusedIndicatorColor = CardBorder,
+                        focusedIndicatorColor = if (isCredit) MaterialTheme.colorScheme.error else RupeeGreen,
+                        unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surface
                     ),
@@ -455,7 +459,7 @@ fun PaymentRecordingScreen(
                     enabled = isValid && operationState !is OperationState.Loading,
                     shape = ButtonShape,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isCredit) ErrorRed else SuccessGreen
+                        containerColor = if (isCredit) MaterialTheme.colorScheme.error else RupeeGreen
                     )
                 ) {
                     if (operationState is OperationState.Loading) {

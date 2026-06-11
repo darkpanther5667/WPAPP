@@ -2,39 +2,29 @@ package com.aistudio.sharmakhata.pqmzvk.ui.theme
 
 import androidx.compose.ui.unit.dp
 
-// ============================================================
-// STITCH SPACING SYSTEM (4dp base)
-// ============================================================
+/**
+ * Compatibility aliases — delegates to [GrahbookSpacing].
+ * Prefer GrahbookSpacing in new code.
+ */
+@Deprecated("Use GrahbookSpacing", ReplaceWith("GrahbookSpacing"))
 object Spacing {
-    val xxsmall = 2.dp
-    val unit = 4.dp           // Stitch unit
-    val xsmall = 4.dp        // Stitch unit
-    val small = 8.dp         // Stitch element-gap
-    val medium = 12.dp       // Stitch gutter
-    val large = 16.dp        // Stitch card-padding / container-margin
-    val xlarge = 20.dp
-    val xxlarge = 24.dp
-    val xxxlarge = 32.dp
-    val huge = 48.dp
-    val gigantic = 64.dp
-
-    /** Horizontal screen padding — Stitch container-margin */
-    val screenPadding = 16.dp
-
-    /** Card inner padding — Stitch card-padding */
-    val cardPadding = 16.dp
-
-    /** Spacing between grid items — Stitch gutter */
-    val gutter = 12.dp
-
-    /** Spacing between elements — Stitch element-gap */
-    val elementGap = 8.dp
-
-    /** Spacing between list items */
-    val listItemGap = 8.dp
-
-    /** Spacing between sections on a screen */
-    val sectionGap = 20.dp
+    val xxsmall get() = GrahbookSpacing.xxsmall
+    val unit get() = GrahbookSpacing.xs
+    val xsmall get() = GrahbookSpacing.xs
+    val small get() = GrahbookSpacing.sm
+    val medium get() = GrahbookSpacing.md
+    val large get() = GrahbookSpacing.lg
+    val xlarge get() = GrahbookSpacing.xl
+    val xxlarge get() = GrahbookSpacing.xxl
+    val xxxlarge get() = GrahbookSpacing.xxxl
+    val huge get() = GrahbookSpacing.huge
+    val gigantic get() = GrahbookSpacing.gigantic
+    val sectionGap get() = GrahbookSpacing.xl
+    val screenPadding get() = GrahbookSpacing.lg
+    val cardPadding get() = GrahbookSpacing.lg
+    val gutter get() = GrahbookSpacing.md
+    val elementGap get() = GrahbookSpacing.sm
+    val listItemGap get() = GrahbookSpacing.sm
 }
 
 // ============================================================
@@ -55,12 +45,12 @@ object IconSize {
 // ============================================================
 object Elevation {
     val none = 0.dp
-    val flat = 1.dp          // Minimal lift (timeline items)
-    val low = 2.dp           // List cards
-    val medium = 4.dp        // Stat cards, standard cards
-    val high = 6.dp          // FABs, prominent cards
-    val highest = 8.dp       // Dialogs, bottom sheets
-    val pressed = 12.dp      // Pressed state
+    val flat = 1.dp
+    val low = 2.dp
+    val medium = 4.dp
+    val high = 6.dp
+    val highest = 8.dp
+    val pressed = 12.dp
 }
 
 // ============================================================
