@@ -11,7 +11,7 @@ import { Phone, Lock, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Google OAuth Client ID from environment
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "884521630755-bd3rvn1a64pcsot27sjr2a2unj46boad.apps.googleusercontent.com";
 
 declare global {
   interface Window {

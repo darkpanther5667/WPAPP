@@ -1009,7 +1009,7 @@ document.getElementById('registerForm').addEventListener('submit',async function
 /* ═══ AUTH SYSTEM — REAL SERVER API ═══ */
 const AUTH_KEY='gh_user';
 const AUTH_TOKEN_KEY='gh_token';
-const API_BASE = ''; // Same origin
+const API_BASE = 'https://wpapp-xz9l.onrender.com';
 
 function openLogin(){document.getElementById('loginModal').classList.add('show');}
 function closeLogin(){document.getElementById('loginModal').classList.remove('show');}
@@ -1147,7 +1147,7 @@ function socialLogin(provider){
 }
 
 // Google OAuth configuration
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com'; // Replace with your actual Client ID
+const GOOGLE_CLIENT_ID = '884521630755-bd3rvn1a64pcsot27sjr2a2unj46boad.apps.googleusercontent.com';
 
 function initGoogleOAuth(){
   if(!window.google||!window.google.accounts||!window.google.accounts.id) return;
@@ -1160,7 +1160,7 @@ function initGoogleOAuth(){
 }
 
 function handleGoogleCredentialResponse(response){
-  fetch('/api/auth/google',{
+  fetch(API_BASE+'/api/auth/google',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({credential:response.credential,clientId:response.clientId||GOOGLE_CLIENT_ID})
