@@ -2489,6 +2489,80 @@ app.post('/api/auth/google', rateLimiter({ windowMs: 60000, max: 10, keyPrefix: 
   }
 });
 
+// POST /api/bill/create - Create a new bill
+app.post('/api/bill/create', async (req, res) => {
+  try {
+    const { customerId, amount, items, discount, invoice_number, gst_enabled, taxable_amount, total_cgst, total_sgst, total_igst } = req.body;
+    if (!customerId || amount === undefined || amount === null || isNaN(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, message: 'Customer ID and valid positive amount are required' });
+    }
+    // Limit items array size
+    if (items && Array.isArray(items) && items.length > 50) {
+      return res.status(400).json({ success: false, message: 'Maximum 50 items per bill' });
+    }
+    const sid = req.storeId || 'default';
+
+    const fullDb = await readDB();
+    if (!fullDb.bills) fullDb.bills = [];
+    if (!fullDb.customers) fullDb.customers = [];
+    if (!fullDb.transactions) fullDb.transactions = [];
+
+    const customer = fullDb.customers.find(c => c.id === customerId && (c.store_id || 'default') === sid);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    const newBillId = genId('b');
+    const timestampIso = new Date().toISOString();
+
+    const billItems = items && items.length > 0
+      ? items.filter(item => item.name && item.name.trim()).map(item => ({
+          name: item.name,
+          qty: Math.max(1, parseInt(item.qty) || 1),
+          price: Math.max(0, Number(item.price) || 0),
+          hsn_code: item.hsn_code || '',
+          gst_rate: item.gst_rate || 0,
+          taxable: item.taxable || 0,
+          cgst: item.cgst || 0,
+          sgst: item.sgst || 0,
+          igst: item.igst || 0,
+          total_with_tax: item.total_with_tax || 0
+        }))
+      : [{ name: 'General Grocery Item', qty: 1, price: Math.max(0, Number(amount) || 0) }];
+
+    const calculatedTotal = billItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const discountVal = discount ? Number(discount) : 0;
+
+    fullDb.bills.push({
+      id: newBillId,
+      invoice_number: invoice_number || newBillId,
+      discount: discountVal,
+      customer_id: customerId,
+      items: billItems,
+      total: calculatedTotal,
+      gst_enabled: gst_enabled || false,
+      taxable_amount: taxable_amount || 0,
+      total_cgst: total_cgst || 0,
+      total_sgst: total_sgst || 0,
+      total_igst: total_igst || 0,
+      grand_total: amount,
+      status: 'unpaid',
+      created_at: timestampIso,
+      paid_at: null,
+      store_id: sid,
+    });
+
+    await writeDB(fullDb);
+    cachedDB = null;
+    dbCacheTimestamp = 0;
+
+    res.json({ success: true, billId: newBillId });
+  } catch (error) {
+    console.error('Error creating bill:', error);
+    res.status(500).json({ success: false, message: 'Failed to create bill' });
+  }
+});
+
 // POST /api/customer/add - Add a new customer
 app.post('/api/customer/add', sessionAuthMiddleware, async (req, res) => {
   try {
@@ -2683,73 +2757,6 @@ app.post('/api/items/update', sessionAuthMiddleware, async (req, res) => {
     res.json({ success: true, item: fullDb.items[itemIndex] });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-});
-
-// POST /api/bill/create - Create a new bill
-app.post('/api/bill/create', async (req, res) => {
-  try {
-    const { customerId, amount, items } = req.body;
-    if (!customerId || amount === undefined || amount === null || isNaN(Number(amount)) || Number(amount) <= 0) {
-      return res.status(400).json({ success: false, message: 'Customer ID and valid positive amount are required' });
-    }
-    // Limit items array size
-    if (items && Array.isArray(items) && items.length > 50) {
-      return res.status(400).json({ success: false, message: 'Maximum 50 items per bill' });
-    }
-    const sid = req.storeId || 'default';
-
-    const fullDb = await readDB();
-    if (!fullDb.bills) fullDb.bills = [];
-    if (!fullDb.customers) fullDb.customers = [];
-    if (!fullDb.transactions) fullDb.transactions = [];
-
-    const customer = fullDb.customers.find(c => c.id === customerId && (c.store_id || 'default') === sid);
-    if (!customer) {
-      return res.status(404).json({ success: false, message: 'Customer not found' });
-    }
-
-    const newBillId = genId('b');
-    const timestampIso = new Date().toISOString();
-
-    const billItems = items && items.length > 0
-      ? items.filter(item => item.name && item.name.trim()).map(item => ({
-          name: item.name,
-          qty: Math.max(1, parseInt(item.qty) || 1),
-          price: Math.max(0, Number(item.price) || 0),
-          hsn_code: item.hsn_code || '',
-          gst_rate: item.gst_rate || 0,
-          taxable: item.taxable || 0,
-          cgst: item.cgst || 0,
-          sgst: item.sgst || 0,
-          igst: item.igst || 0,
-          total_with_tax: item.total_with_tax || 0
-        }))
-      : [{ name: 'General Grocery Item', qty: 1, price: Math.max(0, Number(amount) || 0) }];
-
-    // Always calculate total from items (server is source of truth)
-    const calculatedTotal = billItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
-
-    fullDb.bills.push({
-      id: newBillId,
-      customer_id: customerId,
-      items: billItems,
-      total: calculatedTotal,
-      status: 'unpaid',
-      created_at: timestampIso,
-      paid_at: null,
-      store_id: sid,
-    });
-
-    await writeDB(fullDb);
-    cachedDB = null;
-    dbCacheTimestamp = 0;
-
-    const balance = getCustomerOutstanding(customerId, fullDb.transactions, fullDb.bills);
-    res.json({ success: true, customerName: customer.name, billId: newBillId, amount: calculatedTotal, netOutstanding: balance });
-  } catch (error) {
-    console.error('Error creating bill:', error);
-    res.status(500).json({ success: false, message: 'Failed to create bill' });
   }
 });
 
@@ -3657,9 +3664,15 @@ app.get('/api/bill/:id/pdf', pdfAuthMiddleware, async (req, res) => {
       doc.fontSize(10).fillColor(SLATE_600).text('Subtotal', totalsX, y, { width: 120, align: 'left' });
       doc.fontSize(10).fillColor(SLATE_800).text(`₹${bill.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, totalsX + 120, y, { width: 95, align: 'right' });
       y += 22;
-    }
+      }
 
-    // Grand Total box
+      if (bill.discount && bill.discount > 0) {
+        doc.fontSize(10).fillColor(SLATE_600).text('Discount', totalsX, y, { width: 120, align: 'left' });
+        doc.fontSize(10).fillColor(RED).text(`-₹${bill.discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX + 120, y, { width: 95, align: 'right' });
+        y += 22;
+      }
+
+      // Grand Total box
     doc.roundedRect(totalsX - 10, y, totalsW + 20, 36, 6).fill(INDIGO_LIGHT);
     doc.fontSize(12).fillColor(INDIGO_DARK).text('Grand Total', totalsX, y + 10, { width: 120, align: 'left' });
     doc.fontSize(16).fillColor(INDIGO).text(`₹${finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, totalsX + 100, y + 8, { width: 115, align: 'right' });
