@@ -36,6 +36,8 @@ async function connectDB() {
         db.collection('bills').createIndex({ id: 1, store_id: 1 }),
         db.collection('staff').createIndex({ phone: 1, store_id: 1 }),
         db.collection('staff').createIndex({ store_id: 1, status: 1 }),
+        db.collection('items').createIndex({ store_id: 1 }),
+        db.collection('items').createIndex({ store_id: 1, name: 1 }),
         db.collection('sessions').createIndex({ token: 1 }, { expireAfterSeconds: 2592000 }),
         db.collection('sessions').createIndex({ store_id: 1 }),
         db.collection('login_codes').createIndex({ phone: 1, expires_at: 1 }),
@@ -59,7 +61,7 @@ async function getFullDB() {
       return JSON.parse(data);
     } catch (error) {
       console.error('Error reading local db.json:', error);
-      return { shop: {}, customers: [], transactions: [], bills: [], staff: [], stores: [] };
+      return { shop: {}, customers: [], transactions: [], bills: [], staff: [], stores: [], items: [] };
     }
   };
 
@@ -79,8 +81,9 @@ async function getFullDB() {
   const bills = await database.collection('bills').find({}).toArray();
   const staff = await database.collection('staff').find({}).toArray();
   const stores = await database.collection('stores').find({}).toArray();
+  const items = await database.collection('items').find({}).toArray();
 
-  return { shop, customers, transactions, bills, staff, stores };
+  return { shop, customers, transactions, bills, staff, stores, items };
 }
 
 module.exports = {

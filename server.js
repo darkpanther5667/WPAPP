@@ -481,7 +481,7 @@ async function writeDB(data, expectedVersion) {
     }
 
     // For array collections: upsert each doc AND remove docs not in new data
-    for (const col of ['customers', 'transactions', 'bills', 'staff', 'stores']) {
+    for (const col of ['customers', 'transactions', 'bills', 'staff', 'stores', 'items']) {
       const docs = Array.isArray(data[col]) ? data[col] : [];
       const ops = [];
 
