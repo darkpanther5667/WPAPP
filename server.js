@@ -3059,7 +3059,7 @@ app.get('/api/store/:storeId', async (req, res) => {
 // POST /api/store/update - Update store details (needs bearer token)
 app.post('/api/store/update', sessionAuthMiddleware, async (req, res) => {
   try {
-    const { store_name, owner_name, phone, address, upi_id, gstin, invoice_template } = req.body;
+    const { store_name, owner_name, phone, address, upi_id, gstin, invoice_template, gst_enabled, state } = req.body;
     const db = await readDB();
     const store = (db.stores || []).find(s => s.id === req.storeId);
     
@@ -3074,6 +3074,8 @@ app.post('/api/store/update', sessionAuthMiddleware, async (req, res) => {
     if (upi_id !== undefined) store.upi_id = upi_id;
     if (gstin !== undefined) store.gstin = gstin;
     if (invoice_template !== undefined) store.invoice_template = invoice_template;
+    if (gst_enabled !== undefined) store.gst_enabled = gst_enabled;
+    if (state !== undefined) store.state = state;
 
     await writeDB(db);
     res.json({ success: true, message: 'Store details updated successfully' });
