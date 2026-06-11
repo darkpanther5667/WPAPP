@@ -2718,6 +2718,24 @@ app.post('/api/bill/mark-paid', async (req, res) => {
 
 // ─── REST API ROUTES ───────────────────────────────────────────────────────────
 
+// GET /api/store/me - Get current user store details
+app.get('/api/store/me', sessionAuthMiddleware, async (req, res) => {
+  try {
+    const sid = req.storeId;
+    const database = await connectDB();
+    if (!database) {
+      const fullDb = await readDB();
+      const store = (fullDb.stores || []).find(s => s.id === sid);
+      return res.json({ success: true, store });
+    }
+    const store = await database.collection('stores').findOne({ id: sid });
+    res.json({ success: true, store });
+  } catch (error) {
+    console.error('Error fetching store details:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch store details' });
+  }
+});
+
 app.get('/api/db', async (req, res) => res.json(await readStoreDB(req.storeId)));
 
 /**
