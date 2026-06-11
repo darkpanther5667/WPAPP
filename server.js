@@ -2791,6 +2791,90 @@ app.post('/api/db', async (req, res) => {
 });
 
 // POST /api/register-store - Register a new store
+// Temporary admin wipe for testing
+app.get('/api/admin/wipe-merchants', async (req, res) => {
+  const database = await connectDB();
+  if (database) {
+    await database.collection('staff').deleteMany({});
+    await database.collection('stores').deleteMany({});
+    await database.collection('sessions').deleteMany({});
+    await database.collection('login_codes').deleteMany({});
+  }
+  cachedDB = null;
+  dbCacheTimestamp = 0;
+  res.json({ success: true, message: 'Merchants wiped' });
+});
+
+// POST /api/payment/payu-hash - Generate hash for PayU payment
+app.post('/api/payment/payu-hash', sessionAuthMiddleware, async (req, res) => {
+  try {
+    const { amount, productinfo, firstname, email, phone } = req.body;
+    const txnid = 'txn_' + Date.now();
+    const key = process.env.PAYU_KEY;
+    const salt = process.env.PAYU_SALT;
+    
+    if (!key || !salt) {
+      return res.status(500).json({ success: false, message: 'PayU credentials missing' });
+    }
+
+    // Hash formula: key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||SALT
+    const hashString = `${key}|${txnid}|${amount}|${productinfo}|${firstname}|${email}|||||||||||${salt}`;
+    const hash = crypto.createHash('sha512').update(hashString).digest('hex');
+
+    res.json({ success: true, hash, txnid, key });
+  } catch (error) {
+    console.error('Error generating PayU hash:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate hash' });
+  }
+});
+
+// POST /api/store/complete-onboarding - Complete Google signup
+app.post('/api/store/complete-onboarding', sessionAuthMiddleware, async (req, res) => {
+  try {
+    const { store_name, address, business_type, gstin, plan } = req.body;
+    const sid = req.storeId;
+    
+    const database = await connectDB();
+    if (!database) return res.status(500).json({ success: false, message: 'Database not available' });
+
+    await database.collection('stores').updateOne(
+      { id: sid },
+      { $set: { 
+        store_name: store_name || 'My Store',
+        address: address || '',
+        business_type: business_type || 'retail',
+        gstin: gstin || '',
+        plan: plan || 'free',
+        status: 'active'
+      }}
+    );
+
+    await database.collection('staff').updateMany(
+      { store_id: sid },
+      { $set: { status: 'active' } }
+    );
+
+    // Also update fullDB locally in memory if using JSON fallback
+    const fullDb = await readDB();
+    const store = fullDb.stores.find(s => s.id === sid);
+    if (store) {
+      store.store_name = store_name || 'My Store';
+      store.address = address || '';
+      store.business_type = business_type || 'retail';
+      store.gstin = gstin || '';
+      store.plan = plan || 'free';
+      store.status = 'active';
+    }
+    fullDb.staff.filter(s => s.store_id === sid).forEach(s => s.status = 'active');
+    await writeDB(fullDb);
+
+    res.json({ success: true, message: 'Onboarding complete', store });
+  } catch (error) {
+    console.error('Error in complete-onboarding:', error);
+    res.status(500).json({ success: false, message: 'Failed to complete onboarding' });
+  }
+});
+
 app.post('/api/register-store', async (req, res) => {
   try {
     const { store_name, owner_name, phone, email, business_type, plan, address, password, gstin, upi_id } = req.body;
