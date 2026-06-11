@@ -201,7 +201,7 @@ fun BillsScreen(
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     Icon(
-                                        Icons.AutoMirrored.Outlined.ReceiptLong,
+                                        Icons.AutoMirrored.Filled.ReceiptLong,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(72.dp)
@@ -236,13 +236,12 @@ fun BillsScreen(
                                             onMarkPaid = { showConfirmDialog = bill.id },
                                             onOpenPdf = { onOpenPdf(bill.id) }
                                         )
-                                    }
-                                }
-                            }
                         }
                     }
                 }
             }
+        }
+    }
         }
     }
 }
@@ -381,8 +380,6 @@ private fun InvoiceCard(
                     // PDF Button
                     OutlinedButton(
                         onClick = {
-                            val haptic = LocalHapticFeedback.current
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onOpenPdf()
                         },
                         modifier = Modifier.weight(1f),

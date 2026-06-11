@@ -89,8 +89,6 @@ fun GrahbookPrimaryButton(
         animationSpec = PressSpring,
         label = "button_scale"
     )
-    val haptic = LocalHapticFeedback.current
-
     val primaryColor = MaterialTheme.colorScheme.primary
     val primaryVariant = if (primaryColor == Brand500) Brand700 else Saffron600
     val backgroundBrush = if (enabled) {
@@ -111,7 +109,6 @@ fun GrahbookPrimaryButton(
                 indication = null,
                 enabled = enabled && !isLoading,
                 onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onClick()
                 }
             ),
@@ -184,7 +181,6 @@ fun GrahbookSecondaryButton(
                 indication = null,
                 enabled = enabled && !isLoading,
                 onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onClick()
                 }
             ),
@@ -250,7 +246,6 @@ fun GrahbookDestructiveButton(
                 indication = null,
                 enabled = enabled && !isLoading,
                 onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onClick()
                 }
             ),

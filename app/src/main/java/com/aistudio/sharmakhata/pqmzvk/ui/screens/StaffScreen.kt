@@ -455,7 +455,7 @@ private fun AddStaffDialog(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("+91", fontWeight = FontWeight.Bold, color = StitchPrimaryContainer)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Box(modifier = Modifier.width(1.dp).height(20.dp).color(StitchBorder))
+                            Box(modifier = Modifier.width(1.dp).height(20.dp).background(StitchBorder))
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(Icons.Outlined.Phone, contentDescription = null, tint = StitchPrimaryContainer)
                         }

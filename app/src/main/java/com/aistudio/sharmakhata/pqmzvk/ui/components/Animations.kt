@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.aistudio.sharmakhata.pqmzvk.ui.theme.RupeeGreenDim
 
 // ── CUSTOM EASING CURVES ──────────────────────────────────────────────────
 // Translate Emil's CSS cubic-bezier values to Compose's CubicBezierEasing.

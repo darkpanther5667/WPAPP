@@ -164,7 +164,7 @@ fun AddCustomerScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("+91", fontWeight = FontWeight.Bold, color = IndigoPrimary)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Box(modifier = Modifier.width(1.dp).height(20.dp).color(CardBorder))
+                        Box(modifier = Modifier.width(1.dp).height(20.dp).background(CardBorder))
                         Spacer(modifier = Modifier.width(8.dp))
                         Icon(Icons.Outlined.Phone, contentDescription = null, tint = IndigoPrimary)
                     }

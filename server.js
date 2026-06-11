@@ -2490,9 +2490,9 @@ app.post('/api/auth/google', rateLimiter({ windowMs: 60000, max: 10, keyPrefix: 
 });
 
 // POST /api/customer/add - Add a new customer
-app.post('/api/customer/add', async (req, res) => {
+app.post('/api/customer/add', sessionAuthMiddleware, async (req, res) => {
   try {
-    const { name, phone } = req.body;
+    const { name, phone, email, address, gstin } = req.body;
     if (!name || !phone) {
       return res.status(400).json({ success: false, message: 'Name and phone are required' });
     }
@@ -2522,6 +2522,9 @@ app.post('/api/customer/add', async (req, res) => {
       id: genId('c'),
       name: name.replace(/\b\w/g, c => c.toUpperCase()),
       phone: np,
+      email: email ? email.trim() : '',
+      address: address ? address.trim() : '',
+      gstin: gstin ? gstin.trim() : '',
       created_at: new Date().toISOString().substring(0, 10),
       store_id: sid,
     };
@@ -2536,6 +2539,36 @@ app.post('/api/customer/add', async (req, res) => {
   } catch (error) {
     console.error('Error adding customer:', error);
     res.status(500).json({ success: false, message: 'Failed to add customer' });
+  }
+});
+
+app.post('/api/customer/update', sessionAuthMiddleware, async (req, res) => {
+  try {
+    const { id, name, phone, email, address, gstin } = req.body;
+    if (!id) return res.status(400).json({ success: false, message: 'Customer ID is required' });
+    
+    const sid = req.storeId || 'default';
+    const fullDb = await readDB();
+    if (!fullDb.customers) fullDb.customers = [];
+
+    const customerIndex = fullDb.customers.findIndex(c => c.id === id && (c.store_id || 'default') === sid);
+    if (customerIndex === -1) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    if (name && name.trim()) fullDb.customers[customerIndex].name = name.replace(/\b\w/g, c => c.toUpperCase());
+    if (phone) fullDb.customers[customerIndex].phone = normalizePhone(phone);
+    if (email !== undefined) fullDb.customers[customerIndex].email = email.trim();
+    if (address !== undefined) fullDb.customers[customerIndex].address = address.trim();
+    if (gstin !== undefined) fullDb.customers[customerIndex].gstin = gstin.trim();
+
+    await writeDB(fullDb);
+    cachedDB = null;
+    dbCacheTimestamp = 0;
+    res.json({ success: true, customer: fullDb.customers[customerIndex] });
+  } catch (error) {
+    console.error('Error updating customer:', error);
+    res.status(500).json({ success: false, message: 'Failed to update customer' });
   }
 });
 
@@ -2591,7 +2624,7 @@ app.post('/api/payment/add', async (req, res) => {
 
 app.post('/api/items/add', sessionAuthMiddleware, async (req, res) => {
   try {
-    const { name, price, stock, gst_rate } = req.body;
+    const { name, price, stock, gst_rate, sku, hsn, unit, description, purchase_price } = req.body;
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Item name is required' });
     }
@@ -2606,6 +2639,11 @@ app.post('/api/items/add', sessionAuthMiddleware, async (req, res) => {
       price: Math.max(0, Number(price) || 0),
       stock: Math.max(0, Number(stock) || 0),
       gst_rate: Math.max(0, Number(gst_rate) || 0),
+      sku: sku ? sku.trim() : '',
+      hsn: hsn ? hsn.trim() : '',
+      unit: unit ? unit.trim() : 'pcs',
+      description: description ? description.trim() : '',
+      purchase_price: Math.max(0, Number(purchase_price) || 0),
       created_at: new Date().toISOString()
     };
     fullDb.items.push(newItem);
@@ -2619,7 +2657,7 @@ app.post('/api/items/add', sessionAuthMiddleware, async (req, res) => {
 
 app.post('/api/items/update', sessionAuthMiddleware, async (req, res) => {
   try {
-    const { id, name, price, stock, gst_rate } = req.body;
+    const { id, name, price, stock, gst_rate, sku, hsn, unit, description, purchase_price } = req.body;
     if (!id) return res.status(400).json({ success: false, message: 'Item ID is required' });
     const sid = req.storeId || 'default';
     const fullDb = await readDB();
@@ -2634,6 +2672,11 @@ app.post('/api/items/update', sessionAuthMiddleware, async (req, res) => {
     if (price !== undefined) fullDb.items[itemIndex].price = Math.max(0, Number(price) || 0);
     if (stock !== undefined) fullDb.items[itemIndex].stock = Math.max(0, Number(stock) || 0);
     if (gst_rate !== undefined) fullDb.items[itemIndex].gst_rate = Math.max(0, Number(gst_rate) || 0);
+    if (sku !== undefined) fullDb.items[itemIndex].sku = sku.trim();
+    if (hsn !== undefined) fullDb.items[itemIndex].hsn = hsn.trim();
+    if (unit !== undefined) fullDb.items[itemIndex].unit = unit.trim();
+    if (description !== undefined) fullDb.items[itemIndex].description = description.trim();
+    if (purchase_price !== undefined) fullDb.items[itemIndex].purchase_price = Math.max(0, Number(purchase_price) || 0);
 
     await writeDB(fullDb);
     cachedDB = null;
@@ -3476,6 +3519,19 @@ app.get('/api/bill/:id/pdf', pdfAuthMiddleware, async (req, res) => {
     const GREEN = '#10B981';
     const RED = '#EF4444';
 
+    let qrBuffer = null;
+    const finalTotal = bill.gst_rate > 0 ? (bill.grand_total || bill.total) : bill.total;
+    if (store && store.upi_id && bill.status !== 'paid') {
+      try {
+        const upiUrl = `upi://pay?pa=${encodeURIComponent(store.upi_id)}&pn=${encodeURIComponent(shop.name || 'Store')}&am=${finalTotal.toFixed(2)}&cu=INR`;
+        const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiUrl)}&size=100&margin=0`;
+        const qrResponse = await axios.get(qrUrl, { responseType: 'arraybuffer' });
+        qrBuffer = Buffer.from(qrResponse.data, 'binary');
+      } catch (e) {
+        console.error("Failed to generate QR code:", e.message);
+      }
+    }
+
     const doc = new PDFDocument({ size: 'A4', margin: 0 });
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -3617,6 +3673,13 @@ app.get('/api/bill/:id/pdf', pdfAuthMiddleware, async (req, res) => {
       const outColor = outstanding > 0 ? RED : GREEN;
       doc.fontSize(11).fillColor(outColor).text(`₹${Math.abs(outstanding).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, margin, y + 14);
       y += 35;
+    }
+
+    if (qrBuffer) {
+      doc.image(qrBuffer, margin, y, { width: 60 });
+      doc.fontSize(9).fillColor(SLATE_800).text('Scan to Pay', margin + 70, y + 20);
+      doc.fontSize(8).fillColor(SLATE_500).text(`UPI: ${store.upi_id}`, margin + 70, y + 32);
+      y += 65;
     }
 
     // ── FOOTER ───────────────────────────────────────────────
