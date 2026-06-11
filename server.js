@@ -183,6 +183,7 @@ function requiresSessionAuth(req) {
   if (req.path === '/api/auth/google') return false;
   if (req.path === '/api/auth/logout') return false;
   if (req.path === '/api/admin/clear-all') return false;
+  if (req.path === '/api/admin/wipe-merchants') return false;
 
   // Test/version endpoints
   if (req.path === '/api/test-db') return false;
