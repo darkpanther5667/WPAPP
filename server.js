@@ -177,7 +177,9 @@ function requiresSessionAuth(req) {
 
   // Auth + registration endpoints must be reachable without a session.
   if (req.path === '/api/register-store') return false;
-  if (req.path.startsWith('/api/store/')) return false;
+  if (req.path === '/api/store/') return false;
+  // /api/store/activate and /api/store/update require session auth
+  if (req.path.startsWith('/api/store/') && req.path !== '/api/store/activate' && req.path !== '/api/store/update') return false;
   if (req.path === '/api/auth/request-code') return false;
   if (req.path === '/api/auth/verify-code') return false;
   if (req.path === '/api/auth/login') return false;
