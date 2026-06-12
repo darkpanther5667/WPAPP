@@ -2510,7 +2510,9 @@ app.get('/api/admin/debug-user', async (req, res) => {
     const stores = await database.collection('stores').find({ email }).toArray();
     const staff = await database.collection('staff').find({ email }).toArray();
     const sessions = await database.collection('sessions').find({}).sort({created_at: -1}).limit(10).toArray();
-    res.json({ stores, staff, sessions });
+    const storeIds = stores.map(s => s.id);
+    const customers = await database.collection('customers').find({ store_id: { $in: storeIds } }).toArray();
+    res.json({ stores, staff, sessions, customers });
   } catch(e) { res.json({error: e.message}); }
 });
 
