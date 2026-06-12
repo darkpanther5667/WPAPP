@@ -24,3 +24,8 @@ export const BILL_STATUS_COLORS: Record<string, string> = {
 };
 
 export const APP_NAME = "Grahbook";
+export const SITE_URL = "https://grahbook.com";
+export const APP_DESCRIPTION =
+  "Grahbook is an AI-powered WhatsApp store bot for Indian merchants. Manage billing, UPI payments, GST invoices, and customer chats — all without leaving WhatsApp. Trusted by small shop owners across Bharat.";
+export const OG_IMAGE = `${SITE_URL}/og-image.png`;
+export const TWITTER_HANDLE = "@grahbook";

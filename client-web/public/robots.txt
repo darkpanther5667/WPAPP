@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard/
+Disallow: /customers/
+Disallow: /invoices/
+Disallow: /bills/
+Disallow: /payments/
+Disallow: /items/
+Disallow: /expenses/
+Disallow: /login
+Disallow: /register
+Disallow: /api/
+
+Sitemap: https://grahbook.com/sitemap.xml
