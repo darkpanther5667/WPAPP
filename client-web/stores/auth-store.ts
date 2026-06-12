@@ -126,10 +126,15 @@ function loadInitialState(): AuthState {
   }
 }
 
+const initial = loadInitialState();
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      ...loadInitialState(),
+      token: initial.token,
+      store: initial.store,
+      user: initial.user,
+      isAuthenticated: initial.isAuthenticated,
 
       setAuth: (token, store, user) =>
         set({ token, store, user, isAuthenticated: true }),
