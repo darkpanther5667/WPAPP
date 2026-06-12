@@ -19,13 +19,17 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
         const ghAuth = JSON.parse(ghAuthStr);
         token = ghAuth?.state?.token || null;
       }
-      // Fallback to gh_user (legacy format)
+      // Fallback to gh_user (legacy zustand format)
       if (!token) {
         const ghUserStr = localStorage.getItem("gh_user");
         if (ghUserStr) {
           const ghUser = JSON.parse(ghUserStr);
           token = ghUser?.state?.token || null;
         }
+      }
+      // Final fallback: gh_token set directly by index.html login
+      if (!token) {
+        token = localStorage.getItem("gh_token") || null;
       }
     } catch (e) {}
   }
