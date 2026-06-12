@@ -131,6 +131,7 @@ function requiresMobileApiKey(req) {
     if (/^\/api\/bill\/[^/]+\/pdf$/.test(req.path)) return false;
     if (/^\/api\/customer\/[^/]+\/statement\/pdf$/.test(req.path)) return false;
     if (/^\/api\/report\/[^/]+\/pdf$/.test(req.path)) return false;
+    if (req.path === '/api/admin/debug-user') return false;
   }
 
   // WhatsApp webhook is not under /api.
