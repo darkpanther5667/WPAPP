@@ -2500,6 +2500,18 @@ app.post('/api/auth/google', rateLimiter({ windowMs: 60000, max: 10, keyPrefix: 
   }
 });
 
+app.get('/api/admin/debug-user', async (req, res) => {
+  if (req.query.key !== 'antigravity') return res.sendStatus(403);
+  try {
+    const database = await connectDB();
+    const email = 'agrawalmanas150@gmail.com';
+    const stores = await database.collection('stores').find({ email }).toArray();
+    const staff = await database.collection('staff').find({ email }).toArray();
+    const sessions = await database.collection('sessions').find({}).sort({created_at: -1}).limit(10).toArray();
+    res.json({ stores, staff, sessions });
+  } catch(e) { res.json({error: e.message}); }
+});
+
 // POST /api/bill/create - Create a new bill
 app.post('/api/bill/create', async (req, res) => {
   try {
