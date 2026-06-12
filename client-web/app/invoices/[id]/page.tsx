@@ -1,14 +1,25 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { formatCurrency, formatDate, formatDateTime, cn } from "@/lib/utils";
+import { toast } from "@/lib/use-toast";
 import { Bill, Customer } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, Skeleton } from "@/components/ui";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Skeleton,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui";
 import {
   ChevronLeft,
   Share2,
@@ -16,16 +27,20 @@ import {
   CheckCircle2,
   Clock,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
 
 export default function InvoiceDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const { store } = useAuthStore();
   const billId = params.id as string;
   const [bill, setBill] = useState<Bill | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -83,9 +98,23 @@ export default function InvoiceDetailPage() {
       await apiClient.post("/api/bill/mark-paid", { billId: bill.id });
       setBill({ ...bill, status: "paid", paid_at: new Date().toISOString() });
     } catch (err: any) {
-      alert(err?.response?.data?.message || "Failed to mark as paid");
+      toast({ title: "Error", description: err?.response?.data?.message || "Failed to mark as paid", variant: "error" });
     } finally {
       setMarking(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!bill) return;
+    setDeleting(true);
+    try {
+      await apiClient.delete(`/api/bill/${bill.id}`);
+      toast({ title: "Invoice deleted", variant: "success" });
+      router.push("/invoices");
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.response?.data?.message || "Failed to delete invoice", variant: "error" });
+      setDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -251,7 +280,51 @@ export default function InvoiceDetailPage() {
           <Share2 className="h-4 w-4 mr-1.5" />
           Share PDF
         </Button>
+        <Button
+          variant="outline"
+          className="h-11 w-11 p-0 text-red-500 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-red-900/20"
+          onClick={() => setShowDeleteConfirm(true)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Invoice</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete this invoice? This action cannot be undone.
+          </p>
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  Deleting...
+                </span>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

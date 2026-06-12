@@ -1,14 +1,25 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { formatCurrency, getCustomerOutstanding, formatPhone, cn } from "@/lib/utils";
+import { toast } from "@/lib/use-toast";
 import { Customer, Transaction, Bill } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, Skeleton } from "@/components/ui";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Skeleton,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui";
 import {
   ChevronLeft,
   Wallet,
@@ -17,16 +28,22 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   FileText,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function CustomerDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const { store } = useAuthStore();
   const customerId = params.id as string;
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingCustomer, setDeletingCustomer] = useState(false);
+  const [deletingTxId, setDeletingTxId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -57,6 +74,31 @@ export default function CustomerDetailPage() {
     try {
       await apiClient.post("/api/whatsapp/send-reminder", { customerId });
     } catch {}
+  };
+
+  const handleDeleteCustomer = async () => {
+    setDeletingCustomer(true);
+    try {
+      await apiClient.delete(`/api/customer/${customerId}`);
+      router.push("/customers");
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.response?.data?.message || "Failed to delete customer", variant: "error" });
+      setDeletingCustomer(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  const handleDeleteTransaction = async (txId: string) => {
+    setDeletingTxId(txId);
+    try {
+      await apiClient.delete(`/api/transaction/${txId}`);
+      setTransactions((prev) => prev.filter((t) => t.id !== txId));
+      toast({ title: "Transaction deleted", variant: "success" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.response?.data?.message || "Failed to delete transaction", variant: "error" });
+    } finally {
+      setDeletingTxId(null);
+    }
   };
 
   if (loading) {
@@ -127,6 +169,13 @@ export default function CustomerDetailPage() {
                 Pay
               </Button>
             </Link>
+            <Button
+              variant="outline"
+              className="h-9 w-9 p-0 text-red-500 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-red-900/20"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -142,7 +191,7 @@ export default function CustomerDetailPage() {
             [...transactions]
               .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
               .map((tx) => (
-                <div key={tx.id} className="flex items-center gap-3 p-3 rounded-xl bg-accent/30">
+                <div key={tx.id} className="flex items-center gap-3 p-3 rounded-xl bg-accent/30 group">
                   <div className={cn("flex h-8 w-8 items-center justify-center rounded-full", tx.type === "payment" ? "bg-green-100 text-green-600 dark:bg-green-900/30" : "bg-red-100 text-red-600 dark:bg-red-900/30")}>
                     {tx.type === "payment" ? <ArrowDownRight className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
                   </div>
@@ -150,7 +199,7 @@ export default function CustomerDetailPage() {
                     <p className="text-sm font-medium">{tx.type === "payment" ? "Payment" : "Credit"}</p>
                     <p className="text-xs text-muted-foreground">{tx.note || tx.payment_mode}</p>
                   </div>
-                  <div>
+                  <div className="text-right">
                     <p className={cn("text-sm font-bold", tx.type === "payment" ? "text-green-600" : "text-red-500")}>
                       {tx.type === "payment" ? "+" : "-"}{formatCurrency(tx.amount)}
                     </p>
@@ -158,6 +207,17 @@ export default function CustomerDetailPage() {
                       {new Date(tx.timestamp).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
                     </p>
                   </div>
+                  <button
+                    onClick={() => handleDeleteTransaction(tx.id)}
+                    disabled={deletingTxId === tx.id}
+                    className="shrink-0 h-7 w-7 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-muted-foreground hover:text-red-500 transition-all"
+                  >
+                    {deletingTxId === tx.id ? (
+                      <span className="h-3 w-3 rounded-full border-2 border-red-300 border-t-red-500 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3 w-3" />
+                    )}
+                  </button>
                 </div>
               ))
           )}
@@ -195,6 +255,46 @@ export default function CustomerDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Customer Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+              Delete Customer
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete <strong>{customer.name}</strong>? This will also remove all their transactions and invoices. This action cannot be undone.
+          </p>
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={deletingCustomer}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={handleDeleteCustomer}
+              disabled={deletingCustomer}
+            >
+              {deletingCustomer ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  Deleting...
+                </span>
+              ) : (
+                "Delete Customer"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

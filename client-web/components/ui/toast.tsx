@@ -103,9 +103,21 @@ ToastDescription.displayName = ToastPrimitives.Description.displayName;
 
 type ToastVariant = VariantProps<typeof toastVariants>["variant"];
 
+import { useToast } from "@/lib/use-toast";
+
 const Toaster = () => {
+  const { toasts } = useToast();
   return (
     <ToastProvider>
+      {toasts.map((t) => (
+        <Toast key={t.id} variant={t.variant}>
+          <div>
+            {t.title && <ToastTitle>{t.title}</ToastTitle>}
+            {t.description && <ToastDescription>{t.description}</ToastDescription>}
+          </div>
+          <ToastClose />
+        </Toast>
+      ))}
       <ToastPrimitives.Viewport className="fixed bottom-0 right-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]" />
     </ToastProvider>
   );
@@ -122,3 +134,5 @@ export {
   toastVariants,
   type ToastVariant,
 };
+
+export type { ToastVariant };

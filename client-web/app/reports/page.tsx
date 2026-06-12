@@ -4,11 +4,12 @@ import { useEffect, useState, useMemo } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
-import { Transaction, Bill, Customer } from "@/types";
+import { Transaction, Bill, Customer, Expense } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, Skeleton } from "@/components/ui";
 import {
   Wallet,
   AlertTriangle,
+  TrendingUp,
   RefreshCw,
   Upload,
   Calendar,
@@ -28,6 +29,7 @@ export default function ReportsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -38,6 +40,7 @@ export default function ReportsPage() {
       setTransactions(data.transactions || []);
       setBills(data.bills || []);
       setCustomers(data.customers || []);
+      setExpenses(data.expenses || []);
     } catch (err: any) {
       console.error(err);
     } finally {
@@ -57,12 +60,17 @@ export default function ReportsPage() {
   const todayBills = bills
     .filter((b) => b.created_at?.startsWith(todayStr))
     .reduce((s, b) => s + b.total, 0);
+  const totalRevenue = transactions
+    .filter((t) => t.type === "payment")
+    .reduce((s, t) => s + t.amount, 0);
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  const netProfit = totalRevenue - totalExpenses;
   const outstandingTotal = customers.reduce((sum, c) => {
     const txB = transactions
       .filter((t) => t.customer_id === c.id)
       .reduce((s, t) => s + (t.type === "credit" ? t.amount : -t.amount), 0);
     const billT = bills
-      .filter((b) => b.customer_id === c.id && b.status === "unpaid")
+      .filter((b) => b.customer_id === c.id && (b.status === "unpaid" || b.status === "overdue" || b.status === "partial"))
       .reduce((s, b) => s + b.total, 0);
     return sum + txB + billT;
   }, 0);
@@ -97,7 +105,7 @@ export default function ReportsPage() {
           .filter((t) => t.customer_id === c.id)
           .reduce((s, t) => s + (t.type === "credit" ? t.amount : -t.amount), 0);
         const billT = bills
-          .filter((b) => b.customer_id === c.id && b.status === "unpaid")
+          .filter((b) => b.customer_id === c.id && (b.status === "unpaid" || b.status === "overdue" || b.status === "partial"))
           .reduce((s, b) => s + b.total, 0);
         return { customer: c, balance: txB + billT };
       })
@@ -110,8 +118,8 @@ export default function ReportsPage() {
     return (
       <div className="px-4 py-5 space-y-4 page-enter">
         <Skeleton className="h-8 w-20 rounded-xl" />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          {[1, 2, 3].map((i) => (
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-24 rounded-2xl" />
           ))}
         </div>
@@ -135,9 +143,10 @@ export default function ReportsPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <StatCard icon={<Upload className="h-4 w-4" />} label="Today Sales" value={formatCurrency(todayBills)} color="text-blue-600 bg-blue-50 dark:bg-blue-900/20" />
         <StatCard icon={<Wallet className="h-4 w-4" />} label="Collected" value={formatCurrency(todayPayments)} color="text-green-600 bg-green-50 dark:bg-green-900/20" />
+        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Net Profit" value={formatCurrency(netProfit)} color={netProfit >= 0 ? "text-green-600 bg-green-50 dark:bg-green-900/20" : "text-red-500 bg-red-50 dark:bg-red-900/20"} />
         <StatCard icon={<AlertTriangle className="h-4 w-4" />} label="Outstanding" value={formatCurrency(outstandingTotal)} color="text-red-500 bg-red-50 dark:bg-red-900/20" />
       </div>
 
@@ -160,10 +169,36 @@ export default function ReportsPage() {
                   formatter={(value: any) => formatCurrency(value)}
                   contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb", fontSize: 12 }}
                 />
-                <Bar dataKey="bills" fill="#25d366" radius={[4, 4, 0, 0]} name="Bills" />
-                <Bar dataKey="payments" fill="#128c7e" radius={[4, 4, 0, 0]} name="Payments" />
+                <Bar dataKey="bills" fill="#4F46E5" radius={[4, 4, 0, 0]} name="Bills" />
+                <Bar dataKey="payments" fill="#22c55e" radius={[4, 4, 0, 0]} name="Payments" />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Profit Breakdown */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-green-500" />
+            Profit Breakdown (All Time)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex justify-between items-center p-3 rounded-xl bg-green-50 dark:bg-green-900/10">
+            <span className="text-sm text-muted-foreground">Total Revenue</span>
+            <span className="text-sm font-bold text-green-600">{formatCurrency(totalRevenue)}</span>
+          </div>
+          <div className="flex justify-between items-center p-3 rounded-xl bg-red-50 dark:bg-red-900/10">
+            <span className="text-sm text-muted-foreground">Total Expenses</span>
+            <span className="text-sm font-bold text-red-500">{formatCurrency(totalExpenses)}</span>
+          </div>
+          <div className="border-t border-border pt-3 flex justify-between items-center">
+            <span className="text-sm font-semibold text-foreground">Net Profit</span>
+            <span className={cn("text-base font-extrabold", netProfit >= 0 ? "text-green-600" : "text-red-500")}>
+              {formatCurrency(netProfit)}
+            </span>
           </div>
         </CardContent>
       </Card>

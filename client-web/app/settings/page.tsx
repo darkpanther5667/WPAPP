@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { formatCurrency, formatPhone, cn } from "@/lib/utils";
+import { toast } from "@/lib/use-toast";
 import { Customer, Bill, Transaction } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, Skeleton } from "@/components/ui";
+import { Card, CardContent, Skeleton, Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui";
 import {
   Store,
   User,
@@ -20,17 +21,21 @@ import {
   ChevronRight,
   Users,
   Copy,
+  Sun,
+  Moon,
 } from "lucide-react";
+import { useTheme } from "@/components/theme-provider";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { store, user, logout } = useAuthStore();
+  const { theme, setTheme } = useTheme();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!store?.id) return;
@@ -57,7 +62,6 @@ export default function SettingsPage() {
   const paidBills = bills.filter((b) => b.status === "paid").length;
 
   const handleLogout = async () => {
-    if (!confirm("Are you sure you want to logout?")) return;
     setLoggingOut(true);
     try {
       await apiClient.post("/api/auth/logout");
@@ -68,8 +72,7 @@ export default function SettingsPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    setToast("Copied!");
-    setTimeout(() => setToast(null), 2000);
+    toast({ title: "Store ID copied", variant: "success" });
   };
 
   if (loading) {
@@ -151,10 +154,40 @@ export default function SettingsPage() {
               <div className="h-8 w-8 shrink-0 rounded-lg bg-accent flex items-center justify-center">
                 {item.icon}
               </div>
-              <span className="text-sm font-medium text-foreground flex-1">{item.label}</span>
+              <span className="text-sm font-medium text-foreground flex-1 text-left">{item.label}</span>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
           ))}
+        </CardContent>
+      </Card>
+
+      {/* Appearance */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-foreground">Appearance</h3>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 shrink-0 rounded-lg bg-accent flex items-center justify-center">
+                {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Theme</p>
+                <p className="text-xs text-muted-foreground">{theme === "dark" ? "Dark mode active" : "Light mode active"}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className={cn(
+                "relative h-7 w-12 rounded-full transition-colors",
+                theme === "dark" ? "bg-primary" : "bg-muted-foreground/30"
+              )}
+            >
+              <span className={cn(
+                "absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition-transform",
+                theme === "dark" ? "translate-x-6" : "translate-x-0"
+              )} />
+            </button>
+          </div>
         </CardContent>
       </Card>
 
@@ -162,24 +195,46 @@ export default function SettingsPage() {
       <Button
         variant="outline"
         className="w-full h-12 text-red-500 border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-900/10"
-        onClick={handleLogout}
-        disabled={loggingOut}
+        onClick={() => setShowLogoutConfirm(true)}
       >
         <LogOut className="h-4 w-4 mr-2" />
-        {loggingOut ? "Logging out..." : "Logout"}
+        Logout
       </Button>
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Logout</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to logout? You'll need to login again to access your data.
+          </p>
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowLogoutConfirm(false)}
+              disabled={loggingOut}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={handleLogout}
+              disabled={loggingOut}
+            >
+              {loggingOut ? "Logging out..." : "Logout"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Version */}
       <p className="text-center text-[10px] text-muted-foreground pb-2">
         WhatsApp Billing Pro v1.0
       </p>
-
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-dark-800 text-white text-xs font-medium px-4 py-2 rounded-full shadow-lg z-50 animate-scale-in">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

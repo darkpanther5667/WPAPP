@@ -108,7 +108,7 @@ export default function PaymentsPage() {
           .filter((t) => t.customer_id === selectedCustomerId)
           .reduce((s, t) => s + (t.type === "credit" ? t.amount : -t.amount), 0);
         const billTotal = db.bills
-          .filter((b) => b.customer_id === selectedCustomerId && b.status === "unpaid")
+          .filter((b) => b.customer_id === selectedCustomerId && (b.status === "unpaid" || b.status === "overdue" || b.status === "partial"))
           .reduce((s, b) => s + b.total, 0);
         return txBalance + billTotal;
       })()

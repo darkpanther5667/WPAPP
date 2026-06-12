@@ -4,4 +4,4 @@ export { Input } from "./input";
 export { Skeleton } from "./skeleton";
 export { Badge } from "./badge";
 export { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
-export { Toast, ToastProvider, ToastTitle, ToastDescription } from "./toast";
+export { Toast, ToastProvider, ToastTitle, ToastDescription, ToastClose, Toaster } from "./toast";

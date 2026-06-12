@@ -99,7 +99,7 @@ export default function DashboardPage() {
           0
         ) +
         bills
-          .filter((b) => b.customer_id === c.id && b.status === "unpaid")
+          .filter((b) => b.customer_id === c.id && (b.status === "unpaid" || b.status === "overdue" || b.status === "partial"))
           .reduce((s, b) => s + b.total, 0))
     );
   }, 0);
@@ -108,7 +108,7 @@ export default function DashboardPage() {
     .filter((t) => t.type === "payment" && t.timestamp.startsWith(new Date().toISOString().slice(0, 10)))
     .reduce((s, t) => s + t.amount, 0);
 
-  const pendingBills = bills.filter((b) => b.status === "unpaid").length;
+  const pendingBills = bills.filter((b) => b.status === "unpaid" || b.status === "overdue" || b.status === "partial").length;
 
   const recentTransactions: Transaction[] = [...transactions]
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
@@ -292,7 +292,7 @@ export default function DashboardPage() {
                       0
                     );
                   const billTotal = bills
-                    .filter((b) => b.customer_id === c.id && b.status === "unpaid")
+                    .filter((b) => b.customer_id === c.id && (b.status === "unpaid" || b.status === "overdue" || b.status === "partial"))
                     .reduce((s, b) => s + b.total, 0);
                   return txBalance + billTotal;
                 })(),

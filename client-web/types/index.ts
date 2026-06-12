@@ -72,12 +72,37 @@ export interface Store {
   status: string;
 }
 
+export interface StoredItem {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  gst_rate?: number;
+  sku?: string;
+  hsn?: string;
+  unit?: string;
+  description?: string;
+  purchase_price?: number;
+  created_at: string;
+}
+
 export interface FullDatabase {
   shop?: Shop;
   customers: Customer[];
   transactions: Transaction[];
   bills: Bill[];
   staff: Staff[];
+  items?: StoredItem[];
+  expenses?: Expense[];
+}
+
+export interface Expense {
+  id: string;
+  title: string;
+  amount: number;
+  category: string;
+  note?: string;
+  created_at: string;
 }
 
 export interface DailyReport {

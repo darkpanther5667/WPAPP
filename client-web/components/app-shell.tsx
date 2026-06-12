@@ -8,7 +8,12 @@ import {
   BarChart3,
   Settings,
   LayoutDashboard,
+  Package,
+  Coins,
+  Sun,
+  Moon,
 } from "lucide-react";
+import { useTheme } from "@/components/theme-provider";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -25,6 +30,8 @@ const sidebarNav = [
   { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { href: "/customers", label: "Customers", Icon: Users },
   { href: "/invoices", label: "Invoices", Icon: FileText },
+  { href: "/items", label: "Inventory", Icon: Package },
+  { href: "/expenses", label: "Expenses", Icon: Coins },
   { href: "/payments", label: "Payments", Icon: BarChart3 },
   { href: "/reports", label: "Reports", Icon: BarChart3 },
   { href: "/settings", label: "Settings", Icon: Settings },
@@ -32,6 +39,7 @@ const sidebarNav = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { theme, setTheme } = useTheme();
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
@@ -81,7 +89,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Bottom section */}
-        <div className="px-3 py-4 border-t border-gray-200 dark:border-dark-800">
+        <div className="px-3 py-4 border-t border-gray-200 dark:border-dark-800 space-y-1">
+          {/* Theme toggle */}
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800 hover:text-gray-900 dark:hover:text-white transition-all"
+          >
+            <div className="h-8 w-8 shrink-0 rounded-lg bg-accent flex items-center justify-center">
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </div>
+            <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+          </button>
           <div className="flex items-center gap-3 px-4 py-2.5">
             <div className="w-8 h-8 rounded-lg bg-brand-saffron flex items-center justify-center text-white text-sm font-bold">
               S
