@@ -2363,13 +2363,13 @@ app.post('/api/auth/google', rateLimiter({ windowMs: 60000, max: 10, keyPrefix: 
 
       // Basic validation: check issuer and audience
       const allowedIssuers = ['accounts.google.com', 'https://accounts.google.com'];
-      if (!allowedIssuers.includes(decoded.iss)) {
-        throw new Error('Invalid issuer');
+      if (!allowedIssuers.includes(decoded.iss) && !(decoded.iss && decoded.iss.startsWith('https://securetoken.google.com/'))) {
+        throw new Error('Invalid issuer: ' + decoded.iss);
       }
 
-      // If clientId is provided, verify audience
-      if (clientId && decoded.aud !== clientId) {
-        throw new Error('Invalid audience');
+      // If clientId is provided, verify audience (skip for Firebase secure tokens as their aud is the project ID)
+      if (clientId && decoded.aud !== clientId && !(decoded.iss && decoded.iss.startsWith('https://securetoken.google.com/'))) {
+        throw new Error('Invalid audience: ' + decoded.aud);
       }
 
       // Check expiry
