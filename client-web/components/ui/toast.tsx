@@ -135,4 +135,3 @@ export {
   type ToastVariant,
 };
 
-export type { ToastVariant };
