@@ -15,6 +15,8 @@ const DEFAULT_STATE = {
   isAuthenticated: false,
 };
 
+type InitialAuthState = Omit<AuthState, "setAuth" | "logout">;
+
 export interface AuthState {
   token: string | null;
   store: Store | null;
@@ -93,7 +95,7 @@ function migrateLegacyAuth() {
   } catch { /* ignore */ }
 }
 
-function loadInitialState(): AuthState {
+function loadInitialState(): InitialAuthState {
   if (typeof window === "undefined") {
     return { ...DEFAULT_STATE };
   }
@@ -126,27 +128,28 @@ function loadInitialState(): AuthState {
   }
 }
 
-const initial = loadInitialState();
-
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
-      token: initial.token,
-      store: initial.store,
-      user: initial.user,
-      isAuthenticated: initial.isAuthenticated,
+    (set) => {
+      const initial = loadInitialState();
+      return {
+        token: initial.token,
+        store: initial.store,
+        user: initial.user,
+        isAuthenticated: initial.isAuthenticated,
 
-      setAuth: (token, store, user) =>
-        set({ token, store, user, isAuthenticated: true }),
+        setAuth: (token, store, user) =>
+          set({ token, store, user, isAuthenticated: true }),
 
-      logout: () => {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem(LEGACY_TOKEN_KEY);
-          localStorage.removeItem(AUTH_KEY);
-        }
-        set({ token: null, store: null, user: null, isAuthenticated: false });
-      },
-    }),
+        logout: () => {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem(LEGACY_TOKEN_KEY);
+            localStorage.removeItem(AUTH_KEY);
+          }
+          set({ token: null, store: null, user: null, isAuthenticated: false });
+        },
+      };
+    },
     {
       name: AUTH_KEY,
       storage: createJSONStorage(() => localStorage),

@@ -38,12 +38,27 @@ export default function DashboardPage() {
   const [report, setReport] = useState<DailyReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (useAuthStore.persist.hasHydrated()) {
+      setHydrated(true);
+      return;
+    }
+
+    const unsubscribe = useAuthStore.persist.onFinishHydration(() => {
+      setHydrated(true);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const fetchData = useCallback(async () => {
-    if (!store?.id) return;
     try {
       const [dbRes, reportRes] = await Promise.all([
-        apiClient.get(`/api/db?storeId=${store.id}`),
+        apiClient.get("/api/db"),
         apiClient.get("/api/report"),
       ]);
       setDb(dbRes.data);
@@ -54,18 +69,19 @@ export default function DashboardPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [store?.id]);
+  }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     fetchData();
-  }, [fetchData]);
+  }, [hydrated, fetchData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchData();
   };
 
-  if (loading) {
+  if (loading || !hydrated) {
     return (
       <div className="px-4 py-5 space-y-5 page-enter">
         <div className="flex items-center justify-between">

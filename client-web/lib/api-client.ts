@@ -1,6 +1,7 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from "axios";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || "https://wpapp-xz9l.onrender.com";
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE,

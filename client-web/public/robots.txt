@@ -1,14 +1,9 @@
+# *
 User-agent: *
 Allow: /
-Disallow: /dashboard/
-Disallow: /customers/
-Disallow: /invoices/
-Disallow: /bills/
-Disallow: /payments/
-Disallow: /items/
-Disallow: /expenses/
-Disallow: /login
-Disallow: /register
-Disallow: /api/
 
+# Host
+Host: https://grahbook.com
+
+# Sitemaps
 Sitemap: https://grahbook.com/sitemap.xml
