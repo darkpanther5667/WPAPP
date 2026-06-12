@@ -152,7 +152,7 @@ function mobileApiKeyMiddleware(req, res, next) {
   if (!requiresMobileApiKey(req)) return next();
 
   // If the request has a Bearer token (web dashboard session), let sessionAuthMiddleware handle it
-  if (req.get('Authorization')?.startsWith('Bearer ')) return next();
+  if (req.get('Authorization')?.startsWith('Bearer ') && requiresSessionAuth(req)) return next();
 
   const expectedKey = process.env.MOBILE_API_KEY;
   if (!expectedKey) {
@@ -189,7 +189,8 @@ function requiresSessionAuth(req) {
   if (req.path === '/api/register-store') return false;
   if (req.path === '/api/store/') return false;
   // /api/store/activate and /api/store/update require session auth
-  if (req.path.startsWith('/api/store/') && req.path !== '/api/store/activate' && req.path !== '/api/store/update') return false;
+  const isPublicStoreGet = req.method === 'GET' && /^\/api\/store\/[^/]+$/.test(req.path) && req.path !== '/api/store/me';
+  if (isPublicStoreGet) return false;
   if (req.path === '/api/auth/request-code') return false;
   if (req.path === '/api/auth/verify-code') return false;
   if (req.path === '/api/auth/login') return false;
@@ -465,7 +466,7 @@ async function readDB() {
     return cachedDB;
   } catch (error) {
     console.error('Error reading from MongoDB:', error);
-    return cachedDB;
+    throw error;
   }
 }
 
@@ -529,10 +530,10 @@ async function writeDB(data, expectedVersion) {
 
       // Delete docs that exist in DB but not in new data (handles deletions)
       const currentIds = docs.map(d => d.id).filter(Boolean);
-      if (currentIds.length > 0) {
+      if (true) {
         ops.push({
           deleteMany: {
-            filter: { id: { $nin: currentIds }, store_id: data.shop?.store_id || 'default' }
+            filter: currentIds.length > 0 ? { id: { $nin: currentIds } } : {}
           }
         });
       }
@@ -584,9 +585,20 @@ app.post('/api/admin/clear-all', async (req, res) => {
       });
     }
 
-    const empty = { shop: {}, customers: [], transactions: [], bills: [], staff: [], stores: [] };
-    await writeDB(empty);
-    cachedDB = empty;
+    // Direct database wipe implementation
+    const database = await connectDB();
+    if (database) {
+      await database.collection('shop').deleteMany({});
+      await database.collection('customers').deleteMany({});
+      await database.collection('transactions').deleteMany({});
+      await database.collection('bills').deleteMany({});
+      await database.collection('staff').deleteMany({});
+      await database.collection('stores').deleteMany({});
+      await database.collection('items').deleteMany({});
+    }
+    cachedDB = { shop: {}, customers: [], transactions: [], bills: [], staff: [], stores: [], items: [] };
+    dbCacheTimestamp = 0;
+    lastDbVersion++;
     const timestamp = new Date().toISOString();
     console.warn(`🗑️ ALL DATA CLEARED at ${timestamp} by ${req.ip} for store ${storeId}`);
     return res.json({ success: true, message: 'All data cleared. Everyone starts fresh.', timestamp });
@@ -685,7 +697,9 @@ async function recordPaymentTool(customerId, amount, note, staffPhone, storeId, 
   });
   await writeDB(db);
   cachedDB = null; dbCacheTimestamp = 0;
-  const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
+  const storeTx = (db.transactions || []).filter(t => (t.store_id || 'default') === (storeId || 'default'));
+  const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === (storeId || 'default'));
+  const balance = getCustomerOutstanding(customerId, storeTx, storeBills);
   return { success: true, customerName: customer.name, amount: Number(amount), remainingOutstanding: balance };
 }
 
@@ -707,7 +721,9 @@ async function addCreditTool(customerId, amount, note, staffPhone, storeId) {
   });
   await writeDB(db);
   cachedDB = null; dbCacheTimestamp = 0;
-  const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
+  const storeTx = (db.transactions || []).filter(t => (t.store_id || 'default') === (storeId || 'default'));
+  const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === (storeId || 'default'));
+  const balance = getCustomerOutstanding(customerId, storeTx, storeBills);
   return { success: true, customerName: customer.name, amountAdded: Number(amount), totalOutstanding: balance };
 }
 
@@ -716,7 +732,12 @@ async function addItemToUnpaidBillTool(customerId, itemName, price, qty, storeId
   const storeCustomers = (db.customers || []).filter(c => (c.store_id || 'default') === (storeId || 'default'));
   const customer = storeCustomers.find(c => c.id === customerId);
   if (!customer) return { error: `Customer with ID '${customerId}' not found in your store.` };
-  let currentBill = db.bills.find(b => b.customer_id === customerId && b.status === 'unpaid');
+  let currentBill = db.bills.find(b => {
+    if (b.customer_id !== customerId || b.status !== 'unpaid') return false;
+    if (!b.created_at) return true;
+    const daysDiff = (new Date() - new Date(b.created_at)) / (1000 * 60 * 60 * 24);
+    return daysDiff <= 30;
+  });
   const timestampIso = new Date().toISOString();
   if (!currentBill) {
     currentBill = {
@@ -738,7 +759,9 @@ async function addItemToUnpaidBillTool(customerId, itemName, price, qty, storeId
   // Invalidate cache to ensure AI gets fresh data
   cachedDB = null;
   dbCacheTimestamp = 0;
-  const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
+  const storeTx = (db.transactions || []).filter(t => (t.store_id || 'default') === (storeId || 'default'));
+  const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === (storeId || 'default'));
+  const balance = getCustomerOutstanding(customerId, storeTx, storeBills);
   return { success: true, customerName: customer.name, itemAdded: itemName, itemPrice: Number(price), qty: quantity, billTotal: currentBill.total, netOutstanding: balance };
 }
 
@@ -763,7 +786,9 @@ async function generateBillTool(customerId, amount, storeId) {
   // Invalidate cache to ensure AI gets fresh data
   cachedDB = null;
   dbCacheTimestamp = 0;
-  const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
+  const storeTx = (db.transactions || []).filter(t => (t.store_id || 'default') === (storeId || 'default'));
+  const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === (storeId || 'default'));
+  const balance = getCustomerOutstanding(customerId, storeTx, storeBills);
   return { success: true, customerName: customer.name, billId: newBillId, amount: Number(amount), netOutstanding: balance };
 }
 
@@ -778,19 +803,36 @@ async function markBillAsPaidTool(customerId, storeId) {
   }
   unpaidBill.status = 'paid';
   unpaidBill.paid_at = new Date().toISOString();
+  if (!db.transactions) db.transactions = [];
+  db.transactions.push({
+    id: genId('t'),
+    customer_id: customerId,
+    type: 'payment',
+    amount: unpaidBill.total,
+    note: 'Bill marked as paid via AI tool',
+    payment_mode: 'Cash',
+    staff_phone: '',
+    timestamp: unpaidBill.paid_at,
+    store_id: storeId || 'default',
+    bill_id: unpaidBill.id
+  });
   await writeDB(db);
   // Invalidate cache to ensure AI gets fresh data
   cachedDB = null;
   dbCacheTimestamp = 0;
-  const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
+  const storeTx = (db.transactions || []).filter(t => (t.store_id || 'default') === (storeId || 'default'));
+  const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === (storeId || 'default'));
+  const balance = getCustomerOutstanding(customerId, storeTx, storeBills);
   return { success: true, customerName: customer.name, billId: unpaidBill.id, amountPaid: unpaidBill.total, netOutstanding: balance };
 }
 
 async function getCustomerBalancesTool(storeId) {
   const db = await readDB();
   const storeCustomers = (db.customers || []).filter(c => (c.store_id || 'default') === (storeId || 'default'));
+  const storeTx = (db.transactions || []).filter(t => (t.store_id || 'default') === (storeId || 'default'));
+  const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === (storeId || 'default'));
   const balances = storeCustomers.map(c => {
-    const bal = getCustomerOutstanding(c.id, db.transactions, db.bills);
+    const bal = getCustomerOutstanding(c.id, storeTx, storeBills);
     return { id: c.id, name: c.name, phone: c.phone, outstandingBalance: bal };
   });
   return { success: true, balances };
@@ -825,7 +867,9 @@ async function getCustomerStatementPdfTool(customerId, storeId) {
 
   const customerTransactions = db.transactions.filter(t => t.customer_id === customerId);
   const customerBills = db.bills.filter(b => b.customer_id === customerId);
-  const balance = getCustomerOutstanding(customerId, db.transactions, db.bills);
+  const storeTx = (db.transactions || []).filter(t => (t.store_id || 'default') === (storeId || 'default'));
+  const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === (storeId || 'default'));
+  const balance = getCustomerOutstanding(customerId, storeTx, storeBills);
 
   return {
     success: true,
@@ -2667,7 +2711,7 @@ app.post('/api/bill/create', sessionAuthMiddleware, async (req, res) => {
         }))
       : [{ name: 'General Grocery Item', qty: 1, price: Math.max(0, Number(amount) || 0) }];
 
-    const calculatedTotal = billItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const calculatedTotal = billItems.reduce((sum, item) => sum + (item.total_with_tax || (item.price * item.qty)), 0);
     const discountVal = discount ? Number(discount) : 0;
 
     fullDb.bills.push({
@@ -2830,23 +2874,35 @@ app.post('/api/payment/add', sessionAuthMiddleware, async (req, res) => {
       const unpaidBills = currentDb.bills
         .filter(b => b.customer_id === customerId && b.status !== 'paid' && (b.store_id || 'default') === sid)
         .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
-      const totalUnpaid = unpaidBills.reduce((sum, b) => sum + (b.total || 0), 0);
-      if (totalUnpaid > 0 && parsedAmount >= totalUnpaid) {
-        const now = new Date().toISOString();
-        unpaidBills.forEach(b => { b.status = 'paid'; b.paid_at = now; });
+      let remainingPayment = parsedAmount;
+      let billsUpdated = false;
+
+      for (const bill of unpaidBills) {
+        if (remainingPayment <= 0) break;
+        const billTotal = bill.total || 0;
+        if (remainingPayment >= billTotal) {
+          bill.status = 'paid';
+          bill.paid_at = new Date().toISOString();
+          remainingPayment -= billTotal;
+          billsUpdated = true;
+        } else {
+          bill.status = 'partial';
+          remainingPayment = 0;
+          billsUpdated = true;
+        }
+      }
+
+      if (billsUpdated) {
         await writeDB(currentDb);
-        cachedDB = null;
-        dbCacheTimestamp = 0;
-      } else if (unpaidBills.length === 1 && parsedAmount >= (unpaidBills[0].total || 0)) {
-        unpaidBills[0].status = 'paid';
-        unpaidBills[0].paid_at = new Date().toISOString();
-        await writeDB(currentDb);
+        fullDb.bills = currentDb.bills;
         cachedDB = null;
         dbCacheTimestamp = 0;
       }
     }
 
-    const balance = getCustomerOutstanding(customerId, fullDb.transactions, fullDb.bills);
+    const storeTx = (fullDb.transactions || []).filter(t => (t.store_id || 'default') === sid);
+    const storeBills = (fullDb.bills || []).filter(b => (b.store_id || 'default') === sid);
+    const balance = getCustomerOutstanding(customerId, storeTx, storeBills);
     res.json({ success: true, customerName: customer.name, amount: parsedAmount, remainingOutstanding: balance });
   } catch (error) {
     console.error('Error adding payment:', error);
@@ -3183,13 +3239,33 @@ app.get('/api/db/changes', sessionAuthMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/db', async (req, res) => {
-  const body = req.body;
-  if (!body || typeof body !== 'object' || !body.customers || !body.transactions || !body.bills) {
-    return res.status(400).json({ success: false, message: 'Invalid database payload' });
+app.post('/api/db', sessionAuthMiddleware, async (req, res) => {
+  try {
+    const body = req.body;
+    if (!body || typeof body !== 'object' || !body.customers || !body.transactions || !body.bills) {
+      return res.status(400).json({ success: false, message: 'Invalid database payload' });
+    }
+    const sid = req.storeId || 'default';
+    const fullDb = await readDB();
+
+    for (const col of ['customers', 'transactions', 'bills', 'staff', 'items']) {
+      if (!fullDb[col]) fullDb[col] = [];
+      const incomingDocs = Array.isArray(body[col]) ? body[col] : [];
+      fullDb[col] = fullDb[col].filter(d => (d.store_id || 'default') !== sid);
+      incomingDocs.forEach(d => {
+        d.store_id = sid;
+        fullDb[col].push(d);
+      });
+    }
+
+    await writeDB(fullDb);
+    cachedDB = null;
+    dbCacheTimestamp = 0;
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error in POST /api/db:', error);
+    res.status(500).json({ success: false, message: 'Failed to update store database' });
   }
-  await writeDB(body);
-  res.json({ success: true });
 });
 
 // POST /api/admin/wipe-merchants — Admin-only: wipes all merchant data (requires X-ADMIN-KEY)
@@ -3630,7 +3706,15 @@ app.delete('/api/transaction/:id', async (req, res) => {
     if (idx === -1) {
       return res.status(404).json({ success: false, message: 'Transaction not found' });
     }
+    const txToDelete = fullDb.transactions[idx];
     fullDb.transactions.splice(idx, 1);
+    if (txToDelete.bill_id && fullDb.bills) {
+      const bill = fullDb.bills.find(b => b.id === txToDelete.bill_id);
+      if (bill) {
+        bill.status = 'unpaid';
+        bill.paid_at = null;
+      }
+    }
     await writeDB(fullDb);
     cachedDB = null;
     dbCacheTimestamp = 0;
@@ -3653,6 +3737,9 @@ app.delete('/api/bill/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Bill not found' });
     }
     fullDb.bills.splice(idx, 1);
+    if (fullDb.transactions) {
+      fullDb.transactions = fullDb.transactions.filter(t => t.bill_id !== id);
+    }
     await writeDB(fullDb);
     cachedDB = null;
     dbCacheTimestamp = 0;
@@ -3805,11 +3892,13 @@ app.get('/api/report', sessionAuthMiddleware, async (req, res) => {
   const billsTotal = billsToday.reduce((sum, b) => sum + b.total, 0);
   const collectionsToday = db.transactions.filter(t => t.type === 'payment' && t.timestamp.startsWith(todayString));
   const paymentTotal = collectionsToday.reduce((sum, t) => sum + t.amount, 0);
+  const expensesToday = (db.expenses || []).filter(e => e.date === todayString || (e.created_at && e.created_at.startsWith(todayString)));
+  const expensesTotal = expensesToday.reduce((sum, e) => sum + (e.amount || 0), 0);
   const outstanding = db.customers.map(c => ({
     name: c.name, phone: c.phone,
     balance: getCustomerOutstanding(c.id, db.transactions, db.bills)
   })).filter(c => c.balance > 0);
-  res.json({ date: todayString, billsTotal, paymentTotal, billsCount: billsToday.length, outstanding });
+  res.json({ date: todayString, billsTotal, paymentTotal, billsCount: billsToday.length, expensesTotal, outstanding });
 });
 
 // ─── MOBILE → WHATSAPP ACTIONS (requires X-API-KEY) ───────────────────────────
@@ -4123,7 +4212,9 @@ app.get('/api/bill/:id/pdf', pdfAuthMiddleware, async (req, res) => {
     y += 55;
 
     // ── OUTSTANDING ──────────────────────────────────────────
-    const outstanding = getCustomerOutstanding(customer.id, db.transactions || [], db.bills || []);
+    const storeTx = (db.transactions || []).filter(t => (t.store_id || 'default') === sid);
+    const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === sid);
+    const outstanding = getCustomerOutstanding(customer.id, storeTx, storeBills);
     if (outstanding !== finalTotal || bill.status === 'paid') {
       doc.fontSize(9).fillColor(SLATE_400).text('Total Outstanding (incl. previous):', margin, y);
       const outColor = outstanding > 0 ? RED : GREEN;
@@ -4186,7 +4277,9 @@ app.get('/api/customer/:id/statement/pdf', pdfAuthMiddleware, async (req, res) =
 
     const customerTransactions = db.transactions.filter(t => t.customer_id === customer.id);
     const customerBills = db.bills.filter(b => b.customer_id === customer.id);
-    const balance = getCustomerOutstanding(customer.id, db.transactions, db.bills);
+    const storeTx = (db.transactions || []).filter(t => (t.store_id || 'default') === sid);
+    const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === sid);
+    const balance = getCustomerOutstanding(customer.id, storeTx, storeBills);
 
     // Colors
     const INDIGO = '#4F46E5';
@@ -4609,7 +4702,9 @@ app.get('/view/customer/:id/statement', async (req, res) => {
 
     const customerTransactions = (db.transactions || []).filter(t => t.customer_id === customer.id);
     const customerBills = (db.bills || []).filter(b => b.customer_id === customer.id);
-    const balance = getCustomerOutstanding(customer.id, db.transactions || [], db.bills || []);
+    const storeTx = (db.transactions || []).filter(t => (t.store_id || 'default') === sid);
+    const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === sid);
+    const balance = getCustomerOutstanding(customer.id, storeTx, storeBills);
 
     const cleanShopName = (shop.name || 'Store').replace(/[^a-zA-Z0-9 ]/g, '').trim();
     const upiUri = `upi://pay?pa=${encodeURIComponent(shop.upi_id)}&pn=${encodeURIComponent(cleanShopName)}&am=${balance.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Statement Pay')}`;
