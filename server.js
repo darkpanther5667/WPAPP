@@ -2910,10 +2910,27 @@ app.post('/api/bill/mark-paid', async (req, res) => {
 // ─── DIAGNOSTIC / ADMIN ENDPOINTS ──────────────────────────────────────────────
 
 // GET /api/debug/store-status — Returns store health for current session
-app.get('/api/debug/store-status', sessionAuthMiddleware, async (req, res) => {
+// If no store_id is provided, lists all stores (summary).
+app.get('/api/debug/store-status', async (req, res) => {
   try {
-    const sid = req.storeId;
     const fullDb = await readDB();
+    const sid = req.query.store_id || req.storeId;
+
+    if (!sid) {
+      // List all stores when no store_id is provided
+      const stores = (fullDb.stores || []).map(s => ({
+        store_id: s.id,
+        name: s.store_name,
+        email: s.email,
+        phone: s.phone,
+        status: s.status,
+        staff_count: (fullDb.staff || []).filter(st => (st.store_id || 'default') === s.id).length,
+        customer_count: (fullDb.customers || []).filter(c => (c.store_id || 'default') === s.id).length,
+        bill_count: (fullDb.bills || []).filter(b => (b.store_id || 'default') === s.id).length,
+      }));
+      return res.json({ success: true, stores });
+    }
+
     const store = (fullDb.stores || []).find(s => s.id === sid);
     const staff = (fullDb.staff || []).filter(s => (s.store_id || 'default') === sid);
     const customers = (fullDb.customers || []).filter(c => (c.store_id || 'default') === sid);
