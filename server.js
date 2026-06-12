@@ -2982,6 +2982,7 @@ app.get('/api/admin/find-dup-stores', async (req, res) => {
 // ─── REST API ROUTES ───────────────────────────────────────────────────────────
 
 // GET /api/store/me - Get current user store details
+app.get('/api/store/me', sessionAuthMiddleware, async (req, res) => {
   try {
     const sid = req.storeId;
     const database = await connectDB();
