@@ -2626,7 +2626,7 @@ app.post('/api/customer/add', sessionAuthMiddleware, async (req, res) => {
       email: email ? email.trim() : '',
       address: address ? address.trim() : '',
       gstin: gstin ? gstin.trim() : '',
-      created_at: new Date().toISOString().substring(0, 10),
+      created_at: new Date().toISOString(),
       store_id: sid,
     };
 
