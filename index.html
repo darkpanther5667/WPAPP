@@ -1176,7 +1176,7 @@ function handleGoogleCredentialResponse(response){
   .then(data=>{
     if(!data.success){alert(data.message||'Google login failed.');return;}
     var store=data.store||{};
-    setSession({name:store.owner_name||store.store_name||'Google User',email:store.email||'',phone:store.phone||'',store:store.store_name||'My Store',social:'google',loggedIn:true},data.token);
+    setSession({name:store.owner_name||store.store_name||'Google User',email:store.email||'',phone:store.phone||'',store:store.store_name||'My Store',store_id:store.id||'',social:'google',loggedIn:true},data.token);
     closeLogin();
     goToDashboard(store.id||'');
   })
