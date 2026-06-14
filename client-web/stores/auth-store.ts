@@ -15,7 +15,7 @@ const DEFAULT_STATE = {
   isAuthenticated: false,
 };
 
-type InitialAuthState = Omit<AuthState, "setAuth" | "logout">;
+type InitialAuthState = Omit<AuthState, "setAuth" | "logout" | "updateStore">;
 
 export interface AuthState {
   token: string | null;
@@ -23,6 +23,7 @@ export interface AuthState {
   user: { name: string; phone: string; email?: string } | null;
   isAuthenticated: boolean;
   setAuth: (token: string, store: Store, user: { name: string; phone: string; email?: string }) => void;
+  updateStore: (store: Store) => void;
   logout: () => void;
 }
 
@@ -140,6 +141,9 @@ export const useAuthStore = create<AuthState>()(
 
         setAuth: (token, store, user) =>
           set({ token, store, user, isAuthenticated: true }),
+
+        updateStore: (store) =>
+          set({ store }),
 
         logout: () => {
           if (typeof window !== "undefined") {

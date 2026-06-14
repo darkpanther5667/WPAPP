@@ -70,6 +70,9 @@ export interface Store {
   address?: string;
   created_at: string;
   status: string;
+  invoice_template?: string;
+  upi_id?: string;
+  gstin?: string;
 }
 
 export interface StoredItem {
@@ -94,6 +97,7 @@ export interface FullDatabase {
   staff: Staff[];
   items?: StoredItem[];
   expenses?: Expense[];
+  purchases?: Purchase[];
 }
 
 export interface Expense {
@@ -103,6 +107,26 @@ export interface Expense {
   category: string;
   note?: string;
   created_at: string;
+}
+
+export interface PurchaseItem {
+  name: string;
+  qty: number;
+  price: number;
+  amount: number;
+}
+
+export interface Purchase {
+  id: string;
+  supplierName: string;
+  supplierPhone?: string;
+  totalAmount: number;
+  paidAmount: number;
+  status: "paid" | "unpaid" | "partial";
+  items: PurchaseItem[];
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
 }
 
 export interface DailyReport {

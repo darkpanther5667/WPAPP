@@ -21,6 +21,7 @@ class StaffRepository @Inject constructor(
             }
             val response = apiService.addStaff(AddStaffRequest(name, phone, role))
             if (response.isSuccessful && response.body()?.success == true) {
+                com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.LiveSyncManager.requestImmediateSync()
                 RepoResult.Success("Staff member added successfully")
             } else {
                 val msg = response.body()?.message ?: "Failed to add staff"
@@ -29,7 +30,7 @@ class StaffRepository @Inject constructor(
         } catch (e: Exception) {
             RepoResult.Error(e.message ?: "Network error")
         }
-    }
+     }
 
     suspend fun removeStaff(id: String, context: Context): RepoResult {
         return try {
@@ -38,6 +39,7 @@ class StaffRepository @Inject constructor(
             }
             val response = apiService.removeStaff(id)
             if (response.isSuccessful && response.body()?.success == true) {
+                com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.LiveSyncManager.requestImmediateSync()
                 RepoResult.Success("Staff member removed")
             } else {
                 val msg = response.body()?.message ?: "Failed to remove staff"

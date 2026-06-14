@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
-import { formatCurrency, formatDateTime, formatPhone, cn, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDateTime, formatPhone, cn, formatDate, getCustomerOutstanding } from "@/lib/utils";
 import {
   FullDatabase,
   Transaction,
@@ -106,18 +106,7 @@ export default function DashboardPage() {
   const bills = db?.bills ?? [];
 
   const outstandingTotal = customers.reduce((sum, c) => {
-    return (
-      sum +
-      (transactions
-        .filter((t) => t.customer_id === c.id)
-        .reduce(
-          (s, t) => s + (t.type === "credit" ? t.amount : -t.amount),
-          0
-        ) +
-        bills
-          .filter((b) => b.customer_id === c.id && (b.status === "unpaid" || b.status === "overdue" || b.status === "partial"))
-          .reduce((s, b) => s + b.total, 0))
-    );
+    return sum + getCustomerOutstanding(c.id, transactions, bills);
   }, 0);
 
   const paidToday = transactions
@@ -300,18 +289,7 @@ export default function DashboardPage() {
             {customers
               .map((c) => ({
                 customer: c,
-                balance: (() => {
-                  const txBalance = transactions
-                    .filter((t) => t.customer_id === c.id)
-                    .reduce(
-                      (s, t) => s + (t.type === "credit" ? t.amount : -t.amount),
-                      0
-                    );
-                  const billTotal = bills
-                    .filter((b) => b.customer_id === c.id && (b.status === "unpaid" || b.status === "overdue" || b.status === "partial"))
-                    .reduce((s, b) => s + b.total, 0);
-                  return txBalance + billTotal;
-                })(),
+                balance: getCustomerOutstanding(c.id, transactions, bills),
               }))
               .filter(({ balance }) => balance > 0)
               .slice(0, 5)

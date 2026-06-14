@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [CacheEntry::class, PendingOperation::class, ItemEntity::class, ExpenseEntity::class, PurchaseEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -18,6 +18,15 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun itemDao(): ItemDao
     abstract fun expenseDao(): ExpenseDao
     abstract fun purchaseDao(): PurchaseDao
+
+    /**
+     * Clear all cached API data and pending ops.
+     * Call this when the user logs out or switches stores.
+     */
+    suspend fun clearCache() {
+        cacheDao().clearAll()
+        pendingDao().clearAll()
+    }
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -184,6 +193,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                android.util.Log.i("AppDatabase", "MIGRATION_3_4: Adding serverId columns")
+                try {
+                    tryAlter(db, "purchases", "serverId", "TEXT NOT NULL DEFAULT ''")
+                    tryAlter(db, "expenses", "serverId", "TEXT NOT NULL DEFAULT ''")
+                    android.util.Log.i("AppDatabase", "MIGRATION_3_4 completed successfully")
+                } catch (e: Exception) {
+                    android.util.Log.e("AppDatabase", "MIGRATION_3_4 failed", e)
+                    throw e
+                }
+            }
+        }
+
         // ──────────────────────────────────────────────────────────────
         //  Helper — attempt ALTER TABLE ADD COLUMN, swallow if column
         //            already exists (SQLite error code 1).
@@ -209,7 +232,7 @@ abstract class AppDatabase : RoomDatabase() {
                         AppDatabase::class.java,
                         "grahbook.db"
                     )
-                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                         .apply {
                             if (ALLOW_DESTRUCTIVE_MIGRATION) {
                                 fallbackToDestructiveMigration()
@@ -226,7 +249,7 @@ abstract class AppDatabase : RoomDatabase() {
                             AppDatabase::class.java,
                             "grahbook_fallback.db"
                         )
-                            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                             .apply {
                                 if (ALLOW_DESTRUCTIVE_MIGRATION) {
                                     fallbackToDestructiveMigration()

@@ -28,7 +28,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -71,6 +73,7 @@ fun CustomersScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var refreshing by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -106,8 +109,14 @@ fun CustomersScreen(
 
         PullToRefreshBox(
             state = pullToRefreshState,
-            isRefreshing = dbState is UiState.Loading,
-            onRefresh = { scope.launch { LiveSyncManager.forceRefresh() } },
+            isRefreshing = refreshing,
+            onRefresh = {
+                scope.launch {
+                    refreshing = true
+                    LiveSyncManager.forceRefresh()
+                    refreshing = false
+                }
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -360,6 +369,7 @@ private fun CustomerItemRow(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    val haptic = LocalHapticFeedback.current
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.97f else 1f,
         animationSpec = PressSpring,
@@ -381,7 +391,6 @@ private fun CustomerItemRow(
                     interactionSource = interactionSource,
                     indication = null,
                     onClick = {
-                        val haptic = LocalHapticFeedback.current
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onClick()
                     }

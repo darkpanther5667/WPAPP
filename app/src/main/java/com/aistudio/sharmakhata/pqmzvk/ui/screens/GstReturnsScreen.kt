@@ -35,6 +35,7 @@ data class GstSummary(
     val totalGst: Double = 0.0,
     val b2bCount: Int = 0,
     val b2cCount: Int = 0,
+    val b2cTaxable: Double = 0.0,
     val gstBills: Int = 0,
     val nonGstBills: Int = 0,
     val rateWise: Map<Int, GstRateSummary> = emptyMap()
@@ -54,6 +55,7 @@ fun calculateGstSummary(bills: List<Bill>): GstSummary {
     var igst = 0.0
     var gstCount = 0
     var nonGstCount = 0
+    var b2cTaxable = 0.0
     val rateMap = mutableMapOf<Int, MutableList<Double>>()
     bills.forEach { bill ->
         if ((bill.gstRate ?: 0) > 0) {
@@ -65,6 +67,7 @@ fun calculateGstSummary(bills: List<Bill>): GstSummary {
             rateMap.getOrPut(bill.gstRate) { mutableListOf() }.add(bill.taxableAmount)
         } else {
             nonGstCount++
+            b2cTaxable += bill.total
         }
     }
     val rateWise = rateMap.mapValues { (rate, amounts) ->
@@ -78,6 +81,7 @@ fun calculateGstSummary(bills: List<Bill>): GstSummary {
         totalGst = cgst + sgst + igst,
         b2bCount = gstCount,
         b2cCount = nonGstCount,
+        b2cTaxable = b2cTaxable,
         gstBills = gstCount,
         nonGstBills = nonGstCount,
         rateWise = rateWise
@@ -176,7 +180,7 @@ fun GstReturnsScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         GstReturnRow("B2B (Registered)", gstSummary.b2bCount, gstSummary.totalTaxableSales, StitchPrimaryContainer)
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = StitchBorder)
-                        GstReturnRow("B2C (Unregistered)", gstSummary.b2cCount, 0.0, StitchTextSecondary)
+                        GstReturnRow("B2C (Unregistered)", gstSummary.b2cCount, gstSummary.b2cTaxable, StitchTextSecondary)
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = StitchBorder)
                         if (gstSummary.totalCgst > 0) {
                             GstRow("CGST Collected", FormatUtils.formatCurrency(gstSummary.totalCgst), AccentBlue)

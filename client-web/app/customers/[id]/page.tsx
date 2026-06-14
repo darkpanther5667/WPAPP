@@ -44,6 +44,53 @@ export default function CustomerDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingCustomer, setDeletingCustomer] = useState(false);
   const [deletingTxId, setDeletingTxId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"ledger" | "transactions" | "bills">("ledger");
+
+  const ledgerEntries = useMemo(() => {
+    // Map bills
+    const billEntries = bills.map((b) => ({
+      id: b.id,
+      date: new Date(b.created_at),
+      type: "bill" as const,
+      label: `Invoice #${b.invoice_number || b.id.slice(0, 8)}`,
+      debit: b.total,
+      credit: 0,
+      refUrl: `/invoices/${b.id}`,
+      details: b.items.map(i => `${i.name} (${i.qty}x)`).join(", ")
+    }));
+
+    // Map payments
+    const paymentEntries = transactions
+      .filter((t) => t.type === "payment")
+      .map((t) => ({
+        id: t.id,
+        date: new Date(t.timestamp),
+        type: "payment" as const,
+        label: `Payment received (${t.payment_mode || 'cash'})`,
+        debit: 0,
+        credit: t.amount,
+        refUrl: null,
+        details: t.note || ""
+      }));
+
+    // Combine and sort chronologically
+    const combined = [...billEntries, ...paymentEntries].sort(
+      (a, b) => a.date.getTime() - b.date.getTime()
+    );
+
+    // Calculate running balance
+    let balance = 0;
+    const entriesWithBalance = combined.map((entry) => {
+      balance += entry.debit - entry.credit;
+      return {
+        ...entry,
+        runningBalance: balance,
+      };
+    });
+
+    // Return sorted newest first
+    return entriesWithBalance.reverse();
+  }, [bills, transactions]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -180,81 +227,174 @@ export default function CustomerDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Transactions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {transactions.length === 0 ? (
-            <p className="text-sm text-center text-muted-foreground py-4">No transactions yet</p>
-          ) : (
-            [...transactions]
-              .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-              .map((tx) => (
-                <div key={tx.id} className="flex items-center gap-3 p-3 rounded-xl bg-accent/30 group">
-                  <div className={cn("flex h-8 w-8 items-center justify-center rounded-full", tx.type === "payment" ? "bg-green-100 text-green-600 dark:bg-green-900/30" : "bg-red-100 text-red-600 dark:bg-red-900/30")}>
-                    {tx.type === "payment" ? <ArrowDownRight className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{tx.type === "payment" ? "Payment" : "Credit"}</p>
-                    <p className="text-xs text-muted-foreground">{tx.note || tx.payment_mode}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className={cn("text-sm font-bold", tx.type === "payment" ? "text-green-600" : "text-red-500")}>
-                      {tx.type === "payment" ? "+" : "-"}{formatCurrency(tx.amount)}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {new Date(tx.timestamp).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteTransaction(tx.id)}
-                    disabled={deletingTxId === tx.id}
-                    className="shrink-0 h-7 w-7 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-muted-foreground hover:text-red-500 transition-all"
-                  >
-                    {deletingTxId === tx.id ? (
-                      <span className="h-3 w-3 rounded-full border-2 border-red-300 border-t-red-500 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3 w-3" />
-                    )}
-                  </button>
-                </div>
-              ))
-          )}
-        </CardContent>
-      </Card>
+      {/* Tab controls */}
+      <div className="flex border-b border-gray-200 dark:border-dark-800 gap-4 mt-2">
+        {(["ledger", "transactions", "bills"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              "pb-2 text-sm font-semibold border-b-2 px-1 transition-all capitalize",
+              activeTab === tab
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2"><FileText className="h-4 w-4" /> Bills</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {bills.length === 0 ? (
-            <p className="text-sm text-center text-muted-foreground py-4">No bills</p>
-          ) : (
-            [...bills]
-              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-              .map((bill) => (
-                <Link key={bill.id} href={`/invoices/${bill.id}`}>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-accent/30">
-                    <div>
-                      <p className="text-sm font-medium">Invoice #{bill.id.slice(0, 8)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(bill.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                      </p>
+      {activeTab === "ledger" && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">Customer Ledger</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {ledgerEntries.length === 0 ? (
+              <p className="text-sm text-center text-muted-foreground py-4">No ledger entries yet</p>
+            ) : (
+              <div className="relative border-l border-gray-200 dark:border-dark-800 ml-4 pl-6 space-y-6">
+                {ledgerEntries.map((entry) => (
+                  <div key={entry.id} className="relative group">
+                    {/* Circle marker */}
+                    <span className={cn(
+                      "absolute -left-[31px] top-1.5 flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-white dark:ring-dark-900",
+                      entry.type === "bill" ? "bg-red-500" : "bg-green-500"
+                    )} />
+
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 rounded-xl bg-accent/30 hover:bg-accent/40 transition-all">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-bold text-foreground truncate">
+                            {entry.refUrl ? (
+                              <Link href={entry.refUrl} className="hover:underline text-primary">
+                                {entry.label}
+                              </Link>
+                            ) : (
+                              entry.label
+                            )}
+                          </p>
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(entry.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{entry.details}</p>
+                      </div>
+
+                      <div className="flex items-center gap-6 text-right shrink-0 mt-2 md:mt-0">
+                        {/* Debit column */}
+                        <div className="w-24">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Debit (Give)</p>
+                          <p className="text-sm font-extrabold text-red-500 font-mono-amount">
+                            {entry.debit > 0 ? formatCurrency(entry.debit) : "—"}
+                          </p>
+                        </div>
+
+                        {/* Credit column */}
+                        <div className="w-24">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Credit (Got)</p>
+                          <p className="text-sm font-extrabold text-green-600 font-mono-amount">
+                            {entry.credit > 0 ? formatCurrency(entry.credit) : "—"}
+                          </p>
+                        </div>
+
+                        {/* Balance column */}
+                        <div className="w-28 border-l border-gray-200 dark:border-dark-800 pl-4">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Balance</p>
+                          <p className={cn("text-sm font-black font-mono-amount", entry.runningBalance > 0 ? "text-red-500" : "text-green-600")}>
+                            {formatCurrency(entry.runningBalance)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === "transactions" && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Transactions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {transactions.length === 0 ? (
+              <p className="text-sm text-center text-muted-foreground py-4">No transactions yet</p>
+            ) : (
+              [...transactions]
+                .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                .map((tx) => (
+                  <div key={tx.id} className="flex items-center gap-3 p-3 rounded-xl bg-accent/30 group">
+                    <div className={cn("flex h-8 w-8 items-center justify-center rounded-full", tx.type === "payment" ? "bg-green-100 text-green-600 dark:bg-green-900/30" : "bg-red-100 text-red-600 dark:bg-red-900/30")}>
+                      {tx.type === "payment" ? <ArrowDownRight className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{tx.type === "payment" ? "Payment" : "Credit"}</p>
+                      <p className="text-xs text-muted-foreground">{tx.note || tx.payment_mode}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold">{formatCurrency(bill.total)}</p>
-                      <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", bill.status === "paid" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400")}>
-                        {bill.status}
-                      </span>
+                      <p className={cn("text-sm font-bold", tx.type === "payment" ? "text-green-600" : "text-red-500")}>
+                        {tx.type === "payment" ? "+" : "-"}{formatCurrency(tx.amount)}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {new Date(tx.timestamp).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                      </p>
                     </div>
+                    <button
+                      onClick={() => handleDeleteTransaction(tx.id)}
+                      disabled={deletingTxId === tx.id}
+                      className="shrink-0 h-7 w-7 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-muted-foreground hover:text-red-500 transition-all"
+                    >
+                      {deletingTxId === tx.id ? (
+                        <span className="h-3 w-3 rounded-full border-2 border-red-300 border-t-red-500 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3 w-3" />
+                      )}
+                    </button>
                   </div>
-                </Link>
-              ))
-          )}
-        </CardContent>
-      </Card>
+                ))
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === "bills" && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2"><FileText className="h-4 w-4" /> Bills</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {bills.length === 0 ? (
+              <p className="text-sm text-center text-muted-foreground py-4">No bills</p>
+            ) : (
+              [...bills]
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                .map((bill) => (
+                  <Link key={bill.id} href={`/invoices/${bill.id}`}>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-accent/30 hover:bg-accent/40 transition-all">
+                      <div>
+                        <p className="text-sm font-medium">Invoice #{bill.invoice_number || bill.id.slice(0, 8)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(bill.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold">{formatCurrency(bill.total)}</p>
+                        <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", bill.status === "paid" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400")}>
+                          {bill.status}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Delete Customer Confirmation Dialog */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>

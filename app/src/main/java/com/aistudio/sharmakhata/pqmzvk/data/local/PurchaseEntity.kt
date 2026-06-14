@@ -6,6 +6,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "purchases")
 data class PurchaseEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val serverId: String = "",
     val supplierName: String,
     val supplierPhone: String = "",
     val itemsJson: String = "[]",

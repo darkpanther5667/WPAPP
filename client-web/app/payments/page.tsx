@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
-import { formatCurrency, formatPhone, cn } from "@/lib/utils";
+import { formatCurrency, formatPhone, cn, getCustomerOutstanding } from "@/lib/utils";
 import { Customer, Transaction, Bill } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, Input, Skeleton } from "@/components/ui";
@@ -101,17 +101,7 @@ export default function PaymentsPage() {
 
   // Calculate pending for selected customer
   const pendingAmount = db && selectedCustomerId
-    ? (() => {
-        const cust = db.customers.find((c) => c.id === selectedCustomerId);
-        if (!cust) return 0;
-        const txBalance = db.transactions
-          .filter((t) => t.customer_id === selectedCustomerId)
-          .reduce((s, t) => s + (t.type === "credit" ? t.amount : -t.amount), 0);
-        const billTotal = db.bills
-          .filter((b) => b.customer_id === selectedCustomerId && (b.status === "unpaid" || b.status === "overdue" || b.status === "partial"))
-          .reduce((s, b) => s + b.total, 0);
-        return txBalance + billTotal;
-      })()
+    ? getCustomerOutstanding(selectedCustomerId, db.transactions, db.bills)
     : 0;
 
   return (

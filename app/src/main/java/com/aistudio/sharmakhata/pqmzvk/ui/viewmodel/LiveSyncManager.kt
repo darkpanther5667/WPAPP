@@ -23,7 +23,7 @@ object LiveSyncManager {
     private var consecutiveFailures = 0
     private val maxConsecutiveFailures = 3
 
-    var intervalMillis: Long = 30_000L
+    var intervalMillis: Long = 5_000L
 
     private val _dailyReport = MutableStateFlow<DailyReport?>(null)
     val dailyReport: StateFlow<DailyReport?> = _dailyReport.asStateFlow()
@@ -39,6 +39,11 @@ object LiveSyncManager {
 
     fun init(context: Context) {
         contextRef = context
+    }
+
+    fun requestImmediateSync() {
+        stop()
+        start()
     }
 
     fun start() {
@@ -109,7 +114,10 @@ object LiveSyncManager {
     suspend fun forceRefresh() {
         val ctx = contextRef ?: return
         try {
-            val db = DeltaSyncManager.fetch(ctx, _fullDatabase.value)
+            // Clear delta timestamp to force a FULL fetch
+            com.aistudio.sharmakhata.pqmzvk.util.SessionManager.saveLastSyncedAt(ctx, null)
+            // Fetch fresh data
+            val db = DeltaSyncManager.fetch(ctx, null)
             if (db != null) {
                 _fullDatabase.value = db
                 _lastSynced.value = Instant.now()

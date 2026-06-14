@@ -39,6 +39,7 @@ class PaymentRepository @Inject constructor(
                 AddPaymentRequest(customerId, amount, note, paymentMode, type)
             )
             if (response.isSuccessful) {
+                com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.LiveSyncManager.requestImmediateSync()
                 RepoResult.Success("Payment recorded successfully")
             } else {
                 RepoResult.Error("Failed to record payment")

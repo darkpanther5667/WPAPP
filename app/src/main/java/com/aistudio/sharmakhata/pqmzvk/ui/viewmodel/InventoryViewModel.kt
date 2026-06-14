@@ -24,6 +24,9 @@ class InventoryViewModel @Inject constructor(
     private val _storedItems = MutableStateFlow<List<StoredItem>>(emptyList())
     val storedItems: StateFlow<List<StoredItem>> = _storedItems.asStateFlow()
 
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
     private val _operationState = MutableStateFlow<OperationState>(OperationState.Idle)
     val operationState: StateFlow<OperationState> = _operationState.asStateFlow()
 
@@ -32,7 +35,9 @@ class InventoryViewModel @Inject constructor(
     fun loadItems() {
         itemsJob?.cancel()
         itemsJob = viewModelScope.launch {
+            _isLoading.value = true
             inventoryRepository.getAllItems().collect { _items.value = it }
+            _isLoading.value = false
         }
     }
 

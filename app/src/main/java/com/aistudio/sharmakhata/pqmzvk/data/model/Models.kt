@@ -9,7 +9,10 @@ data class FullDatabase(
     val customers: List<Customer> = emptyList(),
     val transactions: List<Transaction> = emptyList(),
     val bills: List<Bill> = emptyList(),
-    val staff: List<Staff> = emptyList()
+    val staff: List<Staff> = emptyList(),
+    val purchases: List<Purchase> = emptyList(),
+    val expenses: List<Expense> = emptyList(),
+    @Json(name = "server_time") val serverTime: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -98,6 +101,56 @@ data class OutstandingCustomer(
     val balance: Double
 )
 
+@JsonClass(generateAdapter = true)
+data class Store(
+    val id: String,
+    @Json(name = "store_name") val storeName: String?,
+    @Json(name = "owner_name") val ownerName: String?,
+    val phone: String?,
+    val email: String?,
+    @Json(name = "business_type") val businessType: String? = "retail",
+    val plan: String? = "basic",
+    val address: String?,
+    val gstin: String?,
+    @Json(name = "upi_id") val upiId: String?,
+    @Json(name = "created_at") val createdAt: String?,
+    val status: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class Expense(
+    val id: String,
+    val title: String,
+    val amount: Double,
+    val category: String = "Other",
+    val note: String? = null,
+    @Json(name = "store_id") val storeId: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class Purchase(
+    val id: String,
+    val supplierName: String,
+    val supplierPhone: String = "",
+    val totalAmount: Double,
+    val paidAmount: Double = 0.0,
+    val status: String = "unpaid",
+    val items: List<PurchaseItem> = emptyList(),
+    val notes: String = "",
+    @Json(name = "store_id") val storeId: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+    @Json(name = "updated_at") val updatedAt: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class PurchaseItem(
+    val name: String = "",
+    val qty: Int = 1,
+    val price: Double = 0.0,
+    val amount: Double = 0.0
+)
+
 /**
  * Response from the delta sync endpoint [com.aistudio.sharmakhata.pqmzvk.data.remote.ApiService.getDeltaChanges].
  * Contains only records that changed since the given timestamp,
@@ -111,6 +164,10 @@ data class DeltaChanges(
     @Json(name = "deleted_transaction_ids") val deletedTransactionIds: List<String>? = null,
     @Json(name = "bills") val bills: List<Bill>? = null,
     @Json(name = "deleted_bill_ids") val deletedBillIds: List<String>? = null,
+    @Json(name = "purchases") val purchases: List<Purchase>? = null,
+    @Json(name = "deleted_purchase_ids") val deletedPurchaseIds: List<String>? = null,
+    @Json(name = "expenses") val expenses: List<Expense>? = null,
+    @Json(name = "deleted_expense_ids") val deletedExpenseIds: List<String>? = null,
     @Json(name = "server_time") val serverTime: String? = null,
     @Json(name = "fallback_full_db") val fallbackFullDb: FullDatabase? = null
 )

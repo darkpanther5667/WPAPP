@@ -79,6 +79,7 @@ fun DashboardScreen(
     val dbState by viewModel.dbState.collectAsState()
     val reportState by viewModel.reportState.collectAsState()
     val pullToRefreshState = rememberPullToRefreshState()
+    var refreshing by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     val scope = rememberCoroutineScope()
@@ -105,8 +106,14 @@ fun DashboardScreen(
             // === MAIN CONTENT ===
             PullToRefreshBox(
                 state = pullToRefreshState,
-                isRefreshing = reportState is UiState.Loading,
-                onRefresh = { scope.launch { LiveSyncManager.forceRefresh() } },
+                isRefreshing = refreshing,
+                onRefresh = {
+                    scope.launch {
+                        refreshing = true
+                        LiveSyncManager.forceRefresh()
+                        refreshing = false
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
             ) {
                 when (reportState) {

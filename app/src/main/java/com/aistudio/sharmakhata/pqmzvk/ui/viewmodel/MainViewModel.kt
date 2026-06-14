@@ -16,6 +16,8 @@ import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiClient
 import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiService
 import com.aistudio.sharmakhata.pqmzvk.data.remote.CreateBillRequest
 import com.aistudio.sharmakhata.pqmzvk.data.remote.MarkBillPaidRequest
+import com.aistudio.sharmakhata.pqmzvk.data.remote.AddPurchaseRequest
+import com.aistudio.sharmakhata.pqmzvk.data.remote.AddExpenseRequest
 import com.aistudio.sharmakhata.pqmzvk.data.repository.AuthRepository
 import com.aistudio.sharmakhata.pqmzvk.data.repository.AuthResult
 import com.aistudio.sharmakhata.pqmzvk.data.sync.DeltaSyncManager
@@ -110,31 +112,31 @@ class MainViewModel @Inject constructor(
         reportCollectorJob?.cancel()
         syncErrorCollectorJob?.cancel()
 
-        // Step 1: Load from cache immediately (instant, no network needed)
-        viewModelScope.launch(Dispatchers.IO) {
-            if (gen != fetchGeneration) return@launch
-            loadFromCache()
-        }
-
-        // Step 2: Check network — if offline, we're done (cache is shown)
         val ctx = context ?: return
+
+        // Step 1: Check network first
         if (!NetworkUtils.isNetworkAvailable(ctx)) {
             _isOffline.value = true
             _syncError.value = "You're offline — showing saved data"
+            // Only show cache when offline
+            viewModelScope.launch(Dispatchers.IO) {
+                if (gen != fetchGeneration) return@launch
+                loadFromCache()
+            }
             return
         }
         _isOffline.value = false
 
-        // Step 3: Sync pending offline operations first
+        // Step 2: Sync pending offline operations first
         viewModelScope.launch(Dispatchers.IO) {
             if (gen != fetchGeneration) return@launch
             syncPendingOperations()
         }
 
-        // Step 4: Ensure LiveSyncManager is running for continuous polling
+        // Step 3: Start LiveSyncManager
         LiveSyncManager.start()
 
-        // Collect ongoing LiveSyncManager updates (only if generation still matches)
+        // Collect ongoing LiveSyncManager updates
         dbCollectorJob = viewModelScope.launch {
             LiveSyncManager.fullDatabase.collect { data ->
                 if (data != null && gen == fetchGeneration) {
@@ -159,20 +161,48 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Step 5: Immediate one-shot delta fetch — critical after mutations
+        // Step 4: Always try network first — show loading state
+        _dbState.value = UiState.Loading
         viewModelScope.launch(Dispatchers.IO) {
             if (gen != fetchGeneration) return@launch
-            val currentDb = _dbState.value.let {
-                if (it is UiState.Success) it.data else null
+            try {
+                val response = apiService.getFullDatabase()
+                if (response.isSuccessful) {
+                    val freshDb = response.body()
+                    if (freshDb != null && gen == fetchGeneration) {
+                        // Protect against empty DB responses wiping local cache
+                        val currentState = _dbState.value
+                        val isEmptyResponse = freshDb.customers.isNullOrEmpty() && freshDb.bills.isNullOrEmpty()
+                        val hasLocalData = currentState is UiState.Success && 
+                            (!currentState.data.customers.isNullOrEmpty() || !currentState.data.bills.isNullOrEmpty())
+                        
+                        if (isEmptyResponse && hasLocalData) {
+                            android.util.Log.w("MainViewModel", "Received empty database response from server, but local cache has data. Ignoring to prevent data loss.")
+                            return@launch
+                        }
+
+                        _dbState.value = UiState.Success(freshDb)
+                        saveDbToCache(freshDb)
+                        // Update lastSyncedAt using server time
+                        val syncTime = freshDb.serverTime?.let { t ->
+                            try { java.time.Instant.parse(t).minusSeconds(2).toString() }
+                            catch (e: Exception) { java.time.Instant.now().minusSeconds(2).toString() }
+                        } ?: java.time.Instant.now().minusSeconds(2).toString()
+                        com.aistudio.sharmakhata.pqmzvk.util.SessionManager.saveLastSyncedAt(ctx, syncTime)
+                        return@launch
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.d("MainViewModel", "Network fetch failed: ${e.message}")
             }
-            val freshDb = DeltaSyncManager.fetch(ctx, currentDb)
-            if (freshDb != null && gen == fetchGeneration) {
-                _dbState.value = UiState.Success(freshDb)
-                saveDbToCache(freshDb)
-            } else if (gen == fetchGeneration) {
-                android.util.Log.d("MainViewModel", "Immediate delta fetch failed")
+
+            // Network failed — fall back to cache
+            if (gen == fetchGeneration && _dbState.value !is UiState.Success) {
+                loadFromCache()
             }
         }
+
+        // Step 5: Fetch daily report
         viewModelScope.launch(Dispatchers.IO) {
             if (gen != fetchGeneration) return@launch
             try {
@@ -183,11 +213,9 @@ class MainViewModel @Inject constructor(
                         _reportState.value = UiState.Success(freshReport)
                         saveReportToCache(freshReport)
                     }
-                } else {
-                    android.util.Log.d("MainViewModel", "Immediate report fetch failed: HTTP ${response.code()}")
                 }
             } catch (e: Exception) {
-                android.util.Log.d("MainViewModel", "Immediate report fetch failed: ${e.message}")
+                android.util.Log.d("MainViewModel", "Report fetch failed: ${e.message}")
             }
         }
     }
@@ -226,6 +254,59 @@ class MainViewModel @Inject constructor(
         try {
             val json = dbAdapter.toJson(data)
             cacheDao.put(CacheEntry(CACHE_KEY_DB, json, System.currentTimeMillis()))
+
+            // Sync purchases and expenses back to local Room database entities
+            val dbInstance = AppDatabase.get(getApplication())
+
+            // Sync purchases
+            dbInstance.purchaseDao().clearAll()
+            data.purchases.forEach { purchase ->
+                val mappedItems = purchase.items.map { item ->
+                    com.aistudio.sharmakhata.pqmzvk.data.local.PurchaseItemEntry(
+                        name = item.name,
+                        qty = item.qty.toString(),
+                        price = item.price.toString(),
+                        amount = item.amount
+                    )
+                }
+                val itemsJson = moshi.adapter<List<com.aistudio.sharmakhata.pqmzvk.data.local.PurchaseItemEntry>>(
+                    com.squareup.moshi.Types.newParameterizedType(List::class.java, com.aistudio.sharmakhata.pqmzvk.data.local.PurchaseItemEntry::class.java)
+                ).toJson(mappedItems)
+
+                val createdAtLong = try { java.time.Instant.parse(purchase.createdAt).toEpochMilli() } catch (e: Exception) { System.currentTimeMillis() }
+                val updatedAtLong = try { java.time.Instant.parse(purchase.updatedAt).toEpochMilli() } catch (e: Exception) { System.currentTimeMillis() }
+
+                dbInstance.purchaseDao().insert(
+                    com.aistudio.sharmakhata.pqmzvk.data.local.PurchaseEntity(
+                        serverId = purchase.id,
+                        supplierName = purchase.supplierName,
+                        supplierPhone = purchase.supplierPhone,
+                        itemsJson = itemsJson,
+                        totalAmount = purchase.totalAmount,
+                        paidAmount = purchase.paidAmount,
+                        status = purchase.status,
+                        notes = purchase.notes,
+                        createdAt = createdAtLong,
+                        updatedAt = updatedAtLong
+                    )
+                )
+            }
+
+            // Sync expenses
+            dbInstance.expenseDao().clearAll()
+            data.expenses.forEach { expense ->
+                val createdAtLong = try { java.time.Instant.parse(expense.createdAt).toEpochMilli() } catch (e: Exception) { System.currentTimeMillis() }
+                dbInstance.expenseDao().insert(
+                    com.aistudio.sharmakhata.pqmzvk.data.local.ExpenseEntity(
+                        serverId = expense.id,
+                        title = expense.title,
+                        amount = expense.amount,
+                        category = expense.category,
+                        note = expense.note,
+                        createdAt = createdAtLong
+                    )
+                )
+            }
         } catch (e: Exception) {
             android.util.Log.d("MainViewModel", "Cache save failed: ${e.message}")
         }
@@ -301,6 +382,28 @@ class MainViewModel @Inject constructor(
                             response.isSuccessful && response.body()?.success == true
                         } else false
                     }
+                    "add_purchase" -> {
+                        val req = moshi.adapter(AddPurchaseRequest::class.java).fromJson(op.payload)
+                        if (req != null) {
+                            val response = apiService.addPurchase(req)
+                            response.isSuccessful && response.body()?.success == true
+                        } else false
+                    }
+                    "delete_purchase" -> {
+                        val response = apiService.deletePurchase(op.payload)
+                        response.isSuccessful && response.body()?.success == true
+                    }
+                    "add_expense" -> {
+                        val req = moshi.adapter(AddExpenseRequest::class.java).fromJson(op.payload)
+                        if (req != null) {
+                            val response = apiService.addExpense(req)
+                            response.isSuccessful && response.body()?.success == true
+                        } else false
+                    }
+                    "delete_expense" -> {
+                        val response = apiService.deleteExpense(op.payload)
+                        response.isSuccessful && response.body()?.success == true
+                    }
                     else -> false
                 }
 
@@ -319,6 +422,7 @@ class MainViewModel @Inject constructor(
         if (newDropped.isNotEmpty()) {
             _droppedOps.value = _droppedOps.value + newDropped
         }
+        LiveSyncManager.requestImmediateSync()
     }
 
     // ── LiveSync ────────────────────────────────────────────────────────────────
@@ -364,12 +468,18 @@ class MainViewModel @Inject constructor(
                         com.aistudio.sharmakhata.pqmzvk.util.SessionManager.setToken(context, token)
                     }
                     result.storeId?.let { id ->
+                        val oldStoreId = com.aistudio.sharmakhata.pqmzvk.util.SessionManager.storeId
+                        if (oldStoreId != null && oldStoreId != id) {
+                            db.cacheDao().clearAll()
+                            db.pendingDao().clearAll()
+                        }
                         com.aistudio.sharmakhata.pqmzvk.util.SessionManager.saveStoreInfo(context, id, phone)
                         com.aistudio.sharmakhata.pqmzvk.util.SessionManager.reload(context)
                     }
                     LiveSyncManager.stop()
                     LiveSyncManager.init(context)
                     LiveSyncManager.start()
+                    fetchData(context)
                     _operationState.value = OperationState.Success("Logged in")
                 }
                 is AuthResult.Error -> _operationState.value = OperationState.Error(result.message)
@@ -388,13 +498,51 @@ class MainViewModel @Inject constructor(
                         com.aistudio.sharmakhata.pqmzvk.util.SessionManager.setToken(context, token)
                     }
                     result.storeId?.let { id ->
+                        val oldStoreId = com.aistudio.sharmakhata.pqmzvk.util.SessionManager.storeId
+                        if (oldStoreId != null && oldStoreId != id) {
+                            db.cacheDao().clearAll()
+                            db.pendingDao().clearAll()
+                        }
                         com.aistudio.sharmakhata.pqmzvk.util.SessionManager.saveStoreInfo(context, id, phone)
                         com.aistudio.sharmakhata.pqmzvk.util.SessionManager.reload(context)
                     }
                     LiveSyncManager.stop()
                     LiveSyncManager.init(context)
                     LiveSyncManager.start()
+                    fetchData(context)
                     _operationState.value = OperationState.Success("Logged in")
+                }
+                is AuthResult.Error -> _operationState.value = OperationState.Error(result.message)
+            }
+        }
+    }
+
+    fun loginWithGoogle(idToken: String, context: android.content.Context) {
+        _operationState.value = OperationState.Loading
+        viewModelScope.launch {
+            val result = authRepository.googleSignIn(idToken)
+            when (result) {
+                is AuthResult.Success -> {
+                    result.token?.let { token ->
+                        _authToken.value = token
+                        com.aistudio.sharmakhata.pqmzvk.util.SessionManager.setToken(context, token)
+                    }
+                    result.storeId?.let { id ->
+                        // Clear old cache if store changed
+                        val oldStoreId = com.aistudio.sharmakhata.pqmzvk.util.SessionManager.storeId
+                        if (oldStoreId != null && oldStoreId != id) {
+                            db.cacheDao().clearAll()
+                            db.pendingDao().clearAll()
+                        }
+                        com.aistudio.sharmakhata.pqmzvk.util.SessionManager.saveStoreInfo(context, id, "")
+                        com.aistudio.sharmakhata.pqmzvk.util.SessionManager.reload(context)
+                    }
+                    LiveSyncManager.stop()
+                    LiveSyncManager.init(context)
+                    LiveSyncManager.start()
+                    fetchData(context) // Force full refresh after login
+                    val msg = if (result.isNewUser == true) "Register" else "Logged in"
+                    _operationState.value = OperationState.Success(msg)
                 }
                 is AuthResult.Error -> _operationState.value = OperationState.Error(result.message)
             }

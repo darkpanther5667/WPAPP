@@ -3,9 +3,10 @@
 import { useEffect, useState, useMemo } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
-import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { formatCurrency, formatDate, cn, getCustomerOutstanding } from "@/lib/utils";
 import { Transaction, Bill, Customer, Expense } from "@/types";
-import { Card, CardContent, CardHeader, CardTitle, Skeleton } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Skeleton, Button } from "@/components/ui";
+import Link from "next/link";
 import {
   Wallet,
   AlertTriangle,
@@ -66,13 +67,7 @@ export default function ReportsPage() {
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
   const netProfit = totalRevenue - totalExpenses;
   const outstandingTotal = customers.reduce((sum, c) => {
-    const txB = transactions
-      .filter((t) => t.customer_id === c.id)
-      .reduce((s, t) => s + (t.type === "credit" ? t.amount : -t.amount), 0);
-    const billT = bills
-      .filter((b) => b.customer_id === c.id && (b.status === "unpaid" || b.status === "overdue" || b.status === "partial"))
-      .reduce((s, b) => s + b.total, 0);
-    return sum + txB + billT;
+    return sum + getCustomerOutstanding(c.id, transactions, bills);
   }, 0);
 
   // Last 7 days chart data
@@ -100,15 +95,7 @@ export default function ReportsPage() {
   // Top outstanding customers
   const topOutstanding = useMemo(() => {
     return customers
-      .map((c) => {
-        const txB = transactions
-          .filter((t) => t.customer_id === c.id)
-          .reduce((s, t) => s + (t.type === "credit" ? t.amount : -t.amount), 0);
-        const billT = bills
-          .filter((b) => b.customer_id === c.id && (b.status === "unpaid" || b.status === "overdue" || b.status === "partial"))
-          .reduce((s, b) => s + b.total, 0);
-        return { customer: c, balance: txB + billT };
-      })
+      .map((c) => ({ customer: c, balance: getCustomerOutstanding(c.id, transactions, bills) }))
       .filter((x) => x.balance > 0)
       .sort((a, b) => b.balance - a.balance)
       .slice(0, 8);
@@ -133,13 +120,20 @@ export default function ReportsPage() {
     <div className="px-4 py-5 space-y-5 page-enter">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-extrabold text-foreground">Reports</h1>
-        <button
-          onClick={() => { setRefreshing(true); fetchData(); }}
-          disabled={refreshing}
-          className="p-2 rounded-full bg-primary/10 text-primary"
-        >
-          <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-        </button>
+        <div className="flex items-center gap-2">
+          <Link href="/reports/gst">
+            <Button size="sm" variant="outline">
+              GST Report
+            </Button>
+          </Link>
+          <button
+            onClick={() => { setRefreshing(true); fetchData(); }}
+            disabled={refreshing}
+            className="p-2 rounded-full bg-primary/10 text-primary"
+          >
+            <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}

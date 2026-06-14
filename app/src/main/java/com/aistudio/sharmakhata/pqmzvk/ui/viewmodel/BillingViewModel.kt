@@ -86,13 +86,16 @@ class BillingViewModel @Inject constructor(
         totalCgst: Double = 0.0,
         totalSgst: Double = 0.0,
         totalIgst: Double = 0.0,
-        grandTotal: Double = 0.0
+        grandTotal: Double = 0.0,
+        invoiceNumber: String? = null,
+        discount: Double = 0.0
     ) {
         viewModelScope.launch {
             _operationState.value = OperationState.Loading
             val (result, billId) = billingRepository.createBill(
                 context, customerId, amount, items,
-                gstType, gstRate, taxableAmount, totalCgst, totalSgst, totalIgst, grandTotal
+                gstType, gstRate, taxableAmount, totalCgst, totalSgst, totalIgst, grandTotal,
+                invoiceNumber, discount
             )
             if (billId != null) _lastCreatedBillId.value = billId
             _operationState.value = when (result) {
@@ -158,13 +161,16 @@ class BillingViewModel @Inject constructor(
         totalCgst: Double = 0.0,
         totalSgst: Double = 0.0,
         totalIgst: Double = 0.0,
-        grandTotal: Double = 0.0
+        grandTotal: Double = 0.0,
+        invoiceNumber: String? = null,
+        discount: Double = 0.0
     ) {
         viewModelScope.launch {
             _operationState.value = OperationState.Loading
             val (result, billId) = billingRepository.quickBill(
                 context, customerName, customerPhone, total, items,
-                gstType, gstRate, taxableAmount, totalCgst, totalSgst, totalIgst, grandTotal
+                gstType, gstRate, taxableAmount, totalCgst, totalSgst, totalIgst, grandTotal,
+                invoiceNumber, discount
             )
             if (billId != null) _lastCreatedBillId.value = billId
             _operationState.value = when (result) {

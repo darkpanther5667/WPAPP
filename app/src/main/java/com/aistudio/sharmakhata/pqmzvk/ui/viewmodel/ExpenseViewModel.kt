@@ -47,16 +47,31 @@ class ExpenseViewModel @Inject constructor(
         }
     }
 
-    fun saveExpense(title: String, amount: Double, category: String, note: String?) {
+    fun saveExpense(title: String, amount: Double, category: String, note: String?, context: android.content.Context) {
         viewModelScope.launch(Dispatchers.IO) {
-            expenseRepository.insert(ExpenseEntity(title = title, amount = amount, category = category, note = note))
-            _operationState.value = OperationState.Success("Expense added")
+            _operationState.value = OperationState.Loading
+            val result = expenseRepository.addExpense(title, amount, category, note, context)
+            withContext(Dispatchers.Main) {
+                if (result is RepoResult.Success) {
+                    _operationState.value = OperationState.Success(result.message)
+                } else if (result is RepoResult.Error) {
+                    _operationState.value = OperationState.Error(result.message)
+                }
+            }
         }
     }
 
-    fun deleteExpense(id: Long) {
+    fun deleteExpense(id: Long, serverId: String, context: android.content.Context) {
         viewModelScope.launch(Dispatchers.IO) {
-            expenseRepository.deleteById(id)
+            _operationState.value = OperationState.Loading
+            val result = expenseRepository.deleteExpense(id, serverId, context)
+            withContext(Dispatchers.Main) {
+                if (result is RepoResult.Success) {
+                    _operationState.value = OperationState.Success(result.message)
+                } else if (result is RepoResult.Error) {
+                    _operationState.value = OperationState.Error(result.message)
+                }
+            }
         }
     }
 

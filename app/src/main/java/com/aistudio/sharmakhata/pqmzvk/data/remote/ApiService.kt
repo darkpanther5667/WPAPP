@@ -5,6 +5,9 @@ import com.aistudio.sharmakhata.pqmzvk.data.model.DailyReport
 import com.aistudio.sharmakhata.pqmzvk.data.model.DeltaChanges
 import com.aistudio.sharmakhata.pqmzvk.data.model.FullDatabase
 import com.aistudio.sharmakhata.pqmzvk.data.model.Staff
+import com.aistudio.sharmakhata.pqmzvk.data.model.Store
+import com.aistudio.sharmakhata.pqmzvk.data.model.Expense
+import com.aistudio.sharmakhata.pqmzvk.data.model.Purchase
 import com.squareup.moshi.Json
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -73,12 +76,34 @@ interface ApiService {
     @DELETE("api/bill/{id}")
     suspend fun deleteBill(@Path("id") id: String): retrofit2.Response<BasicSuccessResponse>
 
+    @DELETE("api/customer/{id}")
+    suspend fun deleteCustomer(@Path("id") id: String): retrofit2.Response<BasicSuccessResponse>
+
     @POST("api/staff/add")
     suspend fun addStaff(@Body request: AddStaffRequest): retrofit2.Response<AddStaffResponse>
 
     @DELETE("api/staff/{id}")
     suspend fun removeStaff(@Path("id") id: String): retrofit2.Response<BasicSuccessResponse>
+
+    @POST("api/auth/google")
+    suspend fun googleAuth(@Body request: GoogleAuthRequest): retrofit2.Response<VerifyLoginResponse>
+
+    @POST("api/purchases/add")
+    suspend fun addPurchase(@Body request: AddPurchaseRequest): retrofit2.Response<AddPurchaseResponse>
+
+    @DELETE("api/purchases/{id}")
+    suspend fun deletePurchase(@Path("id") id: String): retrofit2.Response<BasicSuccessResponse>
+
+    @POST("api/expense/add")
+    suspend fun addExpense(@Body request: AddExpenseRequest): retrofit2.Response<AddExpenseResponse>
+
+    @DELETE("api/expense/{id}")
+    suspend fun deleteExpense(@Path("id") id: String): retrofit2.Response<BasicSuccessResponse>
 }
+
+data class GoogleAuthRequest(
+    val credential: String
+)
 
 data class AddCustomerRequest(
     val name: String,
@@ -103,6 +128,8 @@ data class CreateBillRequest(
     val customerId: String,
     val amount: Double,
     val items: List<BillItemRequest>?,
+    @Json(name = "invoice_number") val invoiceNumber: String? = null,
+    val discount: Double = 0.0,
     @Json(name = "gst_type") val gstType: String = "cgst_sgst",
     @Json(name = "gst_rate") val gstRate: Int = 0,
     @Json(name = "taxable_amount") val taxableAmount: Double = 0.0,
@@ -126,7 +153,12 @@ data class BillItemRequest(
     val price: Double,
     val qty: Int,
     @Json(name = "hsn_code") val hsnCode: String = "",
-    @Json(name = "gst_rate") val gstRate: Int = 0
+    @Json(name = "gst_rate") val gstRate: Int = 0,
+    @Json(name = "total_with_tax") val totalWithTax: Double = 0.0,
+    val taxable: Double = 0.0,
+    val cgst: Double = 0.0,
+    val sgst: Double = 0.0,
+    val igst: Double = 0.0
 )
 
 data class SendInvoiceRequest(
@@ -165,8 +197,9 @@ data class VerifyLoginCodeRequest(
 data class VerifyLoginResponse(
     val success: Boolean,
     val token: String? = null,
-    val store: Any? = null,
-    val message: String? = null
+    val store: Store? = null,
+    val message: String? = null,
+    val isNewUser: Boolean? = null
 )
 
 data class LoginWithPasswordRequest(
@@ -223,5 +256,41 @@ data class AddStaffRequest(
 data class AddStaffResponse(
     val success: Boolean,
     val staff: Staff? = null,
+    val message: String? = null
+)
+
+data class AddPurchaseRequest(
+    val supplierName: String,
+    val supplierPhone: String = "",
+    val totalAmount: Double,
+    val paidAmount: Double = 0.0,
+    val status: String = "unpaid",
+    val items: List<PurchaseItemRequest> = emptyList(),
+    val notes: String = ""
+)
+
+data class PurchaseItemRequest(
+    val name: String,
+    val qty: Int,
+    val price: Double,
+    val amount: Double
+)
+
+data class AddPurchaseResponse(
+    val success: Boolean,
+    val purchase: Purchase? = null,
+    val message: String? = null
+)
+
+data class AddExpenseRequest(
+    val title: String,
+    val amount: Double,
+    val category: String = "Other",
+    val note: String? = null
+)
+
+data class AddExpenseResponse(
+    val success: Boolean,
+    val expense: Expense? = null,
     val message: String? = null
 )

@@ -29,6 +29,7 @@ class CustomerRepository @Inject constructor(
 
             val response = apiService.addCustomer(AddCustomerRequest(name, phone))
             if (response.isSuccessful && response.body()?.success == true) {
+                com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.LiveSyncManager.requestImmediateSync()
                 RepoResult.Success("Customer added successfully")
             } else {
                 val msg = response.body()?.message ?: "Failed to add customer"

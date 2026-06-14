@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.*
@@ -201,7 +202,7 @@ fun BillsScreen(
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     Icon(
-                                        Icons.AutoMirrored.Filled.ReceiptLong,
+                                        Icons.Default.ReceiptLong,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(72.dp)
@@ -236,12 +237,13 @@ fun BillsScreen(
                                             onMarkPaid = { showConfirmDialog = bill.id },
                                             onOpenPdf = { onOpenPdf(bill.id) }
                                         )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
-        }
-    }
         }
     }
 }
@@ -287,7 +289,7 @@ private fun InvoiceCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.AutoMirrored.Filled.ReceiptLong,
+                            Icons.Default.ReceiptLong,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
@@ -374,52 +376,51 @@ private fun InvoiceCard(
 
             // Action buttons row
             Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // PDF Button
+                OutlinedButton(
+                    onClick = {
+                        onOpenPdf()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                 ) {
-                    // PDF Button
-                    OutlinedButton(
-                        onClick = {
-                            onOpenPdf()
-                        },
+                    Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(stringResource(R.string.pdf_label), fontSize = GrahbookFontSize.bodySmall, fontFamily = Poppins)
+                }
+
+                // WhatsApp Button
+                OutlinedButton(
+                    onClick = onSendWhatsApp,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = WhatsAppGreen),
+                    border = BorderStroke(1.dp, WhatsAppGreen.copy(alpha = 0.3f))
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(stringResource(R.string.whatsapp_label), fontSize = GrahbookFontSize.bodySmall, fontFamily = Poppins)
+                }
+
+                // Mark Paid Button (only if unpaid)
+                if (!isPaid) {
+                    Button(
+                        onClick = onMarkPaid,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                        colors = ButtonDefaults.buttonColors(containerColor = RupeeGreen)
                     ) {
-                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.pdf_label), fontSize = GrahbookFontSize.bodySmall, fontFamily = Poppins)
-                    }
-
-                    // WhatsApp Button
-                    OutlinedButton(
-                        onClick = onSendWhatsApp,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = WhatsAppGreen),
-                        border = BorderStroke(1.dp, WhatsAppGreen.copy(alpha = 0.3f))
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.whatsapp_label), fontSize = GrahbookFontSize.bodySmall, fontFamily = Poppins)
-                    }
-
-                    // Mark Paid Button (only if unpaid)
-                    if (!isPaid) {
-                        Button(
-                            onClick = onMarkPaid,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = RupeeGreen)
-                        ) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(stringResource(R.string.mark_paid_button), fontSize = GrahbookFontSize.bodySmall, fontFamily = Poppins, color = Color.White)
-                        }
+                        Text(stringResource(R.string.mark_paid_button), fontSize = GrahbookFontSize.bodySmall, fontFamily = Poppins, color = Color.White)
                     }
                 }
             }

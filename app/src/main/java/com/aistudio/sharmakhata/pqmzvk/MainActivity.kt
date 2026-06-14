@@ -57,8 +57,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.aistudio.sharmakhata.pqmzvk.ui.screens.*
 import com.aistudio.sharmakhata.pqmzvk.ui.onboarding.OnboardingScreen
-import com.aistudio.sharmakhata.pqmzvk.ui.onboarding.isOnboardingComplete
-import com.aistudio.sharmakhata.pqmzvk.ui.onboarding.setOnboardingComplete
 import com.aistudio.sharmakhata.pqmzvk.navigation.AppNavGraph
 import com.aistudio.sharmakhata.pqmzvk.ui.components.ShimmerLoading
 import com.aistudio.sharmakhata.pqmzvk.ui.components.EmptyState
@@ -145,7 +143,8 @@ class MainActivity : ComponentActivity() {
       val context = LocalContext.current
       var isDarkTheme by remember { mutableStateOf(savedDarkMode) }
       var currentLanguage by remember { mutableStateOf(savedLanguage) }
-      var onboardingComplete by remember { mutableStateOf(isOnboardingComplete(context)) }
+      SessionManager.load(context)
+      var onboardingComplete by remember { mutableStateOf(SessionManager.onboardingComplete) }
       val biometricUnlocked by BiometricAuthHelper.authState.collectAsState()
       val isUnlocked = !BiometricAuthHelper.isAvailable(context) || biometricUnlocked
 
@@ -234,22 +233,21 @@ class MainActivity : ComponentActivity() {
             sharedPrefs.edit().putString("language_code", it).apply()
           }
 
-          if (!onboardingComplete) {
-            val shopNamePref = context.getSharedPreferences("grahbook_session", Context.MODE_PRIVATE)
-                .getString("store_name", "") ?: ""
+          if (!onboardingComplete && !SessionManager.onboardingComplete) {
             OnboardingScreen(
-              shopName = shopNamePref,
+              shopName = SessionManager.shopName ?: "",
               onComplete = { state ->
                 val langCode = when (state.language) {
                   "Hindi" -> "hi"
                   else -> "en"
                 }
                 toggleLanguage(langCode)
-                setOnboardingComplete(context)
+                SessionManager.saveOnboardingData(context, state.shopName, state.category, langCode)
+                SessionManager.load(context)
                 onboardingComplete = true
               },
               onSkip = {
-                setOnboardingComplete(context)
+                SessionManager.saveOnboardingData(context, "", "", "en")
                 onboardingComplete = true
               }
             )

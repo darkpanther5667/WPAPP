@@ -19,7 +19,11 @@ object SessionManager {
     private const val KEY_TOKEN = "token"
     private const val KEY_STORE_ID = "store_id"
     private const val KEY_PHONE = "phone"
+    private const val KEY_SHOP_NAME = "shop_name"
+    private const val KEY_SHOP_CATEGORY = "shop_category"
+    private const val KEY_LANGUAGE = "language_code"
     private const val KEY_LAST_SYNCED = "last_synced_at"
+    private const val KEY_ONBOARDING_COMPLETE = "onboarding_complete"
 
     @Volatile
     var token: String? = null
@@ -34,7 +38,23 @@ object SessionManager {
         private set
 
     @Volatile
+    var shopName: String? = null
+        private set
+
+    @Volatile
+    var shopCategory: String? = null
+        private set
+
+    @Volatile
+    var languageCode: String? = null
+        private set
+
+    @Volatile
     var lastSyncedAt: String? = null
+        private set
+
+    @Volatile
+    var onboardingComplete: Boolean = false
         private set
 
     private var prefs: SharedPreferences? = null
@@ -63,7 +83,11 @@ object SessionManager {
         token = prefs?.getString(KEY_TOKEN, null)
         storeId = prefs?.getString(KEY_STORE_ID, null)
         phone = prefs?.getString(KEY_PHONE, null)
+        shopName = prefs?.getString(KEY_SHOP_NAME, null)
+        shopCategory = prefs?.getString(KEY_SHOP_CATEGORY, null)
+        languageCode = prefs?.getString(KEY_LANGUAGE, null)
         lastSyncedAt = prefs?.getString(KEY_LAST_SYNCED, null)
+        onboardingComplete = prefs?.getBoolean(KEY_ONBOARDING_COMPLETE, false) ?: false
     }
 
     /**
@@ -88,29 +112,61 @@ object SessionManager {
      */
     fun saveStoreInfo(context: Context, storeIdValue: String?, phoneValue: String?) {
         if (prefs == null) load(context)
+        val isStoreChanged = storeId != null && storeId != storeIdValue
         edit {
             putString(KEY_STORE_ID, storeIdValue)
             putString(KEY_PHONE, phoneValue)
+            if (isStoreChanged) {
+                remove(KEY_LAST_SYNCED)
+            }
         }
         storeId = storeIdValue
         phone = phoneValue
+        if (isStoreChanged) {
+            lastSyncedAt = null
+        }
     }
 
     fun saveLastSyncedAt(context: Context, value: String?) {
         if (prefs == null) load(context)
-        edit { putString(KEY_LAST_SYNCED, value) }
+        if (value == null) {
+            edit { remove(KEY_LAST_SYNCED) }
+        } else {
+            edit { putString(KEY_LAST_SYNCED, value) }
+        }
         lastSyncedAt = value
     }
 
     /**
      * Clear all session data (logout).
      */
+    /**
+     * Save onboarding data (shop name, category, language) to persistent storage.
+     */
+    fun saveOnboardingData(context: Context, name: String?, category: String?, languageCode: String?) {
+        if (prefs == null) load(context)
+        edit {
+            putString(KEY_SHOP_NAME, name)
+            putString(KEY_SHOP_CATEGORY, category)
+            putString(KEY_LANGUAGE, languageCode)
+            putBoolean(KEY_ONBOARDING_COMPLETE, true)
+        }
+        this.shopName = name
+        this.shopCategory = category
+        this.languageCode = languageCode
+        this.onboardingComplete = true
+    }
+
     fun clear(context: Context) {
         prefs?.edit()?.clear()?.apply()
         token = null
         storeId = null
         phone = null
+        shopName = null
+        shopCategory = null
+        languageCode = null
         lastSyncedAt = null
+        onboardingComplete = false
     }
 
     /**

@@ -59,7 +59,7 @@ export function getCustomerOutstanding(
       else if (t.type === "payment") balance -= t.amount;
     });
   bills
-    .filter((b) => b.customer_id === customerId && (b.status === "unpaid" || b.status === "overdue" || b.status === "partial"))
+    .filter((b) => b.customer_id === customerId)
     .forEach((b) => {
       balance += b.total;
     });

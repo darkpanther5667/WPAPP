@@ -79,7 +79,7 @@ class CustomerViewModel @Inject constructor(
     private fun outstandingBalance(customerId: String, transactions: List<Transaction>, bills: List<Bill>): Double {
         val payments = transactions.filter { it.customerId == customerId && it.type == "payment" }.sumOf { it.amount }
         val credits = transactions.filter { it.customerId == customerId && it.type == "credit" }.sumOf { it.amount }
-        val unpaidBillTotal = bills.filter { it.customerId == customerId && it.status != "paid" }.sumOf { it.total }
+        val unpaidBillTotal = bills.filter { it.customerId == customerId }.sumOf { it.total }
         return credits + unpaidBillTotal - payments
     }
 

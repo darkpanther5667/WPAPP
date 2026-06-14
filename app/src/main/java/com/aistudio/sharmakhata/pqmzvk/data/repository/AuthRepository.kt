@@ -1,6 +1,7 @@
 package com.aistudio.sharmakhata.pqmzvk.data.repository
 
 import com.aistudio.sharmakhata.pqmzvk.data.remote.ApiService
+import com.aistudio.sharmakhata.pqmzvk.data.remote.GoogleAuthRequest
 import com.aistudio.sharmakhata.pqmzvk.data.remote.LoginWithPasswordRequest
 import com.aistudio.sharmakhata.pqmzvk.data.remote.RegisterStoreRequest
 import com.aistudio.sharmakhata.pqmzvk.data.remote.RequestLoginCodeRequest
@@ -10,7 +11,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 sealed class AuthResult {
-    data class Success(val token: String? = null, val storeId: String? = null, val message: String? = null) : AuthResult()
+    data class Success(val token: String? = null, val storeId: String? = null, val message: String? = null, val isNewUser: Boolean? = null) : AuthResult()
     data class Error(val message: String) : AuthResult()
 }
 
@@ -38,8 +39,7 @@ class AuthRepository @Inject constructor(
             val body = response.body()
             val token = body?.token
             if (response.isSuccessful && !token.isNullOrBlank()) {
-                val storeMap = body?.store as? Map<*, *>
-                val storeIdFromServer = storeMap?.get("id") as? String
+                val storeIdFromServer = body.store?.id
                 AuthResult.Success(token = token, storeId = storeIdFromServer)
             } else {
                 AuthResult.Error(body?.message ?: "Invalid or expired OTP")
@@ -54,11 +54,25 @@ class AuthRepository @Inject constructor(
             val response = apiService.loginWithPassword(LoginWithPasswordRequest(phone, password))
             val body = response.body()
             if (response.isSuccessful && body?.success == true && !body.token.isNullOrBlank()) {
-                val storeMap = body.store as? Map<*, *>
-                val storeIdFromServer = storeMap?.get("id") as? String
+                val storeIdFromServer = body.store?.id
                 AuthResult.Success(token = body.token, storeId = storeIdFromServer)
             } else {
                 AuthResult.Error(body?.message ?: "Login failed. Check your phone and password.")
+            }
+        } catch (e: Exception) {
+            AuthResult.Error(mapNetworkError(e))
+        }
+    }
+
+    suspend fun googleSignIn(idToken: String): AuthResult {
+        return try {
+            val response = apiService.googleAuth(GoogleAuthRequest(credential = idToken))
+            val body = response.body()
+            if (response.isSuccessful && body?.success == true && !body.token.isNullOrBlank()) {
+                val storeIdFromServer = body.store?.id
+                AuthResult.Success(token = body.token, storeId = storeIdFromServer, message = body.message, isNewUser = body.isNewUser)
+            } else {
+                AuthResult.Error(body?.message ?: "Google Sign-In failed. Please try again.")
             }
         } catch (e: Exception) {
             AuthResult.Error(mapNetworkError(e))

@@ -28,7 +28,7 @@ import { useTheme } from "@/components/theme-provider";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { store, user, logout } = useAuthStore();
+  const { store, user, logout, updateStore } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
@@ -187,6 +187,54 @@ export default function SettingsPage() {
                 theme === "dark" ? "translate-x-6" : "translate-x-0"
               )} />
             </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Invoice Template Selector */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <FileText className="h-4.5 w-4.5 text-primary" /> Invoice Template
+          </h3>
+          <p className="text-xs text-muted-foreground">Select how your invoice PDFs compile</p>
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            {[
+              { id: "modern", label: "Modern", desc: "Clean modern design" },
+              { id: "classic", label: "Classic", desc: "Standard billing look" },
+              { id: "professional", label: "Professional", desc: "For corporate billing" },
+              { id: "thermal", label: "Thermal", desc: "Receipt layout" }
+            ].map((tmpl) => {
+              const selected = (store?.invoice_template || "modern") === tmpl.id;
+              return (
+                <button
+                  key={tmpl.id}
+                  onClick={async () => {
+                    if (!store) return;
+                    try {
+                      await apiClient.post("/api/store/update", { invoice_template: tmpl.id });
+                      updateStore({ ...store, invoice_template: tmpl.id });
+                      toast({ title: `Template updated to ${tmpl.label}`, variant: "success" });
+                    } catch (err: any) {
+                      toast({
+                        title: "Error",
+                        description: err?.response?.data?.message || "Failed to update template",
+                        variant: "error"
+                      });
+                    }
+                  }}
+                  className={cn(
+                    "flex flex-col items-start p-3 rounded-xl border text-left transition-all",
+                    selected
+                      ? "border-primary bg-primary/5 dark:bg-primary/10 ring-1 ring-primary"
+                      : "border-border hover:bg-accent/40"
+                  )}
+                >
+                  <span className="text-xs font-bold text-foreground">{tmpl.label}</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">{tmpl.desc}</span>
+                </button>
+              );
+            })}
           </div>
         </CardContent>
       </Card>

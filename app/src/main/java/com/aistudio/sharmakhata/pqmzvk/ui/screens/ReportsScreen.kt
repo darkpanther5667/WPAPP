@@ -31,6 +31,13 @@ import com.aistudio.sharmakhata.pqmzvk.data.model.DailyReport
 import androidx.compose.ui.res.stringResource
 import com.aistudio.sharmakhata.pqmzvk.R
 
+enum class ReportPeriod {
+    TODAY,
+    THIS_WEEK,
+    THIS_MONTH,
+    ALL
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(
@@ -40,9 +47,8 @@ fun ReportsScreen(
     shopInitial: String = "S",
     onBack: () -> Unit
 ) {
-    val reportState by viewModel.reportState.collectAsState()
     val dbState by viewModel.dbState.collectAsState()
-    var selectedPeriod by remember { mutableStateOf("Today") }
+    var selectedPeriod by remember { mutableStateOf(ReportPeriod.TODAY) }
 
     Scaffold(
         topBar = {
@@ -68,8 +74,13 @@ fun ReportsScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf(R.string.today, R.string.this_week, R.string.this_month, R.string.all).forEach { periodRes ->
-                    val period = stringResource(periodRes)
+                val periods = listOf(
+                    ReportPeriod.TODAY to R.string.today,
+                    ReportPeriod.THIS_WEEK to R.string.this_week,
+                    ReportPeriod.THIS_MONTH to R.string.this_month,
+                    ReportPeriod.ALL to R.string.all
+                )
+                periods.forEach { (period, periodRes) ->
                     FilterChip(
                         selected = selectedPeriod == period,
                         onClick = { selectedPeriod = period },
@@ -85,11 +96,76 @@ fun ReportsScreen(
                 }
             }
 
-            when (reportState) {
+            when (dbState) {
                 is UiState.Success -> {
-                    val report = (reportState as UiState.Success).data
-                    val totalExpenses = expenses.sumOf { it.amount }
-                    val netProfit = report.billsTotal - totalExpenses
+                    val db = (dbState as UiState.Success).data
+                    
+                    // Determine period start timestamp in ms (local time)
+                    val periodStartTime = remember(selectedPeriod) {
+                        val cal = java.util.Calendar.getInstance()
+                        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                        cal.set(java.util.Calendar.MINUTE, 0)
+                        cal.set(java.util.Calendar.SECOND, 0)
+                        cal.set(java.util.Calendar.MILLISECOND, 0)
+                        when (selectedPeriod) {
+                            ReportPeriod.TODAY -> cal.timeInMillis
+                            ReportPeriod.THIS_WEEK -> {
+                                val dayOfWeek = cal.get(java.util.Calendar.DAY_OF_WEEK)
+                                val diff = if (dayOfWeek == java.util.Calendar.SUNDAY) 6 else dayOfWeek - java.util.Calendar.MONDAY
+                                cal.add(java.util.Calendar.DAY_OF_MONTH, -diff)
+                                cal.timeInMillis
+                            }
+                            ReportPeriod.THIS_MONTH -> {
+                                cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                                cal.timeInMillis
+                            }
+                            ReportPeriod.ALL -> 0L
+                        }
+                    }
+
+                    // Filter bills, transactions and expenses
+                    val filteredBills = remember(db.bills, periodStartTime) {
+                        db.bills.filter { b ->
+                            val date = FormatUtils.parseDate(b.createdAt)
+                            date != null && date.time >= periodStartTime
+                        }
+                    }
+
+                    val filteredTransactions = remember(db.transactions, periodStartTime) {
+                        db.transactions.filter { t ->
+                            val date = FormatUtils.parseDate(t.timestamp)
+                            date != null && date.time >= periodStartTime
+                        }
+                    }
+
+                    val filteredExpenses = remember(expenses, periodStartTime) {
+                        expenses.filter { e ->
+                            e.createdAt >= periodStartTime
+                        }
+                    }
+
+                    val billsTotal = filteredBills.sumOf { it.total }
+                    val paymentTotal = filteredTransactions.filter { it.type == "payment" }.sumOf { it.amount }
+                    val totalExpenses = filteredExpenses.sumOf { it.amount }
+                    val netProfit = billsTotal - totalExpenses
+                    val billsCount = filteredBills.size
+                    val expensesCount = filteredExpenses.size
+
+                    val outstanding = remember(db.customers, db.transactions, db.bills) {
+                        db.customers.map { customer ->
+                            val cTxns = db.transactions.filter { it.customerId == customer.id }
+                            val cBills = db.bills.filter { it.customerId == customer.id }
+                            val payments = cTxns.filter { it.type == "payment" }.sumOf { it.amount }
+                            val credits = cTxns.filter { it.type == "credit" }.sumOf { it.amount }
+                            val billTotal = cBills.sumOf { it.total }
+                            val balance = credits + billTotal - payments
+                            com.aistudio.sharmakhata.pqmzvk.data.model.OutstandingCustomer(
+                                name = customer.name,
+                                phone = customer.phone,
+                                balance = balance
+                            )
+                        }.filter { it.balance > 0.0 }
+                    }
 
                     // Summary cards row
                     Row(
@@ -100,7 +176,7 @@ fun ReportsScreen(
                     ) {
                         ReportStatCard(
                             label = stringResource(R.string.total_sales),
-                            value = FormatUtils.formatCurrency(report.billsTotal),
+                            value = FormatUtils.formatCurrency(billsTotal),
                             icon = Icons.AutoMirrored.Outlined.TrendingUp,
                             gradient = GradientWhatsApp,
                             valueColor = StitchPrimaryContainer,
@@ -134,7 +210,7 @@ fun ReportsScreen(
                         )
                         ReportStatCard(
                             label = stringResource(R.string.collection_label),
-                            value = FormatUtils.formatCurrency(report.paymentTotal),
+                            value = FormatUtils.formatCurrency(paymentTotal),
                             icon = Icons.Outlined.AccountBalanceWallet,
                             gradient = GradientIndigo,
                             valueColor = AccentBlue,
@@ -165,15 +241,15 @@ fun ReportsScreen(
                         Column(modifier = Modifier.padding(16.dp)) {
                             BreakdownRow(
                                 label = stringResource(R.string.total_bills_label),
-                                value = FormatUtils.formatCurrency(report.billsTotal),
-                                count = stringResource(R.string.bills_count, report.billsCount),
+                                value = FormatUtils.formatCurrency(billsTotal),
+                                count = stringResource(R.string.bills_count, billsCount),
                                 valueColor = StitchPrimaryContainer
                             )
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp, color = DividerColor)
                             BreakdownRow(
                                 label = stringResource(R.string.total_expenses_label),
                                 value = FormatUtils.formatCurrency(totalExpenses),
-                                count = stringResource(R.string.entries_count, expenses.size),
+                                count = stringResource(R.string.entries_count, expensesCount),
                                 valueColor = ErrorRed
                             )
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp, color = DividerColor)
@@ -186,8 +262,8 @@ fun ReportsScreen(
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp, color = DividerColor)
                             BreakdownRow(
                                 label = stringResource(R.string.outstanding_label),
-                                value = FormatUtils.formatCurrency(report.outstanding.sumOf { it.balance }),
-                                count = stringResource(R.string.customers_count, report.outstanding.size),
+                                value = FormatUtils.formatCurrency(outstanding.sumOf { it.balance }),
+                                count = stringResource(R.string.customers_count, outstanding.size),
                                 valueColor = OrangeDanger
                             )
                         }
@@ -196,7 +272,7 @@ fun ReportsScreen(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // Outstanding section
-                    if (report.outstanding.isNotEmpty()) {
+                    if (outstanding.isNotEmpty()) {
                         Text(
                             text = stringResource(R.string.outstanding_section),
                             style = SectionOverlineStyle,
@@ -215,11 +291,11 @@ fun ReportsScreen(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {
                             Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                                report.outstanding.take(5).forEachIndexed { index, entry ->
+                                outstanding.take(5).forEachIndexed { index, entry ->
                                     OutstandingRow(
                                         name = entry.name,
                                         balance = entry.balance,
-                                        isLast = index == report.outstanding.lastIndex || index == 4
+                                        isLast = index == outstanding.lastIndex || index == 4
                                     )
                                 }
                             }

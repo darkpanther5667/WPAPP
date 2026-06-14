@@ -96,7 +96,7 @@ fun ExpensesScreen(
     shopInitial: String = "S",
     onBack: () -> Unit,
     onAddExpense: () -> Unit,
-    onDeleteExpense: (Long) -> Unit,
+    onDeleteExpense: (Long, String) -> Unit,
     onRefresh: () -> Unit = {},
     isLoading: Boolean = false
 ) {
@@ -291,7 +291,7 @@ fun ExpensesScreen(
                             items(filteredExpenses, key = { it.id }) { expense ->
                                 ExpenseCard(
                                     expense = expense,
-                                    onDelete = { onDeleteExpense(expense.id) }
+                                    onDelete = { onDeleteExpense(expense.id, expense.serverId) }
                                 )
                             }
                         }

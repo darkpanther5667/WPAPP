@@ -154,10 +154,20 @@ object DeltaSyncManager {
         val updateBills = delta.bills?.associateBy { it.id } ?: emptyMap()
         val mergedBills = db.bills.filterNot { it.id in deleteBills || it.id in updateBills } + delta.bills.orEmpty()
 
+        val deletePurchases = delta.deletedPurchaseIds?.toSet() ?: emptySet()
+        val updatePurchases = delta.purchases?.associateBy { it.id } ?: emptyMap()
+        val mergedPurchases = db.purchases.filterNot { it.id in deletePurchases || it.id in updatePurchases } + delta.purchases.orEmpty()
+
+        val deleteExpenses = delta.deletedExpenseIds?.toSet() ?: emptySet()
+        val updateExpenses = delta.expenses?.associateBy { it.id } ?: emptyMap()
+        val mergedExpenses = db.expenses.filterNot { it.id in deleteExpenses || it.id in updateExpenses } + delta.expenses.orEmpty()
+
         return db.copy(
             customers = mergedCustomers,
             transactions = mergedTransactions,
-            bills = mergedBills
+            bills = mergedBills,
+            purchases = mergedPurchases,
+            expenses = mergedExpenses
         )
     }
 
@@ -166,7 +176,9 @@ object DeltaSyncManager {
             shop = null,
             customers = delta.customers.orEmpty(),
             transactions = delta.transactions.orEmpty(),
-            bills = delta.bills.orEmpty()
+            bills = delta.bills.orEmpty(),
+            purchases = delta.purchases.orEmpty(),
+            expenses = delta.expenses.orEmpty()
         )
     }
 

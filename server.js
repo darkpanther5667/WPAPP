@@ -234,9 +234,6 @@ async function sessionAuthMiddleware(req, res, next) {
 
 app.use(sessionAuthMiddleware);
 
-// ─── ADMIN AUTH MIDDLEWARE ─────────────────────────────────────────────────────
-// Requires both a valid session AND a matching ADMIN_KEY header.
-// Alternatively accepts just the ADMIN_KEY as ?key param for ad-hoc admin queries.
 function adminAuthMiddleware(req, res, next) {
   const adminKey = process.env.ADMIN_KEY;
   if (!adminKey) {
@@ -246,8 +243,6 @@ function adminAuthMiddleware(req, res, next) {
   if (req.query.key === adminKey) return next();
   // Allow via X-ADMIN-KEY header
   if (req.get('X-ADMIN-KEY') === adminKey) return next();
-  // Allow via Bearer token (session) — only for admin store IDs
-  if (req.storeId && req.storeId.startsWith('admin_')) return next();
   return res.status(403).json({ success: false, message: 'Admin access required' });
 }
 
@@ -372,13 +367,14 @@ async function readStoreDB(storeId) {
     staff: (db.staff || []).filter(s => (s.store_id || 'default') === sid),
     items: (db.items || []).filter(i => (i.store_id || 'default') === sid),
     expenses: (db.expenses || []).filter(e => (e.store_id || 'default') === sid),
+    purchases: (db.purchases || []).filter(p => (p.store_id || 'default') === sid),
   };
 }
 
 // ─── DATABASE HELPERS (MONGODB) ────────────────────────────────────────────────
 const { connectDB, getFullDB } = require('./db.js');
 
-let cachedDB = { shop: {}, customers: [], transactions: [], bills: [], staff: [], stores: [], items: [], expenses: [] };
+let cachedDB = { shop: {}, customers: [], transactions: [], bills: [], staff: [], stores: [], items: [], expenses: [], purchases: [], deletions: [] };
 let dbCacheTimestamp = 0;
 const DB_CACHE_TTL = 5000; // 5 seconds cache TTL
 
@@ -474,7 +470,11 @@ async function readDB() {
 let dbWriteLock = false;
 let lastDbVersion = 0;
 
-async function writeDB(data, expectedVersion) {
+async function writeDB(data, expectedVersion, sid) {
+  if (typeof expectedVersion === 'string' && sid === undefined) {
+    sid = expectedVersion;
+    expectedVersion = undefined;
+  }
   // Optimistic locking: reject if version mismatch (concurrent write hazard)
   if (expectedVersion !== undefined && expectedVersion !== lastDbVersion) {
     const err = new Error('Conflict: database was modified by another write. Please retry.');
@@ -530,13 +530,15 @@ async function writeDB(data, expectedVersion) {
 
       // Delete docs that exist in DB but not in new data (handles deletions)
       const currentIds = docs.map(d => d.id).filter(Boolean);
-      if (true) {
-        ops.push({
-          deleteMany: {
-            filter: currentIds.length > 0 ? { id: { $nin: currentIds } } : {}
-          }
-        });
+      const deleteFilter = { id: { $nin: currentIds } };
+      if (sid) {
+        deleteFilter.store_id = sid;
       }
+      ops.push({
+        deleteMany: {
+          filter: deleteFilter
+        }
+      });
 
       if (ops.length > 0) {
         await database.collection(col).bulkWrite(ops);
@@ -635,9 +637,42 @@ function getCustomerOutstanding(customerId, transactions, bills) {
     }
   });
   bills.forEach(b => {
-    if (b.customer_id === customerId && (b.status === 'unpaid' || b.status === 'overdue' || b.status === 'partial')) balance += b.total;
+    if (b.customer_id === customerId) balance += b.total;
   });
   return balance;
+}
+
+// Realign bill statuses (paid, partial, unpaid) based on customer payment history
+function realignBillStatuses(customerId, fullDb, sid) {
+  const customerBills = (fullDb.bills || [])
+    .filter(b => b.customer_id === customerId && (b.store_id || 'default') === sid)
+    .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+  
+  const customerPayments = (fullDb.transactions || [])
+    .filter(t => t.customer_id === customerId && t.type === 'payment' && (t.store_id || 'default') === sid);
+  
+  let totalPayments = customerPayments.reduce((sum, t) => sum + t.amount, 0);
+  
+  for (const bill of customerBills) {
+    const billTotal = bill.total || 0;
+    const prevStatus = bill.status;
+    const prevPaidAt = bill.paid_at;
+    if (totalPayments >= billTotal) {
+      bill.status = 'paid';
+      if (!bill.paid_at) bill.paid_at = new Date().toISOString();
+      totalPayments -= billTotal;
+    } else if (totalPayments > 0) {
+      bill.status = 'partial';
+      bill.paid_at = null;
+      totalPayments = 0;
+    } else {
+      bill.status = 'unpaid';
+      bill.paid_at = null;
+    }
+    if (bill.status !== prevStatus || bill.paid_at !== prevPaidAt) {
+      bill.updated_at = new Date().toISOString();
+    }
+  }
 }
 
 // Find customer by name (supports Hindi/English first name or full name)
@@ -673,7 +708,7 @@ async function addCustomerTool(name, phone, storeId) {
   };
   const db = await readDB();
   db.customers.push(newCustomer);
-  await writeDB(db);
+  await writeDB(db, undefined, storeId || 'default');
   cachedDB = null; dbCacheTimestamp = 0;
   return { success: true, customer: newCustomer };
 }
@@ -695,7 +730,7 @@ async function recordPaymentTool(customerId, amount, note, staffPhone, storeId, 
     timestamp: new Date().toISOString(),
     store_id: storeId || 'default',
   });
-  await writeDB(db);
+  await writeDB(db, undefined, storeId || 'default');
   cachedDB = null; dbCacheTimestamp = 0;
   const storeTx = (db.transactions || []).filter(t => (t.store_id || 'default') === (storeId || 'default'));
   const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === (storeId || 'default'));
@@ -719,7 +754,7 @@ async function addCreditTool(customerId, amount, note, staffPhone, storeId) {
     timestamp: new Date().toISOString(),
     store_id: storeId || 'default',
   });
-  await writeDB(db);
+  await writeDB(db, undefined, storeId || 'default');
   cachedDB = null; dbCacheTimestamp = 0;
   const storeTx = (db.transactions || []).filter(t => (t.store_id || 'default') === (storeId || 'default'));
   const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === (storeId || 'default'));
@@ -733,7 +768,7 @@ async function addItemToUnpaidBillTool(customerId, itemName, price, qty, storeId
   const customer = storeCustomers.find(c => c.id === customerId);
   if (!customer) return { error: `Customer with ID '${customerId}' not found in your store.` };
   let currentBill = db.bills.find(b => {
-    if (b.customer_id !== customerId || b.status !== 'unpaid') return false;
+    if (b.customer_id !== customerId || b.status !== 'unpaid' || (b.store_id || 'default') !== (storeId || 'default')) return false;
     if (!b.created_at) return true;
     const daysDiff = (new Date() - new Date(b.created_at)) / (1000 * 60 * 60 * 24);
     return daysDiff <= 30;
@@ -756,7 +791,7 @@ async function addItemToUnpaidBillTool(customerId, itemName, price, qty, storeId
   currentBill.items.push({ name: itemName, qty: quantity, price: Number(price), hsn_code: '', gst_rate: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, total_with_tax: 0 });
   currentBill.total += Number(price) * quantity;
   currentBill.updated_at = new Date().toISOString();
-  await writeDB(db);
+  await writeDB(db, undefined, storeId || 'default');
   // Invalidate cache to ensure AI gets fresh data
   cachedDB = null;
   dbCacheTimestamp = 0;
@@ -783,7 +818,7 @@ async function generateBillTool(customerId, amount, storeId) {
     created_at: timestampIso,
     paid_at: null
   });
-  await writeDB(db);
+  await writeDB(db, undefined, storeId || 'default');
   // Invalidate cache to ensure AI gets fresh data
   cachedDB = null;
   dbCacheTimestamp = 0;
@@ -798,7 +833,7 @@ async function markBillAsPaidTool(customerId, storeId) {
   const storeCustomers = (db.customers || []).filter(c => (c.store_id || 'default') === (storeId || 'default'));
   const customer = storeCustomers.find(c => c.id === customerId);
   if (!customer) return { error: `Customer with ID '${customerId}' not found in your store.` };
-  const unpaidBill = db.bills.find(b => b.customer_id === customerId && b.status === 'unpaid');
+  const unpaidBill = db.bills.find(b => b.customer_id === customerId && b.status === 'unpaid' && (b.store_id || 'default') === (storeId || 'default'));
   if (!unpaidBill) {
     return { error: `No active unpaid bill found for customer '${customer.name}'.` };
   }
@@ -818,7 +853,7 @@ async function markBillAsPaidTool(customerId, storeId) {
     store_id: storeId || 'default',
     bill_id: unpaidBill.id
   });
-  await writeDB(db);
+  await writeDB(db, undefined, storeId || 'default');
   // Invalidate cache to ensure AI gets fresh data
   cachedDB = null;
   dbCacheTimestamp = 0;
@@ -2765,7 +2800,9 @@ app.post('/api/bill/create', sessionAuthMiddleware, async (req, res) => {
       store_id: sid,
     });
 
-    await writeDB(fullDb);
+    realignBillStatuses(finalCustomerId, fullDb, sid);
+
+    await writeDB(fullDb, undefined, sid);
     cachedDB = null;
     dbCacheTimestamp = 0;
 
@@ -2817,7 +2854,7 @@ app.post('/api/customer/add', sessionAuthMiddleware, async (req, res) => {
     };
 
     fullDb.customers.push(newCustomer);
-    await writeDB(fullDb);
+    await writeDB(fullDb, undefined, sid);
     // Invalidate cache to ensure AI gets fresh data
     cachedDB = null;
     dbCacheTimestamp = 0;
@@ -2896,43 +2933,13 @@ app.post('/api/payment/add', sessionAuthMiddleware, async (req, res) => {
       store_id: sid,
     });
 
-    await writeDB(fullDb);
+    if (txType === 'payment') {
+      realignBillStatuses(customerId, fullDb, sid);
+    }
+
+    await writeDB(fullDb, undefined, sid);
     cachedDB = null;
     dbCacheTimestamp = 0;
-
-    // Auto-mark unpaid bill(s) as paid if payment covers them
-    if (txType === 'payment') {
-      const currentDb = await readDB();
-      const unpaidBills = currentDb.bills
-        .filter(b => b.customer_id === customerId && b.status !== 'paid' && (b.store_id || 'default') === sid)
-        .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
-      let remainingPayment = parsedAmount;
-      let billsUpdated = false;
-
-      for (const bill of unpaidBills) {
-        if (remainingPayment <= 0) break;
-        const billTotal = bill.total || 0;
-        if (remainingPayment >= billTotal) {
-          bill.status = 'paid';
-          bill.paid_at = new Date().toISOString();
-          bill.updated_at = bill.paid_at;
-          remainingPayment -= billTotal;
-          billsUpdated = true;
-        } else {
-          bill.status = 'partial';
-          bill.updated_at = new Date().toISOString();
-          remainingPayment = 0;
-          billsUpdated = true;
-        }
-      }
-
-      if (billsUpdated) {
-        await writeDB(currentDb);
-        fullDb.bills = currentDb.bills;
-        cachedDB = null;
-        dbCacheTimestamp = 0;
-      }
-    }
 
     const storeTx = (fullDb.transactions || []).filter(t => (t.store_id || 'default') === sid);
     const storeBills = (fullDb.bills || []).filter(b => (b.store_id || 'default') === sid);
@@ -3022,7 +3029,7 @@ app.delete('/api/items/delete/:id', sessionAuthMiddleware, async (req, res) => {
     fullDb.items.splice(idx, 1);
     if (!fullDb.deletions) fullDb.deletions = [];
     fullDb.deletions.push({ id, type: 'item', deleted_at: new Date().toISOString(), store_id: sid });
-    await writeDB(fullDb);
+    await writeDB(fullDb, undefined, sid);
     cachedDB = null;
     dbCacheTimestamp = 0;
     res.json({ success: true, message: 'Item deleted successfully' });
@@ -3096,7 +3103,9 @@ app.post('/api/bill/mark-paid', sessionAuthMiddleware, async (req, res) => {
       store_id: sid,
     });
 
-    await writeDB(fullDb);
+    realignBillStatuses(bill.customer_id, fullDb, sid);
+
+    await writeDB(fullDb, undefined, sid);
     cachedDB = null;
     dbCacheTimestamp = 0;
 
@@ -3234,8 +3243,10 @@ app.get('/api/db/changes', sessionAuthMiddleware, async (req, res) => {
     const storeTransactions = (db.transactions || []).filter(t => (t.store_id || 'default') === sid);
     const storeBills = (db.bills || []).filter(b => (b.store_id || 'default') === sid);
     const storeStaff = (db.staff || []).filter(s => (s.store_id || 'default') === sid);
+    const storeExpenses = (db.expenses || []).filter(e => (e.store_id || 'default') === sid);
+    const storePurchases = (db.purchases || []).filter(p => (p.store_id || 'default') === sid);
 
-    // Filter by last modified: we check created_at, paid_at, timestamp
+    // Filter by last modified: we check created_at, paid_at, timestamp, updated_at
     const newCustomers = storeCustomers.filter(c =>
       c.created_at && new Date(c.created_at) > sinceDate
     );
@@ -3247,13 +3258,25 @@ app.get('/api/db/changes', sessionAuthMiddleware, async (req, res) => {
       (b.paid_at && new Date(b.paid_at) > sinceDate) ||
       (b.updated_at && new Date(b.updated_at) > sinceDate)
     );
-    // Items inside bills don't have independent timestamps, so a bill
-    // whose items changed is returned as part of the updated bills list.
+    const newExpenses = storeExpenses.filter(e =>
+      (e.created_at && new Date(e.created_at) > sinceDate) ||
+      (e.updated_at && new Date(e.updated_at) > sinceDate)
+    );
+    const newPurchases = storePurchases.filter(p =>
+      (p.created_at && new Date(p.created_at) > sinceDate) ||
+      (p.updated_at && new Date(p.updated_at) > sinceDate)
+    );
 
     const storeDeletions = (db.deletions || []).filter(d => (d.store_id || 'default') === sid);
     const deletedRecords = storeDeletions.filter(d =>
       d.deleted_at && new Date(d.deleted_at) > sinceDate
     ).map(d => ({ id: d.id, type: d.type }));
+
+    const deleted_customer_ids = deletedRecords.filter(r => r.type === 'customer').map(r => r.id);
+    const deleted_transaction_ids = deletedRecords.filter(r => r.type === 'transaction' || r.type === 'payment' || r.type === 'credit').map(r => r.id);
+    const deleted_bill_ids = deletedRecords.filter(r => r.type === 'bill').map(r => r.id);
+    const deleted_expense_ids = deletedRecords.filter(r => r.type === 'expense').map(r => r.id);
+    const deleted_purchase_ids = deletedRecords.filter(r => r.type === 'purchase').map(r => r.id);
 
     const serverTime = new Date().toISOString();
 
@@ -3261,7 +3284,14 @@ app.get('/api/db/changes', sessionAuthMiddleware, async (req, res) => {
       customers: newCustomers,
       transactions: newTransactions,
       bills: newBills,
+      expenses: newExpenses,
+      purchases: newPurchases,
       deleted: deletedRecords,
+      deleted_customer_ids,
+      deleted_transaction_ids,
+      deleted_bill_ids,
+      deleted_expense_ids,
+      deleted_purchase_ids,
       server_time: serverTime,
     });
   } catch (error) {
@@ -3276,6 +3306,8 @@ app.get('/api/db/changes', sessionAuthMiddleware, async (req, res) => {
         transactions: (full.transactions || []).filter(t => (t.store_id || 'default') === sid),
         bills: (full.bills || []).filter(b => (b.store_id || 'default') === sid),
         staff: (full.staff || []).filter(s => (s.store_id || 'default') === sid),
+        expenses: (full.expenses || []).filter(e => (e.store_id || 'default') === sid),
+        purchases: (full.purchases || []).filter(p => (p.store_id || 'default') === sid),
       },
       server_time: new Date().toISOString(),
     });
@@ -3301,7 +3333,7 @@ app.post('/api/db', sessionAuthMiddleware, async (req, res) => {
       });
     }
 
-    await writeDB(fullDb);
+    await writeDB(fullDb, undefined, sid);
     cachedDB = null;
     dbCacheTimestamp = 0;
     res.json({ success: true });
@@ -3753,14 +3785,10 @@ app.delete('/api/transaction/:id', async (req, res) => {
     fullDb.transactions.splice(idx, 1);
     if (!fullDb.deletions) fullDb.deletions = [];
     fullDb.deletions.push({ id, type: 'transaction', deleted_at: new Date().toISOString(), store_id: sid });
-    if (txToDelete.bill_id && fullDb.bills) {
-      const bill = fullDb.bills.find(b => b.id === txToDelete.bill_id);
-      if (bill) {
-        bill.status = 'unpaid';
-        bill.paid_at = null;
-      }
+    if (txToDelete.customer_id) {
+      realignBillStatuses(txToDelete.customer_id, fullDb, sid);
     }
-    await writeDB(fullDb);
+    await writeDB(fullDb, undefined, sid);
     cachedDB = null;
     dbCacheTimestamp = 0;
     return res.json({ success: true, message: 'Transaction deleted successfully' });
@@ -3781,13 +3809,17 @@ app.delete('/api/bill/:id', async (req, res) => {
     if (idx === -1) {
       return res.status(404).json({ success: false, message: 'Bill not found' });
     }
+    const deletedBill = fullDb.bills[idx];
     fullDb.bills.splice(idx, 1);
     if (!fullDb.deletions) fullDb.deletions = [];
     fullDb.deletions.push({ id, type: 'bill', deleted_at: new Date().toISOString(), store_id: sid });
     if (fullDb.transactions) {
       fullDb.transactions = fullDb.transactions.filter(t => t.bill_id !== id);
     }
-    await writeDB(fullDb);
+    if (deletedBill.customer_id) {
+      realignBillStatuses(deletedBill.customer_id, fullDb, sid);
+    }
+    await writeDB(fullDb, undefined, sid);
     cachedDB = null;
     dbCacheTimestamp = 0;
     return res.json({ success: true, message: 'Bill deleted successfully' });
@@ -3851,7 +3883,7 @@ app.post('/api/expense/add', async (req, res) => {
       created_at: new Date().toISOString()
     };
     fullDb.expenses.push(expense);
-    await writeDB(fullDb);
+    await writeDB(fullDb, undefined, sid);
     cachedDB = null;
     dbCacheTimestamp = 0;
     return res.json({ success: true, expense, message: 'Expense added successfully' });
@@ -3873,13 +3905,77 @@ app.delete('/api/expense/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Expense not found' });
     }
     fullDb.expenses.splice(idx, 1);
-    await writeDB(fullDb);
+    // Track deletion for delta sync
+    if (!fullDb.deletions) fullDb.deletions = [];
+    fullDb.deletions.push({ id, type: 'expense', deleted_at: new Date().toISOString(), store_id: sid });
+    await writeDB(fullDb, undefined, sid);
     cachedDB = null;
     dbCacheTimestamp = 0;
     return res.json({ success: true, message: 'Expense deleted successfully' });
   } catch (error) {
     console.error('Error deleting expense:', error);
     return res.status(500).json({ success: false, message: 'Failed to delete expense' });
+  }
+});
+
+// ─── PURCHASE ROUTES ─────────────────────────────────────────────────────────────
+
+// POST /api/purchases/add — Add a new supplier purchase
+app.post('/api/purchases/add', async (req, res) => {
+  try {
+    const { supplierName, supplierPhone, totalAmount, paidAmount, status, items, notes } = req.body;
+    const sid = req.storeId || 'default';
+    if (!supplierName || totalAmount === undefined) {
+      return res.status(400).json({ success: false, message: 'Supplier name and total amount are required' });
+    }
+    const fullDb = await readDB();
+    if (!fullDb.purchases) fullDb.purchases = [];
+    const purchase = {
+      id: `pur_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      supplierName,
+      supplierPhone: supplierPhone || '',
+      totalAmount: parseFloat(totalAmount),
+      paidAmount: parseFloat(paidAmount || 0),
+      status: status || 'unpaid',
+      items: Array.isArray(items) ? items : [],
+      notes: notes || '',
+      store_id: sid,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    fullDb.purchases.push(purchase);
+    await writeDB(fullDb, undefined, sid);
+    cachedDB = null;
+    dbCacheTimestamp = 0;
+    return res.json({ success: true, purchase, message: 'Purchase added successfully' });
+  } catch (error) {
+    console.error('Error adding purchase:', error);
+    return res.status(500).json({ success: false, message: 'Failed to add purchase' });
+  }
+});
+
+// DELETE /api/purchases/:id — Delete a purchase
+app.delete('/api/purchases/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sid = req.storeId || 'default';
+    const fullDb = await readDB();
+    if (!fullDb.purchases) fullDb.purchases = [];
+    const idx = fullDb.purchases.findIndex(p => p.id === id && (p.store_id || 'default') === sid);
+    if (idx === -1) {
+      return res.status(404).json({ success: false, message: 'Purchase not found' });
+    }
+    fullDb.purchases.splice(idx, 1);
+    // Track deletion for delta sync
+    if (!fullDb.deletions) fullDb.deletions = [];
+    fullDb.deletions.push({ id, type: 'purchase', deleted_at: new Date().toISOString(), store_id: sid });
+    await writeDB(fullDb, undefined, sid);
+    cachedDB = null;
+    dbCacheTimestamp = 0;
+    return res.json({ success: true, message: 'Purchase deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting purchase:', error);
+    return res.status(500).json({ success: false, message: 'Failed to delete purchase' });
   }
 });
 

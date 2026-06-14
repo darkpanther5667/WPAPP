@@ -29,45 +29,37 @@ class BillingRepository @Inject constructor(
         totalCgst: Double = 0.0,
         totalSgst: Double = 0.0,
         totalIgst: Double = 0.0,
-        grandTotal: Double = 0.0
+        grandTotal: Double = 0.0,
+        invoiceNumber: String? = null,
+        discount: Double = 0.0
     ): Pair<RepoResult, String?> {
-        // Automatically deduct stock count locally for sold items
-        try {
-            val db = com.aistudio.sharmakhata.pqmzvk.data.local.AppDatabase.get(context)
-            val itemDao = db.itemDao()
-            items?.forEach { billItem ->
-                val matchingItem = itemDao.getAllItemsList().find { it.name.trim().equals(billItem.name.trim(), ignoreCase = true) }
-                if (matchingItem != null) {
-                    itemDao.reduceStock(matchingItem.id, billItem.qty)
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("BillingRepository", "Stock deduction failed: ${e.message}")
-        }
-
         return try {
             if (!NetworkUtils.isNetworkAvailable(context)) {
                 val payload = moshi.adapter(CreateBillRequest::class.java).toJson(
-                    CreateBillRequest(customerId, amount, items, gstType, gstRate, taxableAmount, totalCgst, totalSgst, totalIgst, grandTotal)
+                    CreateBillRequest(customerId = customerId, amount = amount, items = items, invoiceNumber = invoiceNumber, discount = discount, gstType = gstType, gstRate = gstRate, taxableAmount = taxableAmount, totalCgst = totalCgst, totalSgst = totalSgst, totalIgst = totalIgst, grandTotal = grandTotal)
                 )
                 pendingDao.insert(PendingOperation(type = "create_bill", payload = payload))
+                deductStockLocally(context, items)
                 return Pair(RepoResult.Success("Bill saved - will sync when online"), null)
             }
 
             val response = apiService.createBill(
-                CreateBillRequest(customerId, amount, items, gstType, gstRate, taxableAmount, totalCgst, totalSgst, totalIgst, grandTotal)
+                CreateBillRequest(customerId = customerId, amount = amount, items = items, invoiceNumber = invoiceNumber, discount = discount, gstType = gstType, gstRate = gstRate, taxableAmount = taxableAmount, totalCgst = totalCgst, totalSgst = totalSgst, totalIgst = totalIgst, grandTotal = grandTotal)
             )
             val billId = response.body()?.billId
             if (response.isSuccessful && !billId.isNullOrBlank()) {
+                deductStockLocally(context, items)
+                com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.LiveSyncManager.requestImmediateSync()
                 Pair(RepoResult.Success("Bill created (ID: $billId)"), billId)
             } else {
                 Pair(RepoResult.Error("Failed to create bill"), null)
             }
         } catch (e: Exception) {
             val payload = moshi.adapter(CreateBillRequest::class.java).toJson(
-                CreateBillRequest(customerId, amount, items, gstType, gstRate, taxableAmount, totalCgst, totalSgst, totalIgst, grandTotal)
+                CreateBillRequest(customerId = customerId, amount = amount, items = items, invoiceNumber = invoiceNumber, discount = discount, gstType = gstType, gstRate = gstRate, taxableAmount = taxableAmount, totalCgst = totalCgst, totalSgst = totalSgst, totalIgst = totalIgst, grandTotal = grandTotal)
             )
             pendingDao.insert(PendingOperation(type = "create_bill", payload = payload))
+            deductStockLocally(context, items)
             Pair(RepoResult.Success("Bill saved offline - will sync later"), null)
         }
     }
@@ -84,45 +76,37 @@ class BillingRepository @Inject constructor(
         totalCgst: Double = 0.0,
         totalSgst: Double = 0.0,
         totalIgst: Double = 0.0,
-        grandTotal: Double = 0.0
+        grandTotal: Double = 0.0,
+        invoiceNumber: String? = null,
+        discount: Double = 0.0
     ): Pair<RepoResult, String?> {
-        // Automatically deduct stock count locally for sold items
-        try {
-            val db = com.aistudio.sharmakhata.pqmzvk.data.local.AppDatabase.get(context)
-            val itemDao = db.itemDao()
-            items?.forEach { billItem ->
-                val matchingItem = itemDao.getAllItemsList().find { it.name.trim().equals(billItem.name.trim(), ignoreCase = true) }
-                if (matchingItem != null) {
-                    itemDao.reduceStock(matchingItem.id, billItem.qty)
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("BillingRepository", "Stock deduction failed: ${e.message}")
-        }
-
         return try {
             if (!NetworkUtils.isNetworkAvailable(context)) {
                 val payload = moshi.adapter(CreateBillRequest::class.java).toJson(
-                    CreateBillRequest(Constants.WALK_IN_CUSTOMER_ID, total, items, gstType, gstRate, taxableAmount, totalCgst, totalSgst, totalIgst, grandTotal)
+                    CreateBillRequest(customerId = Constants.WALK_IN_CUSTOMER_ID, amount = grandTotal, items = items, invoiceNumber = invoiceNumber, discount = discount, gstType = gstType, gstRate = gstRate, taxableAmount = taxableAmount, totalCgst = totalCgst, totalSgst = totalSgst, totalIgst = totalIgst, grandTotal = grandTotal)
                 )
                 pendingDao.insert(PendingOperation(type = "create_bill", payload = payload))
+                deductStockLocally(context, items)
                 return Pair(RepoResult.Success("Bill saved - will sync when online"), null)
             }
 
             val response = apiService.createBill(
-                CreateBillRequest(Constants.WALK_IN_CUSTOMER_ID, total, items, gstType, gstRate, taxableAmount, totalCgst, totalSgst, totalIgst, grandTotal)
+                CreateBillRequest(customerId = Constants.WALK_IN_CUSTOMER_ID, amount = grandTotal, items = items, invoiceNumber = invoiceNumber, discount = discount, gstType = gstType, gstRate = gstRate, taxableAmount = taxableAmount, totalCgst = totalCgst, totalSgst = totalSgst, totalIgst = totalIgst, grandTotal = grandTotal)
             )
             val billId = response.body()?.billId
             if (response.isSuccessful && !billId.isNullOrBlank()) {
+                deductStockLocally(context, items)
+                com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.LiveSyncManager.requestImmediateSync()
                 Pair(RepoResult.Success("Bill created (ID: $billId)"), billId)
             } else {
                 Pair(RepoResult.Error("Failed to create bill"), null)
             }
         } catch (e: Exception) {
             val payload = moshi.adapter(CreateBillRequest::class.java).toJson(
-                CreateBillRequest(Constants.WALK_IN_CUSTOMER_ID, total, items, gstType, gstRate, taxableAmount, totalCgst, totalSgst, totalIgst, grandTotal)
+                CreateBillRequest(customerId = Constants.WALK_IN_CUSTOMER_ID, amount = grandTotal, items = items, invoiceNumber = invoiceNumber, discount = discount, gstType = gstType, gstRate = gstRate, taxableAmount = taxableAmount, totalCgst = totalCgst, totalSgst = totalSgst, totalIgst = totalIgst, grandTotal = grandTotal)
             )
             pendingDao.insert(PendingOperation(type = "create_bill", payload = payload))
+            deductStockLocally(context, items)
             Pair(RepoResult.Success("Bill saved offline - will sync later"), null)
         }
     }
@@ -137,6 +121,7 @@ class BillingRepository @Inject constructor(
 
             val response = apiService.markBillPaid(MarkBillPaidRequest(billId))
             if (response.isSuccessful && response.body()?.success == true) {
+                com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.LiveSyncManager.requestImmediateSync()
                 RepoResult.Success("Bill marked as paid")
             } else {
                 RepoResult.Error("Failed to mark bill paid")
@@ -212,6 +197,7 @@ class BillingRepository @Inject constructor(
             }
             val response = apiService.deleteBill(billId)
             if (response.isSuccessful && response.body()?.success == true) {
+                com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.LiveSyncManager.requestImmediateSync()
                 RepoResult.Success("Bill deleted")
             } else {
                 RepoResult.Error(response.body()?.message ?: "Failed to delete bill")
@@ -228,12 +214,28 @@ class BillingRepository @Inject constructor(
             }
             val response = apiService.deleteTransaction(transactionId)
             if (response.isSuccessful && response.body()?.success == true) {
+                com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.LiveSyncManager.requestImmediateSync()
                 RepoResult.Success("Transaction deleted")
             } else {
                 RepoResult.Error(response.body()?.message ?: "Failed to delete transaction")
             }
         } catch (e: Exception) {
             RepoResult.Error("Failed to delete transaction: ${e.message}")
+        }
+    }
+
+    private suspend fun deductStockLocally(context: Context, items: List<BillItemRequest>?) {
+        try {
+            val db = com.aistudio.sharmakhata.pqmzvk.data.local.AppDatabase.get(context)
+            val itemDao = db.itemDao()
+            items?.forEach { billItem ->
+                val matchingItem = itemDao.getAllItemsList().find { it.name.trim().equals(billItem.name.trim(), ignoreCase = true) }
+                if (matchingItem != null) {
+                    itemDao.reduceStock(matchingItem.id, billItem.qty)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BillingRepository", "Stock deduction failed: ${e.message}")
         }
     }
 }

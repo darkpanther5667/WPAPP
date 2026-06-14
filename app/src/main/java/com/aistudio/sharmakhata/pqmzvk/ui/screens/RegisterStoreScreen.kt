@@ -57,6 +57,14 @@ fun RegisterStoreScreen(
 
     LaunchedEffect(Unit) {
         SessionManager.load(context)
+
+        // Pre-fill business name from onboarding
+        val savedName = SessionManager.shopName
+        if (!savedName.isNullOrBlank()) {
+            businessName = savedName
+        }
+
+        // Pre-fill phone from previous session
         val storedPhone = SessionManager.phone
         if (!storedPhone.isNullOrBlank()) {
             val digits = storedPhone.filter { it.isDigit() }

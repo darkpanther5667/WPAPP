@@ -28,6 +28,9 @@ interface PurchaseDao {
     @Query("DELETE FROM purchases WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("DELETE FROM purchases")
+    suspend fun clearAll()
+
     @Query("SELECT SUM(totalAmount) FROM purchases")
     fun getTotalPurchaseAmount(): Flow<Double?>
 

@@ -22,18 +22,22 @@ object FormatUtils {
         }
     }
 
-    private fun parseDate(isoString: String): Date? {
-        return try {
-            val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault())
-            parser.parse(isoString)
-        } catch (_: Exception) {
+    fun parseDate(isoString: String): Date? {
+        val formats = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS",
+            "yyyy-MM-dd'T'HH:mm:ss",
+            "yyyy-MM-dd"
+        )
+        for (format in formats) {
             try {
-                val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-                parser.parse(isoString)
-            } catch (_: Exception) {
-                null
-            }
+                val parser = SimpleDateFormat(format, Locale.getDefault())
+                val date = parser.parse(isoString)
+                if (date != null) return date
+            } catch (_: Exception) {}
         }
+        return null
     }
 
     fun formatDate(isoString: String): String {

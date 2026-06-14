@@ -38,7 +38,7 @@ class DailySummaryReceiver : BroadcastReceiver() {
 
                 val totalOutstanding = db.customers.sumOf { customer ->
                     val billTotal = db.bills
-                        .filter { it.customerId == customer.id && it.status != "paid" }
+                        .filter { it.customerId == customer.id }
                         .sumOf { it.total }
                     val paymentTotal = db.transactions
                         .filter { it.customerId == customer.id && it.type == "payment" }

@@ -12,6 +12,8 @@ import {
   Coins,
   Sun,
   Moon,
+  ShoppingCart,
+  UserCheck,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import Link from "next/link";
@@ -32,6 +34,8 @@ const sidebarNav = [
   { href: "/invoices", label: "Invoices", Icon: FileText },
   { href: "/items", label: "Inventory", Icon: Package },
   { href: "/expenses", label: "Expenses", Icon: Coins },
+  { href: "/purchases", label: "Purchases", Icon: ShoppingCart },
+  { href: "/staff", label: "Staff", Icon: UserCheck },
   { href: "/payments", label: "Payments", Icon: BarChart3 },
   { href: "/reports", label: "Reports", Icon: BarChart3 },
   { href: "/settings", label: "Settings", Icon: Settings },

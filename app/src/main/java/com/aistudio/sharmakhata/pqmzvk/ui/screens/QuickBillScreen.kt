@@ -46,7 +46,21 @@ fun QuickBillScreen(
     onMenuClick: () -> Unit = {},
     shopInitial: String = "S",
     onBack: () -> Unit,
-    onCreateBill: (customerName: String?, customerPhone: String?, total: Double, items: List<BillItemRequest>) -> Unit,
+    onCreateBill: (
+        customerName: String?,
+        customerPhone: String?,
+        total: Double,
+        items: List<BillItemRequest>,
+        gstType: String,
+        gstRate: Int,
+        taxableAmount: Double,
+        totalCgst: Double,
+        totalSgst: Double,
+        totalIgst: Double,
+        grandTotal: Double,
+        invoiceNumber: String?,
+        discount: Double
+    ) -> Unit,
     operationState: OperationState,
     lastBillId: String?,
     storedItems: List<StoredItem>,
@@ -58,6 +72,8 @@ fun QuickBillScreen(
     var items by remember { mutableStateOf(listOf(BillItemEntry())) }
     var customerName by remember { mutableStateOf("") }
     var customerPhone by remember { mutableStateOf("") }
+    var invoiceNumber by remember { mutableStateOf("") }
+    var discountText by remember { mutableStateOf("") }
     var showSuccessDialog by remember { mutableStateOf(false) }
     var showStoredItems by remember { mutableStateOf(true) }
 
@@ -695,9 +711,37 @@ fun QuickBillScreen(
                         }
                     }
 
+                    // Custom Invoice & Discount Inputs
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = invoiceNumber,
+                            onValueChange = { invoiceNumber = it },
+                            label = { Text("Invoice No. (Optional)") },
+                            modifier = Modifier.weight(1.5f),
+                            singleLine = true,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        OutlinedTextField(
+                            value = discountText,
+                            onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() || c == '.' }) discountText = it },
+                            label = { Text("Discount (₹)") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     // Totals Section with GST
                     val subtotal = calculateTotal()
                     val gstBreakdown = calculateGst()
+                    val discountAmount = discountText.toDoubleOrNull() ?: 0.0
+                    val finalGrandTotal = (gstBreakdown.grandTotal - discountAmount).coerceAtLeast(0.0)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = CardShape,
@@ -707,6 +751,13 @@ fun QuickBillScreen(
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(stringResource(R.string.subtotal), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(FormatUtils.formatCurrency(subtotal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            }
+                            if (discountAmount > 0) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Discount", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("- " + FormatUtils.formatCurrency(discountAmount), style = MaterialTheme.typography.bodySmall, color = ErrorRed)
+                                }
                             }
                             if (enableGst) {
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -744,7 +795,7 @@ fun QuickBillScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Text(stringResource(R.string.grand_total), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                                Text(FormatUtils.formatCurrency(gstBreakdown.grandTotal), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                Text(FormatUtils.formatCurrency(finalGrandTotal), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -784,6 +835,8 @@ fun QuickBillScreen(
     if (showPreview) {
         val previewSubtotal = calculateTotal()
         val previewGst = calculateGst()
+        val discountAmount = discountText.toDoubleOrNull() ?: 0.0
+        val finalGrandTotal = (previewGst.grandTotal - discountAmount).coerceAtLeast(0.0)
         AlertDialog(
             onDismissRequest = { showPreview = false },
             title = {
@@ -820,9 +873,15 @@ fun QuickBillScreen(
                             Text(FormatUtils.formatCurrency(previewGst.totalGst), style = MaterialTheme.typography.bodySmall, color = AccentBlue)
                         }
                     }
+                    if (discountAmount > 0) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Discount", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("- " + FormatUtils.formatCurrency(discountAmount), style = MaterialTheme.typography.bodySmall, color = ErrorRed)
+                        }
+                    }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(stringResource(R.string.grand_total), fontWeight = FontWeight.Bold)
-                        Text(FormatUtils.formatCurrency(previewGst.grandTotal), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text(FormatUtils.formatCurrency(finalGrandTotal), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             },
@@ -834,7 +893,21 @@ fun QuickBillScreen(
                         val billItems = items.filter { it.name.isNotBlank() && it.price.isNotBlank() }
                             .map { BillItemRequest(it.name, it.price.toDoubleOrNull() ?: 0.0, it.qty.toIntOrNull() ?: 1) }
                         if (billItems.isNotEmpty()) {
-                            onCreateBill(customerName.ifBlank { null }, customerPhone.ifBlank { null }, previewGst.grandTotal, billItems)
+                            onCreateBill(
+                                customerName.ifBlank { null },
+                                customerPhone.ifBlank { null },
+                                previewSubtotal,
+                                billItems,
+                                if (enableGst) (if (gstTypeState == GstType.CGST_SGST) "cgst_sgst" else "igst") else "non_gst",
+                                if (enableGst) gstRateState else 0,
+                                previewGst.taxableAmount,
+                                previewGst.cgst,
+                                previewGst.sgst,
+                                previewGst.igst,
+                                finalGrandTotal,
+                                invoiceNumber.takeIf { it.isNotBlank() },
+                                discountAmount
+                            )
                         }
                     }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) {
                         Text(stringResource(R.string.create_invoice_button), fontWeight = FontWeight.Bold)

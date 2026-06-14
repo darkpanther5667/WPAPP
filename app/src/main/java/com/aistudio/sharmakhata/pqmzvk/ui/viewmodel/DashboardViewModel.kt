@@ -35,47 +35,6 @@ class DashboardViewModel @Inject constructor() : ViewModel() {
         error != null && error.contains("offline", ignoreCase = true)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-    val recentTransactions: StateFlow<List<Transaction>> = dbState.map { state ->
-        when (state) {
-            is UiState.Success -> state.data.transactions
-                .sortedByDescending { it.timestamp }
-                .take(10)
-            else -> emptyList()
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val totalOutstanding: StateFlow<Double> = dbState.map { state ->
-        when (state) {
-            is UiState.Success -> state.data.bills
-                .filter { it.status != "paid" }
-                .sumOf { it.total }
-            else -> 0.0
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
-    val todayCollection: StateFlow<Double> = dbState.map { state ->
-        when (state) {
-            is UiState.Success -> state.data.transactions
-                .filter { it.type == "payment" && it.timestamp.startsWith(java.time.LocalDate.now().toString()) }
-                .sumOf { it.amount }
-            else -> 0.0
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
-    val pendingInvoices: StateFlow<Int> = dbState.map { state ->
-        when (state) {
-            is UiState.Success -> state.data.bills.count { it.status != "paid" }
-            else -> 0
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
-    val totalClients: StateFlow<Int> = dbState.map { state ->
-        when (state) {
-            is UiState.Success -> state.data.customers.size
-            else -> 0
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
     init {
         // Unauthorized events handled globally in MainViewModel
     }

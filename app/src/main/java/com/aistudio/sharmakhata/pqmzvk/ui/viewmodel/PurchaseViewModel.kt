@@ -44,35 +44,30 @@ class PurchaseViewModel @Inject constructor(
         }
     }
 
-    fun savePurchase(supplierName: String, supplierPhone: String, items: List<PurchaseItemEntry>, totalAmount: Double, paidAmount: Double, notes: String) {
+    fun savePurchase(supplierName: String, supplierPhone: String, items: List<PurchaseItemEntry>, totalAmount: Double, paidAmount: Double, notes: String, context: android.content.Context) {
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val itemsJson = purchaseItemsAdapter.toJson(items)
-                purchaseRepository.insert(
-                    PurchaseEntity(
-                        supplierName = supplierName,
-                        supplierPhone = supplierPhone,
-                        itemsJson = itemsJson,
-                        totalAmount = totalAmount,
-                        paidAmount = paidAmount,
-                        notes = notes,
-                        status = if (paidAmount >= totalAmount) "paid" else if (paidAmount > 0) "partial" else "unpaid"
-                    )
-                )
-                _operationState.value = OperationState.Success("Purchase recorded")
-            } catch (e: Exception) {
-                _operationState.value = OperationState.Error("Failed to save purchase: ${e.message}")
+            _operationState.value = OperationState.Loading
+            val result = purchaseRepository.addPurchase(supplierName, supplierPhone, items, totalAmount, paidAmount, notes, context)
+            withContext(Dispatchers.Main) {
+                if (result is RepoResult.Success) {
+                    _operationState.value = OperationState.Success(result.message)
+                } else if (result is RepoResult.Error) {
+                    _operationState.value = OperationState.Error(result.message)
+                }
             }
         }
     }
 
-    fun deletePurchase(id: Long) {
+    fun deletePurchase(id: Long, serverId: String, context: android.content.Context) {
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                purchaseRepository.deleteById(id)
-                _operationState.value = OperationState.Success("Purchase deleted")
-            } catch (e: Exception) {
-                _operationState.value = OperationState.Error("Failed to delete purchase: ${e.message}")
+            _operationState.value = OperationState.Loading
+            val result = purchaseRepository.deletePurchase(id, serverId, context)
+            withContext(Dispatchers.Main) {
+                if (result is RepoResult.Success) {
+                    _operationState.value = OperationState.Success(result.message)
+                } else if (result is RepoResult.Error) {
+                    _operationState.value = OperationState.Error(result.message)
+                }
             }
         }
     }

@@ -7,7 +7,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -16,6 +18,11 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +35,7 @@ import com.aistudio.sharmakhata.pqmzvk.ui.components.EmptyState
 import com.aistudio.sharmakhata.pqmzvk.ui.components.ShimmerLoading
 import com.aistudio.sharmakhata.pqmzvk.ui.theme.*
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.MainViewModel
+import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.LiveSyncManager
 import com.aistudio.sharmakhata.pqmzvk.ui.viewmodel.UiState
 import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 
@@ -36,7 +44,9 @@ import com.aistudio.sharmakhata.pqmzvk.util.FormatUtils
 fun BillsOverviewScreen(
   viewModel: MainViewModel,
   onCustomerClick: (String) -> Unit,
-  onNavigateToSearch: () -> Unit = {}
+  onNavigateToSearch: () -> Unit = {},
+  onMenuClick: () -> Unit = {},
+  onBack: () -> Unit = {}
 ) {
   val dbState by viewModel.dbState.collectAsState()
   val context = LocalContext.current
@@ -44,8 +54,16 @@ fun BillsOverviewScreen(
   Scaffold(
     topBar = {
       TopAppBar(
-        title = { Text("Bills Overview") },
+        title = { Text(stringResource(R.string.bills_overview)) },
+        navigationIcon = {
+          IconButton(onClick = onBack) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+          }
+        },
         actions = {
+          IconButton(onClick = onMenuClick) {
+            Icon(Icons.Default.Menu, contentDescription = "Menu")
+          }
           IconButton(onClick = onNavigateToSearch) {
             Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search))
           }
@@ -57,12 +75,20 @@ fun BillsOverviewScreen(
       )
     }
   ) { padding ->
+    val scope = rememberCoroutineScope()
+    var refreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
 
     PullToRefreshBox(
       state = pullToRefreshState,
-      isRefreshing = dbState is UiState.Loading,
-      onRefresh = { viewModel.fetchData(context) },
+      isRefreshing = refreshing,
+      onRefresh = {
+        scope.launch {
+          refreshing = true
+          LiveSyncManager.forceRefresh()
+          refreshing = false
+        }
+      },
       modifier = Modifier
         .fillMaxSize()
         .padding(padding)

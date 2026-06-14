@@ -40,23 +40,8 @@ import androidx.compose.ui.res.stringResource
 import com.aistudio.sharmakhata.pqmzvk.R
 import kotlinx.coroutines.delay
 
-private const val PREFS_ONBOARDING = "grahbook_onboarding"
-private const val KEY_ONBOARDING_COMPLETE = "onboarding_complete"
-
 // Brand gold accent for onboarding (no theme equivalent)
 private val OnboardingGold = Color(0xFFFFD54F)
-
-fun isOnboardingComplete(context: Context): Boolean {
-    return context.getSharedPreferences(PREFS_ONBOARDING, Context.MODE_PRIVATE)
-        .getBoolean(KEY_ONBOARDING_COMPLETE, false)
-}
-
-fun setOnboardingComplete(context: Context) {
-    context.getSharedPreferences(PREFS_ONBOARDING, Context.MODE_PRIVATE)
-        .edit()
-        .putBoolean(KEY_ONBOARDING_COMPLETE, true)
-        .apply()
-}
 
 data class OnboardingState(
     val shopName: String = "",
@@ -137,26 +122,33 @@ fun OnboardingScreen(
                     0 -> WelcomeStep()
                     1 -> WhatsAppBotStep()
                     2 -> ShopSetupStep(state)
-                    3 -> ReadyStep(onComplete = { onComplete(state.value) })
+                    3 -> ReadyStep(state, onComplete = { onComplete(state.value) })
                 }
             }
 
             // Bottom navigation
             if (currentStep < 3) {
+                val canProceed = when (currentStep) {
+                    2 -> state.value.shopName.isNotBlank()
+                    else -> true
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(24.dp)
                 ) {
                     Button(
-                        onClick = { currentStep++ },
+                        onClick = { if (canProceed) currentStep++ },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(54.dp),
+                        enabled = canProceed,
                         shape = RoundedCornerShape(GrahbookRadius.lg),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White,
-                            contentColor = Brand800
+                            contentColor = Brand800,
+                            disabledContainerColor = Color.White.copy(alpha = 0.3f),
+                            disabledContentColor = Brand800.copy(alpha = 0.4f)
                         )
                     ) {
                         Text(
@@ -606,7 +598,7 @@ private fun ShopSetupStep(state: MutableState<OnboardingState>) {
 // === STEP 4: Ready ===
 
 @Composable
-private fun ReadyStep(onComplete: () -> Unit) {
+private fun ReadyStep(state: MutableState<OnboardingState>, onComplete: () -> Unit) {
     var showContent by remember { mutableStateOf(false) }
     var showButton by remember { mutableStateOf(false) }
 
@@ -671,6 +663,43 @@ private fun ReadyStep(onComplete: () -> Unit) {
                     color = Color.White.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center
                 )
+
+                // Show shop name summary
+                if (state.value.shopName.isNotBlank()) {
+                    Spacer(Modifier.height(16.dp))
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color.White.copy(alpha = 0.12f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Store,
+                                contentDescription = null,
+                                tint = OnboardingGold,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = state.value.shopName,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp
+                                )
+                                Text(
+                                    text = state.value.category.ifBlank { "General Store" },
+                                    color = Color.White.copy(alpha = 0.6f),
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 

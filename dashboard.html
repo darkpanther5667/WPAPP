@@ -351,13 +351,43 @@
       stores: []
     };
     
+    const AUTH_KEY = 'gh_user';
+    const AUTH_TOKEN_KEY = 'gh_token';
+    const API_BASE = 'https://wpapp-xz9l.onrender.com';
     let currentStore = null;
     let storeId = null;
 
+    function getSession() {
+      try {
+        const stored = localStorage.getItem(AUTH_KEY);
+        return stored ? JSON.parse(stored) : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function getToken() {
+      return localStorage.getItem(AUTH_TOKEN_KEY);
+    }
+
+    function getDashboardStoreId() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const session = getSession();
+      return urlParams.get('store_id') || session?.store_id || session?.storeId || null;
+    }
+
+    function getAuthHeaders() {
+      const headers = { 'Content-Type': 'application/json' };
+      const token = getToken();
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      return headers;
+    }
+
     // Get store ID from URL
     function getStoreIdFromUrl() {
-      const urlParams = new URLSearchParams(window.location.search);
-      return urlParams.get('store_id');
+      return getDashboardStoreId();
     }
 
     // Fetch store information
@@ -370,7 +400,7 @@
       }
 
       try {
-        const response = await fetch(`/api/store/${storeId}`);
+        const response = await fetch(`${API_BASE}/api/store/${encodeURIComponent(storeId)}`);
         const data = await response.json();
         if (data.status === 'success') {
           currentStore = data.store;
@@ -419,7 +449,7 @@
     // Fetch data from backend
     async function fetchDatabase() {
       try {
-        const response = await fetch('/api/db');
+        const response = await fetch(`${API_BASE}/api/db`, { headers: getAuthHeaders() });
         const data = await response.json();
         database = data;
         updateDashboard();

@@ -51,7 +51,7 @@ fun PurchasesScreen(
     onBack: () -> Unit,
     onAddPurchase: () -> Unit,
     onPurchaseClick: (Long) -> Unit,
-    onDeletePurchase: (Long) -> Unit,
+    onDeletePurchase: (Long, String) -> Unit,
     onRefresh: () -> Unit = {},
     isLoading: Boolean = false
 ) {
@@ -170,7 +170,7 @@ fun PurchasesScreen(
                         PurchaseListItem(
                             purchase = purchase,
                             onClick = { onPurchaseClick(purchase.id) },
-                            onDelete = { onDeletePurchase(purchase.id) }
+                            onDelete = { onDeletePurchase(purchase.id, purchase.serverId) }
                         )
                     }
                 }

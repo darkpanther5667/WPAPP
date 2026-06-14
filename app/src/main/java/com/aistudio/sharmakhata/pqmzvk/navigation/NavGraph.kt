@@ -76,7 +76,12 @@ fun AppNavGraph(
     // Drawer navigation handler
     val drawerNavigate: (String) -> Unit = { screen ->
         scope.launch { drawerState.close() }
-        when (screen) {
+        val targetRoute = when (screen) {
+            "dashboard" -> NavRoutes.HOME
+            "items" -> NavRoutes.INVENTORY
+            else -> screen
+        }
+        when (targetRoute) {
             "logout" -> {
                 SessionManager.clear(context)
                 navController.navigate(NavRoutes.LOGIN) {
@@ -91,7 +96,7 @@ fun AppNavGraph(
                 context.startActivity(Intent.createChooser(shareIntent, "Share via"))
             }
             else -> {
-                navController.navigate(screen) {
+                navController.navigate(targetRoute) {
                     popUpTo(navController.graph.startDestinationId) { saveState = true }
                     launchSingleTop = true
                     restoreState = true
@@ -381,8 +386,8 @@ fun AppNavGraph(
                         onCustomerClick = { customerId ->
                             navController.navigate(NavRoutes.customerDetail(customerId))
                         },
-                        onBillClick = { customerId, _ ->
-                            navController.navigate("bills/$customerId")
+                        onBillClick = { _, billId ->
+                            navController.navigate(NavRoutes.webviewPdf(billId))
                         }
                     )
                 }
@@ -394,7 +399,9 @@ fun AppNavGraph(
                         onCustomerClick = { customerId ->
                             navController.navigate(NavRoutes.customerDetail(customerId))
                         },
-                        onNavigateToSearch = { navController.navigate(NavRoutes.SEARCH) }
+                        onNavigateToSearch = { navController.navigate(NavRoutes.SEARCH) },
+                        onMenuClick = openDrawer,
+                        onBack = { navController.popBackStack() }
                     )
                 }
 
@@ -436,6 +443,7 @@ fun AppNavGraph(
                 composable(NavRoutes.INVENTORY) {
                     val invVm: InventoryViewModel = hiltViewModel()
                     val items by invVm.items.collectAsState()
+                    val itemsLoading by invVm.isLoading.collectAsState()
                     LaunchedEffect(Unit) { invVm.loadItems() }
                     ItemsScreen(
                         items = items,
@@ -444,7 +452,7 @@ fun AppNavGraph(
                         onEditItem = { id -> navController.navigate(NavRoutes.editItem(id)) },
                         onDeleteItem = { id -> invVm.deleteItem(id) },
                         onRefresh = { invVm.refreshItems() },
-                        isLoading = false,
+                        isLoading = itemsLoading,
                         onMenuClick = openDrawer
                     )
                 }
@@ -489,8 +497,23 @@ fun AppNavGraph(
                     LaunchedEffect(Unit) { billingVm.loadStoredItems() }
                     QuickBillScreen(
                         onBack = { navController.popBackStack() },
-                        onCreateBill = { name, phone, total, items ->
-                            billingVm.quickBill(context, name, phone, total, items)
+                        onCreateBill = { name, phone, total, items, gstType, gstRate, taxableAmount, totalCgst, totalSgst, totalIgst, grandTotal, invoiceNo, disc ->
+                            billingVm.quickBill(
+                                context = context,
+                                customerName = name,
+                                customerPhone = phone,
+                                total = total,
+                                items = items,
+                                gstType = gstType,
+                                gstRate = gstRate,
+                                taxableAmount = taxableAmount,
+                                totalCgst = totalCgst,
+                                totalSgst = totalSgst,
+                                totalIgst = totalIgst,
+                                grandTotal = grandTotal,
+                                invoiceNumber = invoiceNo,
+                                discount = disc
+                            )
                         },
                         operationState = operationState,
                         lastBillId = lastBillId,
@@ -506,7 +529,7 @@ fun AppNavGraph(
                     AddExpenseScreen(
                         onBack = { navController.popBackStack() },
                         onSave = { title, amount, category, note ->
-                            expVm.saveExpense(title, amount, category, note)
+                            expVm.saveExpense(title, amount, category, note, context)
                             navController.popBackStack()
                         }
                     )
@@ -523,7 +546,7 @@ fun AppNavGraph(
                         todayTotal = todayTotal,
                         onBack = { navController.popBackStack() },
                         onAddExpense = { navController.navigate(NavRoutes.ADD_EXPENSE) },
-                        onDeleteExpense = { id -> expVm.deleteExpense(id) },
+                        onDeleteExpense = { id, serverId -> expVm.deleteExpense(id, serverId, context) },
                         onMenuClick = openDrawer
                     )
                 }
@@ -539,7 +562,7 @@ fun AppNavGraph(
                         onBack = { navController.popBackStack() },
                         onAddPurchase = { navController.navigate(NavRoutes.ADD_PURCHASE) },
                         onPurchaseClick = { id -> navController.navigate(NavRoutes.purchaseDetail(id)) },
-                        onDeletePurchase = { id -> purchVm.deletePurchase(id) },
+                        onDeletePurchase = { id, serverId -> purchVm.deletePurchase(id, serverId, context) },
                         onRefresh = { purchVm.loadPurchases() },
                         isLoading = false
                     )
@@ -550,7 +573,7 @@ fun AppNavGraph(
                     AddPurchaseScreen(
                         onBack = { navController.popBackStack() },
                         onSave = { name, phone, items, total, paid, notes ->
-                            purchVm.savePurchase(name, phone, items, total, paid, notes)
+                            purchVm.savePurchase(name, phone, items, total, paid, notes, context)
                             navController.popBackStack()
                         }
                     )
@@ -567,7 +590,7 @@ fun AppNavGraph(
                     PurchaseDetailScreen(
                         purchase = purchase,
                         onBack = { navController.popBackStack() },
-                        onDelete = { purchVm.deletePurchase(it); navController.popBackStack() }
+                        onDelete = { purchVm.deletePurchase(it, purchase?.serverId ?: "", context); navController.popBackStack() }
                     )
                 }
 

@@ -57,6 +57,8 @@ fun BillCreationScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     var items by remember { mutableStateOf(listOf(BillItemEntry())) }
+    var invoiceNumber by remember { mutableStateOf("") }
+    var discountText by remember { mutableStateOf("") }
     var showSuccessDialog by remember { mutableStateOf(false) }
 
     // Stored items from server
@@ -516,8 +518,34 @@ fun BillCreationScreen(
                         }
                     }
 
+                    // Custom Invoice & Discount Inputs
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = invoiceNumber,
+                            onValueChange = { invoiceNumber = it },
+                            label = { Text("Invoice No. (Optional)") },
+                            modifier = Modifier.weight(1.5f),
+                            singleLine = true,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        OutlinedTextField(
+                            value = discountText,
+                            onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() || c == '.' }) discountText = it },
+                            label = { Text("Discount (₹)") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    }
+
                     // Totals Section
                     val totalAmount = calculateTotal()
+                    val discountAmount = discountText.toDoubleOrNull() ?: 0.0
+                    val grandTotal = (totalAmount - discountAmount).coerceAtLeast(0.0)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
@@ -532,6 +560,16 @@ fun BillCreationScreen(
                             ) {
                                 Text(stringResource(R.string.subtotal), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(FormatUtils.formatCurrency(totalAmount), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            }
+                            if (discountAmount > 0) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Discount", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("- " + FormatUtils.formatCurrency(discountAmount), style = MaterialTheme.typography.bodySmall, color = ErrorRed)
+                                }
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(
@@ -558,7 +596,7 @@ fun BillCreationScreen(
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    FormatUtils.formatCurrency(totalAmount),
+                                    FormatUtils.formatCurrency(grandTotal),
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
@@ -582,7 +620,17 @@ fun BillCreationScreen(
                             }
                         if (billItems.isNotEmpty()) {
                             val total = calculateTotal()
-                            viewModel.createBill(context, customerId, total, billItems)
+                            val discountAmount = discountText.toDoubleOrNull() ?: 0.0
+                            val grandTotal = (total - discountAmount).coerceAtLeast(0.0)
+                            viewModel.createBill(
+                                context = context, 
+                                customerId = customerId, 
+                                amount = grandTotal, 
+                                items = billItems,
+                                invoiceNumber = invoiceNumber.takeIf { it.isNotBlank() },
+                                discount = discountAmount,
+                                grandTotal = grandTotal
+                            )
                         }
                     },
                     modifier = Modifier
