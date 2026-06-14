@@ -245,7 +245,7 @@ fun LoginScreen(
                                                     val googleIdOption = GetGoogleIdOption.Builder()
                                                         .setFilterByAuthorizedAccounts(false)
                                                         .setServerClientId(context.getString(R.string.default_web_client_id))
-                                                        .setAutoSelectEnabled(true)
+                                                        .setAutoSelectEnabled(false)
                                                         .build()
                                                     val request = GetCredentialRequest.Builder()
                                                         .addCredentialOption(googleIdOption)
@@ -273,7 +273,7 @@ fun LoginScreen(
                                                 } catch (e: GetCredentialException) {
                                                     googleLoading = false
                                                     scope.launch {
-                                                        snackbarHostState.showSnackbar("Google Sign-In cancelled")
+                                                        snackbarHostState.showSnackbar("Google Sign-In error: ${e.message}")
                                                     }
                                                 } catch (e: Exception) {
                                                     googleLoading = false
